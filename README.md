@@ -25,22 +25,20 @@ This code is not ready for use. It may not even be ready for release.
 
 Overlord expects to be used alongside ASDF, with ASDF responsible for
 compiling and loading Lisp code, and Overlord doing everything else.
-(This works particularly well with ASDF’s `package-inferred-system`
-style.)
 
 Overlord is mostly independent of ASDF. It still, however, needs ASDF
-to resolve relative pathnames. Depending on ASDF in this respect is
-probably not unreasonable, since making it easy to locate a system’s
-file is what ASDF was designed for.
+to resolve relative pathnames in Lisp code. Depending on ASDF in this
+respect is probably not unreasonable, since making it easy to locate a
+system’s file is what ASDF was designed for.
 
 (Note that, while Overlord is mostly independent of ASDF the program,
 it still depends on ASDF the project, because it builds on the UIOP
 portability layer.)
 
-(Note that relying on ASDF means there is a discrepancy between path
-names in Overlord modules, which are relative to the file, and path
-names in Lisp files, which are relative to the system. This is
-unlikely to change.)
+(Note also that relying on ASDF means there is a discrepancy between
+path names in Overlord modules, which are relative to the file, and
+path names in Lisp files, which are relative to the system. This is,
+unfortunately, unlikely to change.)
 
 # Overlord vs. Redo
 
@@ -62,13 +60,12 @@ of dependencies.
 
 During development, as targets are defined and re-defined, or rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
-from the one specified by Overlord’s dependency graph. Such
-discrepancies are fine during development. Before dumping an image,
-however, they must be resolved. It is obviously undesirable, for
-example, for an image built on one machine to try to lazy-load a
-module on another machine where the source of that module is
-unavailable. (Actually it would be a disaster, since that source file
-might be provided maliciously.)
+from the one specified by Overlord’s dependency graph. Before dumping
+an image such discrepancies must be resolved. It is obviously
+undesirable, for example, for an image built on one machine to try to
+lazy-load a module on another machine where the source of that module
+is unavailable. (Actually it would be a disaster, since that source
+file might be provided maliciously.)
 
 Thus, before an image is saved, Overlord needs to do two things:
 
@@ -320,7 +317,8 @@ Nonetheless, examples are necessary, so here are a few:
 - Lots of tests.
 - More portability testing.
 - Leverage UIOP more.
-- Convenient logging protocol.
+- Convenient logging protocol/syntax.
+- More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
 - Centralize Overlord fasls.
 - More expressive syntax for imports. (Compare [R6RS][r6rs-imports].)
@@ -328,21 +326,18 @@ Nonetheless, examples are necessary, so here are a few:
 - Fewer dependencies.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el).)
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
-- A better name for the project?
 - Interfaces for modules?
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
 
 - A EBNF parser generator like [ragg][] or [Instaparse][].
-- A simple lexer for a shell-like syntax (like [shlex][]).
 - An [at-exp][] meta-language.
 - A working `#lang scheme`. (Compare [Pseudoscheme][]).
 - A language for literate programming.
 - A language with an ML-style type system.
 - `#lang shen`.
 - An array language.
-- `#lang snowball` (the [Snowball stemming language][Snowball]).
 - A unit-aware language (compare [Frink][]).
 - Any language or meta-language you care to implement.
 
@@ -390,3 +385,6 @@ You might want them again later. -->
 [Bawden]: https://people.csail.mit.edu/alan/mtt/
 [Frink]: https://frinklang.org
 [LoL]: http://www.letoverlambda.com/
+
+<!-- NB Don’t remove links, even if they’re not currently being used.
+You might want them again later. -->
