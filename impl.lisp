@@ -851,7 +851,9 @@ E.g. delete a file, unbind a variable."
            (lambda ()
              (let ((*building-root* t)
                    ;; `depends-on' needs it to be bound to something.
-                   (*base* #p"~/"))
+                   (*base*
+                     (or (bound-value '*base*)
+                         (user-homedir-pathname))))
                ;; (apply #'depends-on (list-all-targets))
                (~>> (list-all-targets)
                     shuffle*
