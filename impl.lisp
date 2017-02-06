@@ -1899,7 +1899,11 @@ instead."
                      ;; There is an external symbol, but it's not
                      ;; fbound.
                      (error* "No binding for reader in package ~a" p))
-                    (t sym))))))))
+                    (t
+                     (unless (eql (symbol-package sym) p)
+                       (simple-style-warning "Package reader ~a in ~a is inherited from ~a."
+                                             sym p (symbol-package sym)))
+                     sym))))))))
 
 (defun reintern (s &aux (p *package*))
   (let ((s (string s)))
@@ -1928,7 +1932,11 @@ instead."
                  (error* "Expander in package ~a is missing its binding" p))
                 ((not (macro-function sym))
                  (error* "Package ~a exports a non-macro expander" p))
-                (t sym)))))))
+                (t
+                 (unless (eql (symbol-package sym) p)
+                   (simple-style-warning "Package expander ~a in ~a is inherited from ~a."
+                                         sym p (symbol-package sym)))
+                 sym)))))))
 
 (defparameter *file-local-variables*
   '(*package* *readtable*
