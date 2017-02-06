@@ -134,6 +134,7 @@ Must be the name of a CL package.")
 (defvar overlord-mode-keymap
   (let ((m (make-sparse-keymap)))
     (define-key m (kbd "C-c C-k") 'overlord-compile-file)
+    (define-key m (kbd "C-c C-c") 'overlord-compile-file)
     (define-key m (kbd "C-c C-z") 'overlord-switch-repl)
     (define-key m (kbd "C-c C-i C-v") 'overlord-import-vars)
     (define-key m (kbd "C-c C-i C-f") 'overlord-import-fns)
