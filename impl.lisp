@@ -948,11 +948,13 @@ Don't know how to build missing prerequisite ~s."
             (task.init task)
             (task.deps task))))
 
-(defun build (target &key (errorp t) force)
+(defun build (&optional (target nil target-supplied?) &key (errorp t) force)
   (check-not-frozen)
-  (multiple-value-bind (target thunk deps)
-      (target-task-values target errorp)
-    (build-task target thunk deps :force force)))
+  (if target-supplied?
+      (multiple-value-bind (target thunk deps)
+          (target-task-values target errorp)
+        (build-task target thunk deps :force force))
+      (build root-target)))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
