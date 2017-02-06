@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>compile-to-file.lisp</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="all.html">
+                  all.lisp
+                </a>
+              
+                
+                <a class="source" href="base.html">
+                  base.lisp
+                </a>
+              
+                
+                <a class="source" href="compile-to-file.html">
+                  compile-to-file.lisp
+                </a>
+              
+                
+                <a class="source" href="file-package.html">
+                  file-package.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-lang.html">
+                  hash-lang.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-table-module.html">
+                  hash-table-module.lisp
+                </a>
+              
+                
+                <a class="source" href="http.html">
+                  http.lisp
+                </a>
+              
+                
+                <a class="source" href="impl.html">
+                  impl.lisp
+                </a>
+              
+                
+                <a class="source" href="makefile.html">
+                  makefile.lisp
+                </a>
+              
+                
+                <a class="source" href="module.html">
+                  module.lisp
+                </a>
+              
+                
+                <a class="source" href="parsers.html">
+                  parsers.lisp
+                </a>
+              
+                
+                <a class="source" href="safer-read.html">
+                  safer-read.lisp
+                </a>
+              
+                
+                <a class="source" href="scripts.html">
+                  scripts.lisp
+                </a>
+              
+                
+                <a class="source" href="shadows.html">
+                  shadows.lisp
+                </a>
+              
+                
+                <a class="source" href="similarity.html">
+                  similarity.lisp
+                </a>
+              
+                
+                <a class="source" href="simple-module.html">
+                  simple-module.lisp
+                </a>
+              
+                
+                <a class="source" href="specials.html">
+                  specials.lisp
+                </a>
+              
+                
+                <a class="source" href="types.html">
+                  types.lisp
+                </a>
+              
+                
+                <a class="source" href="universal.html">
+                  universal.lisp
+                </a>
+              
+                
+                <a class="source" href="util.html">
+                  util.lisp
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>compile-to-file.lisp</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>(<span class="hljs-name">defpackage</span> #<span class="hljs-symbol">:overlord/compile-to-file</span>
+  (<span class="hljs-symbol">:use</span> #<span class="hljs-symbol">:cl</span> #<span class="hljs-symbol">:alexandria</span> #<span class="hljs-symbol">:serapeum</span> #<span class="hljs-symbol">:overlord/specials</span>)
+  (<span class="hljs-symbol">:export</span> #<span class="hljs-symbol">:compile-to-file</span> #<span class="hljs-symbol">:load-as-module</span> <span class="hljs-symbol">:fasl-ext</span> <span class="hljs-symbol">:module</span>))
+(<span class="hljs-name">in-package</span> #<span class="hljs-symbol">:overlord/compile-to-file</span>)
+
+(<span class="hljs-name">defconst</span> no-module <span class="hljs-string">"no-module"</span>)
+
+(<span class="hljs-name">defun</span> module? (<span class="hljs-name">x</span>)
+  (<span class="hljs-name">not</span> (<span class="hljs-name">eq</span> x no-module)))
+
+(<span class="hljs-name">deftype</span> module ()
+  '(not (satisfies module?)))
+
+(<span class="hljs-name">defconst</span> fasl-ext
+  (<span class="hljs-name">pathname-type</span>
+   (<span class="hljs-name">compile-file-pathname</span>
+    <span class="hljs-string">"foo.lisp"</span>))
+  <span class="hljs-string">"The extension of a fasl in this Lisp."</span>)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>;; <a href="http://kpreid.livejournal.com/14713.html">http://kpreid.livejournal.com/14713.html</a></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>(<span class="hljs-name">def</span> universal-file (<span class="hljs-name">asdf</span><span class="hljs-symbol">:system-relative-pathname</span> <span class="hljs-symbol">:overlord</span> <span class="hljs-string">"universal.lisp"</span>))
+
+(<span class="hljs-name">defun</span> compile-to-file (<span class="hljs-name">program</span> output-file <span class="hljs-symbol">&amp;key</span> top-level)
+  <span class="hljs-string">"Compile PROGRAM to a fasl."</span>
+  (<span class="hljs-name">let</span> ((<span class="hljs-name">*program*</span>
+          (<span class="hljs-name">if</span> top-level
+              program
+              `(setq *module* ,program))))
+    (<span class="hljs-name">compile-file</span> universal-file
+                  <span class="hljs-symbol">:output-file</span> output-file
+                  <span class="hljs-symbol">:external-format</span> <span class="hljs-symbol">:utf-8</span>)))
+
+(<span class="hljs-name">defun</span> load-as-module (<span class="hljs-name">file</span>)
+  <span class="hljs-string">"Load FILE and return whatever it assigns to `*module*'."</span>
+  (<span class="hljs-name">let</span> ((<span class="hljs-name">*module*</span> no-module))
+    (<span class="hljs-name">load</span> file <span class="hljs-symbol">:external-format</span> <span class="hljs-symbol">:utf-8</span>)
+    (<span class="hljs-name">if</span> (<span class="hljs-name">module</span>? *module*)
+        *module*
+        (<span class="hljs-name">error</span> <span class="hljs-string">"No module in ~a"</span> file))))</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>scripts.lisp</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="all.html">
+                  all.lisp
+                </a>
+              
+                
+                <a class="source" href="base.html">
+                  base.lisp
+                </a>
+              
+                
+                <a class="source" href="compile-to-file.html">
+                  compile-to-file.lisp
+                </a>
+              
+                
+                <a class="source" href="file-package.html">
+                  file-package.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-lang.html">
+                  hash-lang.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-table-module.html">
+                  hash-table-module.lisp
+                </a>
+              
+                
+                <a class="source" href="http.html">
+                  http.lisp
+                </a>
+              
+                
+                <a class="source" href="impl.html">
+                  impl.lisp
+                </a>
+              
+                
+                <a class="source" href="makefile.html">
+                  makefile.lisp
+                </a>
+              
+                
+                <a class="source" href="module.html">
+                  module.lisp
+                </a>
+              
+                
+                <a class="source" href="parsers.html">
+                  parsers.lisp
+                </a>
+              
+                
+                <a class="source" href="safer-read.html">
+                  safer-read.lisp
+                </a>
+              
+                
+                <a class="source" href="scripts.html">
+                  scripts.lisp
+                </a>
+              
+                
+                <a class="source" href="shadows.html">
+                  shadows.lisp
+                </a>
+              
+                
+                <a class="source" href="similarity.html">
+                  similarity.lisp
+                </a>
+              
+                
+                <a class="source" href="simple-module.html">
+                  simple-module.lisp
+                </a>
+              
+                
+                <a class="source" href="specials.html">
+                  specials.lisp
+                </a>
+              
+                
+                <a class="source" href="types.html">
+                  types.lisp
+                </a>
+              
+                
+                <a class="source" href="universal.html">
+                  universal.lisp
+                </a>
+              
+                
+                <a class="source" href="util.html">
+                  util.lisp
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>scripts.lisp</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>(<span class="hljs-name">defpackage</span> #<span class="hljs-symbol">:overlord/scripts</span>
+  (<span class="hljs-symbol">:use</span> #<span class="hljs-symbol">:cl</span> <span class="hljs-symbol">:command-line-arguments</span> <span class="hljs-symbol">:serapeum</span>)
+  (<span class="hljs-symbol">:import-from</span> #<span class="hljs-symbol">:overlord</span> #<span class="hljs-symbol">:build</span> #<span class="hljs-symbol">:run</span>)
+  (<span class="hljs-symbol">:import-from</span> #<span class="hljs-symbol">:overlord/safer-read</span>
+    #<span class="hljs-symbol">:safer-read-from-string</span>)
+  (<span class="hljs-symbol">:import-from</span> <span class="hljs-symbol">:alexandria</span> <span class="hljs-symbol">:read-file-into-string</span>)
+  (<span class="hljs-symbol">:import-from</span> <span class="hljs-symbol">:uiop</span> <span class="hljs-symbol">:quit</span>)
+  (<span class="hljs-symbol">:export</span> #<span class="hljs-symbol">:main</span>))
+(<span class="hljs-name">in-package</span> #<span class="hljs-symbol">:overlord/scripts</span>)
+
+(<span class="hljs-name">defvar</span> *verbose* <span class="hljs-literal">nil</span>)
+
+(<span class="hljs-name">def</span> cli-spec
+  '(((<span class="hljs-string">"verbose"</span> #\v) :type boolean :optional <span class="hljs-literal">t</span> :documentation <span class="hljs-string">"be verbose"</span>)
+    ((<span class="hljs-string">"help"</span> #\h #\?) :type boolean :optional <span class="hljs-literal">t</span> :documentation <span class="hljs-string">"be helpful"</span>)
+    ((<span class="hljs-string">"version"</span> #\V) :type boolean :optional <span class="hljs-literal">t</span> :documentation <span class="hljs-string">"print version"</span>)
+    ((<span class="hljs-string">"system"</span>) :type string :optional <span class="hljs-literal">t</span> :documentation <span class="hljs-string">"name of ASDF system"</span>)
+    ((<span class="hljs-string">"package"</span>) :type string :optional <span class="hljs-literal">t</span> :documentation <span class="hljs-string">"name of Lisp package"</span>)))
+
+(<span class="hljs-name">defun</span> die (<span class="hljs-name">control</span> <span class="hljs-symbol">&amp;rest</span> args)
+  (<span class="hljs-name">format</span> <span class="hljs-literal">t</span> <span class="hljs-string">"Overlord: ~?~%"</span> control args)
+  (<span class="hljs-name">quit</span> <span class="hljs-number">-1</span>))
+
+(<span class="hljs-name">defun</span> out (<span class="hljs-name">control</span> <span class="hljs-symbol">&amp;rest</span> args)
+  (<span class="hljs-name">when</span> *verbose*
+    (<span class="hljs-name">format</span> <span class="hljs-literal">t</span> <span class="hljs-string">"Overlord: ~?~%"</span> control args)))
+
+(<span class="hljs-name">defun</span> maybe-muffle-warning (<span class="hljs-name">w</span>)
+  (<span class="hljs-name">unless</span> *verbose*
+    (<span class="hljs-name">muffle-warning</span> w)))
+
+(<span class="hljs-name">defun</span> print-version ()
+  (<span class="hljs-name">princ</span> (<span class="hljs-name">read-version</span>)))
+
+(<span class="hljs-name">defun</span> read-version ()
+  (<span class="hljs-name">read-file-into-string</span> (<span class="hljs-name">version-file</span>)))
+
+(<span class="hljs-name">defun</span> version-file ()
+  (<span class="hljs-name">asdf</span><span class="hljs-symbol">:system-relative-pathname</span> <span class="hljs-symbol">:overlord</span> <span class="hljs-string">"version.sexp"</span>))
+
+(<span class="hljs-name">defun</span> main (<span class="hljs-name">argv</span>)
+  (<span class="hljs-name">handle-command-line</span>
+   cli-spec
+   'handle-args
+   <span class="hljs-symbol">:command-line</span> argv
+   <span class="hljs-symbol">:name</span> <span class="hljs-string">"Overlord"</span>
+   <span class="hljs-symbol">:positional-arity</span> <span class="hljs-number">2</span>
+   <span class="hljs-symbol">:rest-arity</span> <span class="hljs-literal">nil</span>))
+
+(<span class="hljs-name">defun</span> handle-args (<span class="hljs-name">cmd</span> target <span class="hljs-symbol">&amp;key</span> ((<span class="hljs-symbol">:verbose</span> *verbose*) <span class="hljs-literal">nil</span>)
+                                    help version
+                                    ((<span class="hljs-symbol">:system</span> system-name) <span class="hljs-literal">nil</span>)
+                                    ((<span class="hljs-symbol">:package</span> package-name) <span class="hljs-literal">nil</span>))
+  (<span class="hljs-name">setf</span> package-name (<span class="hljs-name">or</span> package-name system-name))
+  (<span class="hljs-name">handler-bind</span> ((<span class="hljs-name">warning</span> #'maybe-muffle-warning))
+    (<span class="hljs-name">cond</span> (<span class="hljs-name">help</span>
+           (<span class="hljs-name">show-option-help</span> cli-spec <span class="hljs-symbol">:sort-names</span> <span class="hljs-literal">t</span>)
+           (<span class="hljs-name">quit</span>))
+          (<span class="hljs-name">version</span>
+           (<span class="hljs-name">print-version</span>)
+           (<span class="hljs-name">quit</span>))
+          ((<span class="hljs-name">equal</span> cmd <span class="hljs-string">"build"</span>)
+           (<span class="hljs-name">let</span> ((<span class="hljs-name">target</span> (<span class="hljs-name">safer-read-from-string</span> target)))
+             (<span class="hljs-name">build</span> target)
+             (<span class="hljs-name">out</span> <span class="hljs-string">"Built ~a.~%"</span> target)))
+          ((<span class="hljs-name">equal</span> cmd <span class="hljs-string">"run"</span>)
+           (<span class="hljs-name">multiple-value-bind</span> (<span class="hljs-name">target</span> system-name package)
+               (<span class="hljs-name">run</span> target system-name package-name)
+             (<span class="hljs-name">out</span> <span class="hljs-string">"Built target ~s in system ~s (package ~s).~%"</span>
+                  target system-name package)))
+          (<span class="hljs-name">t</span> (<span class="hljs-name">die</span> <span class="hljs-string">"Invalid cmd: ~a~%"</span> cmd)))))</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

@@ -1,0 +1,5 @@
+#!/usr/bin/cl -Q -s overlord/scripts -E main
+;;; -*- mode:lisp -*-
+
+(defun main (argv)
+  (overlord/scripts:main argv))

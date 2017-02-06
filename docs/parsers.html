@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>parsers.lisp</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="all.html">
+                  all.lisp
+                </a>
+              
+                
+                <a class="source" href="base.html">
+                  base.lisp
+                </a>
+              
+                
+                <a class="source" href="compile-to-file.html">
+                  compile-to-file.lisp
+                </a>
+              
+                
+                <a class="source" href="file-package.html">
+                  file-package.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-lang.html">
+                  hash-lang.lisp
+                </a>
+              
+                
+                <a class="source" href="hash-table-module.html">
+                  hash-table-module.lisp
+                </a>
+              
+                
+                <a class="source" href="http.html">
+                  http.lisp
+                </a>
+              
+                
+                <a class="source" href="impl.html">
+                  impl.lisp
+                </a>
+              
+                
+                <a class="source" href="makefile.html">
+                  makefile.lisp
+                </a>
+              
+                
+                <a class="source" href="module.html">
+                  module.lisp
+                </a>
+              
+                
+                <a class="source" href="parsers.html">
+                  parsers.lisp
+                </a>
+              
+                
+                <a class="source" href="safer-read.html">
+                  safer-read.lisp
+                </a>
+              
+                
+                <a class="source" href="scripts.html">
+                  scripts.lisp
+                </a>
+              
+                
+                <a class="source" href="shadows.html">
+                  shadows.lisp
+                </a>
+              
+                
+                <a class="source" href="similarity.html">
+                  similarity.lisp
+                </a>
+              
+                
+                <a class="source" href="simple-module.html">
+                  simple-module.lisp
+                </a>
+              
+                
+                <a class="source" href="specials.html">
+                  specials.lisp
+                </a>
+              
+                
+                <a class="source" href="types.html">
+                  types.lisp
+                </a>
+              
+                
+                <a class="source" href="universal.html">
+                  universal.lisp
+                </a>
+              
+                
+                <a class="source" href="util.html">
+                  util.lisp
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>parsers.lisp</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>(<span class="hljs-name">defpackage</span> #<span class="hljs-symbol">:overlord/parsers</span>
+  (<span class="hljs-symbol">:use</span> #<span class="hljs-symbol">:cl</span> #<span class="hljs-symbol">:alexandria</span> #<span class="hljs-symbol">:serapeum</span>)
+  (<span class="hljs-symbol">:import-from</span> #<span class="hljs-symbol">:named-readtables</span>
+    #<span class="hljs-symbol">:find-readtable</span>)
+  (<span class="hljs-symbol">:import-from</span> <span class="hljs-symbol">:overlord/hash-lang</span> <span class="hljs-symbol">:skip-hash-lang</span>)
+  (<span class="hljs-symbol">:export</span> #<span class="hljs-symbol">:slurp-stream</span> #<span class="hljs-symbol">:slurp-file</span>)
+  (<span class="hljs-symbol">:documentation</span> <span class="hljs-string">"Trivial parsers."</span>))
+(<span class="hljs-name">in-package</span> #<span class="hljs-symbol">:overlord/parsers</span>)
+
+(<span class="hljs-name">defconst</span> eof <span class="hljs-string">"eof"</span>)
+
+(<span class="hljs-name">defun</span> slurp-stream (<span class="hljs-name">in</span>
+                     <span class="hljs-symbol">&amp;key</span> (<span class="hljs-name">readtable</span> <span class="hljs-symbol">:standard</span>)
+                          (<span class="hljs-name">package</span> <span class="hljs-symbol">:cl-user</span>)
+                          (<span class="hljs-name">read-eval</span> <span class="hljs-literal">nil</span>)
+                          (<span class="hljs-name">read-base</span> <span class="hljs-number">10</span>)
+                          (<span class="hljs-name">read-default-float-format</span> 'single-float))
+  (<span class="hljs-name">skip-hash-lang</span> in)
+  (<span class="hljs-name">with-standard-io-syntax</span>
+    (<span class="hljs-name">let</span> ((<span class="hljs-name">*readtable*</span>                 (<span class="hljs-name">find-readtable</span> readtable))
+          (<span class="hljs-name">*package*</span>                   (<span class="hljs-name">find-package</span> package))
+          (<span class="hljs-name">*read-eval*</span>                 read-eval)
+          (<span class="hljs-name">*read-base*</span>                 read-base)
+          (<span class="hljs-name">*read-default-float-format*</span> read-default-float-format))
+      (<span class="hljs-name">loop</span> for form = (<span class="hljs-name">read</span> in <span class="hljs-literal">nil</span> eof)
+            until (<span class="hljs-name">eq</span> form eof)
+            collect form))))
+
+(<span class="hljs-name">defun</span> slurp-file (<span class="hljs-name">file</span> <span class="hljs-symbol">&amp;rest</span> args <span class="hljs-symbol">&amp;key</span> <span class="hljs-symbol">&amp;allow-other-keys</span>)
+  (<span class="hljs-name">with-input-from-file</span> (<span class="hljs-name">in</span> file)
+    (<span class="hljs-name">apply</span> #'slurp-stream in args)))</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
