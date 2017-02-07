@@ -21,6 +21,9 @@ in [impl.lisp](impl.lisp); the rest is support.)
 When I say “experimental”, I mean it. Anything may change at any time.
 This code is not ready for use. It may not even be ready for release.
 
+Before loading Overlord, it would be a good idea to make sure you are
+running the latest version of [ASDF][].
+
 # Overlord vs. ASDF
 
 Overlord expects to be used alongside ASDF, with ASDF responsible for
@@ -29,7 +32,7 @@ compiling and loading Lisp code, and Overlord doing everything else.
 Overlord is mostly independent of ASDF. It still, however, needs ASDF
 to resolve relative pathnames in Lisp code. Depending on ASDF in this
 respect is probably not unreasonable, since making it easy to locate a
-system’s file is what ASDF was designed for.
+system’s files is what ASDF was designed for.
 
 (Note that, while Overlord is mostly independent of ASDF the program,
 it still depends on ASDF the project, because it builds on the UIOP
@@ -110,9 +113,9 @@ reader*. The symbol named `module-progn` is the *package expander*.
 
 The important thing: when the package’s reader is called, that same
 package is also bound as the *current* package. It is then the
-responsibility of the reader to make sure any symbols it reads in are
-interned in the correct package. (There is a shortcut for this,
-`overlord:reintern`.)
+responsibility of the reader to make sure any symbols it reads in, or
+inserts into the expansion, are interned in the correct package. (There
+is a shortcut for this, `overlord:reintern`.)
 
 (There is one exception to the rule of *language=package*. If another
 package exists, having the same name, but ending in `-user`, and this
@@ -347,7 +350,7 @@ You might want them again later. -->
 [Lisp1.5]: http://www.softwarepreservation.org/projects/LISP/lisp15_family#Lisp_15_Programmers_Manual_
 [phase separation]: http://www.phyast.pitt.edu/~micheles/scheme/scheme21.html
 [language tower]: www.phyast.pitt.edu/~micheles/scheme/scheme22.html
-[ASDF]: common-lisp.net/project/asdf/
+[ASDF]: https://common-lisp.net/project/asdf/
 [Racket]: https://racket-lang.org/
 [Redo]: https://github.com/apenwarr/redo
 [implicit phasing]: http://www.cs.indiana.edu/~dyb/pubs/implicit-phasing.pdf
