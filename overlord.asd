@@ -23,5 +23,5 @@
                #:overlord/lang/sweet-exp
                #:overlord/lang/s-exp)
   :perform (test-op (o s)
-                    (uiop:symbol-call :overlord-tests '#:run-all-tests))
+                    (uiop:symbol-call :overlord-tests '#:run-overlord-tests))
   :components ((:file "tests")))
