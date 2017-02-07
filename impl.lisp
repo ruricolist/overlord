@@ -855,10 +855,7 @@ E.g. delete a file, unbind a variable."
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
-               ;; (apply #'depends-on (list-all-targets))
-               (~>> (list-all-targets)
-                    shuffle*
-                    (map nil #'depends-on))))))
+               (depends-on-all/unordered (list-all-targets))))))
     ((or bindable-symbol pathname)
      (gethash target *tasks*))
     (directory-ref
@@ -1068,6 +1065,9 @@ Don't know how to build missing prerequisite ~s."
   "Build DEPS in no particular order.
 If any of DEPS is a list, its elements will also be added in no
 particular order."
+  (depends-on-all/unordered deps))
+
+(defun depends-on-all/unordered (deps)
   ;; NB This is where you would add parallelism.
   (assert (boundp '*base*))
   (~>> deps
@@ -1079,6 +1079,9 @@ particular order."
 (defun depends-on* (&rest deps)
   "Build DEPS in the order they are supplied.
 If any of DEPS is a list, it will be descended into."
+  (depends-on-all/ordered deps))
+
+(defun depends-on-all/ordered (deps)
   (assert (boundp '*base*))
   (~> deps
       (flatten-deps *base*)
@@ -1144,8 +1147,6 @@ value and NEW do not match under TEST."
                 `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(depends-on* ,x ,@xs))
-              (:depends-on-all (xs)
-                `(depends-on-all ,xs))
               (:package-exists (name &key use nicknames)
                 `(package-ref ,name :use ,use :nicknames ,nicknames))
               (:directory-exists (name)
