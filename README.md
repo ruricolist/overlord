@@ -323,7 +323,6 @@ Nonetheless, examples are necessary, so here are a few:
 - Convenient logging protocol/syntax.
 - More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
-- Centralize Overlord fasls.
 - More expressive syntax for imports. (Compare [R6RS][r6rs-imports].)
 - Better names for definition forms (e.g. `defconst/deps`).
 - Fewer dependencies.

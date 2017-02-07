@@ -33,7 +33,8 @@
   (:import-from :uiop
     :implementation-identifier
     :with-temporary-file
-    :rename-file-overwriting-target)
+    :rename-file-overwriting-target
+    :xdg-cache-home)
   ;; How to escape names for use in pathnames.
   (:import-from :quri :url-encode)
   (:import-from :cl-custom-hash-table
@@ -1556,25 +1557,28 @@ interoperation with Emacs."
   (check-type lang-name lang-name)
   (url-encode (string lang-name) :encoding :utf-8))
 
-(defun fasl-dir (lang)
-  (let ((impl-id (implementation-identifier))
-        (lang-string (escape-lang-name lang)))
-    `(:relative ".overlord"
-                "fasls"
-                ,(fmt "~a" *fasl-version*)
-                ,impl-id
-                ;; XXX Package? TODO
-                ,lang-string)))
+(defun lang-fasl-dir (lang current-dir)
+  (let ((version-string (fmt "v~a" *fasl-version*))
+        (lang-string (escape-lang-name lang))
+        (suffix
+          (make-pathname :directory
+                         (cons :relative
+                               (drop-while #'keywordp
+                                           (pathname-directory current-dir))))))
+    (xdg-cache-home "overlord"
+                    version-string
+                    :implementation
+                    lang-string
+                    suffix)))
 
 (defun faslize (lang pathname)
   (etypecase-of lang lang
     (package (faslize (package-name-keyword lang) pathname))
     (lang-name
      (merge-pathnames*
-      (make-pathname :directory (fasl-dir lang)
-                     :name (pathname-name pathname)
+      (make-pathname :name (pathname-name pathname)
                      :type fasl-ext)
-      pathname))))
+      (lang-fasl-dir lang pathname)))))
 
 (defun fasl? (pathname)
   (equal (pathname-type pathname)
@@ -2288,14 +2292,14 @@ actually exported by the module specified by LANG and SOURCE."
             ((or function-alias macro-alias)
              (second module)))))
     `(deftask ,task-name
-         (progn
-           (require-as ',as ,from)
-           ;; Put this back if we ever allow non-lazy loaded modules again.
-           #+ () ,(let ((req-form `(require-as ',as ,from)))
-                    (if lazy
-                        req-form
-                        `(setf ,module ,req-form)))
-           (update-value-bindings ,module ,@values)))))
+       (progn
+         (require-as ',as ,from)
+         ;; Put this back if we ever allow non-lazy loaded modules again.
+         #+ () ,(let ((req-form `(require-as ',as ,from)))
+                  (if lazy
+                      req-form
+                      `(setf ,module ,req-form)))
+         (update-value-bindings ,module ,@values)))))
 
 (defmacro update-value-bindings (module &body values)
   `(progn
