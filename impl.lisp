@@ -843,7 +843,7 @@ E.g. delete a file, unbind a variable."
     ((or directory-ref package-ref pattern-ref module-cell)
      (setf (target-table-member *all-targets* target) nil))))
 
-(defun find-task (target)
+(defun find-saved-task (target)
   (check-not-frozen)
   (etypecase-of target target
     (root-target
@@ -931,7 +931,7 @@ Don't know how to build missing prerequisite ~s."
 
 (defun target-task (target &optional (errorp t))
   (check-not-frozen)
-  (or (find-task target)
+  (or (find-saved-task target)
       (cond ((symbolp target)
              (if (boundp target)
                  (task target (constantly nil) (constantly nil))
