@@ -82,6 +82,7 @@
   (:depends-on +literal-string-file+))
 
 (test const/deps
+  (sleep 1)
   (local
     (def original #.+literal-string+)
     (touch +literal-string-file+)
