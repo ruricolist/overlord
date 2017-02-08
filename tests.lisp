@@ -129,5 +129,5 @@
   (touch "tests/factorial.lsp")
   (is
    (= 2432902008176640000
-      (overlord:with-imports (factorializer :from "tests/factorial.lsp" :binding (#'factorial))
-        (factorial 20)))))
+      (overlord:with-imports (factorializer :from "tests/factorial.lsp" :binding (#'fact))
+        (fact 20)))))

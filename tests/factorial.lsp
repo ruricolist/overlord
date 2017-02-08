@@ -1,8 +1,8 @@
 #lang overlord/lang/sweet-exp overlord/simple-module
 
-(:export #'factorial)
+(:export #'fact)
 
-defun factorial (n)
+defun fact (n)
   if {n <= 1}
     1
     {n * factorial{n - 1}}
