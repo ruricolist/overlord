@@ -1089,12 +1089,16 @@ If any of DEPS is a list, it will be descended into."
   (values))
 
 (defun flatten-deps (base deps)
-  ;; We want lists of dependencies to be flattened.
-  (let ((deps (mappend #'ensure-list deps)))
-    ;; A single target may resolve into multiple dependencies (e.g.
-    ;; patterns), but only to one level.
-    (assure (list-of atom)
-      (mappend (op (ensure-list (resolve-target _ base))) deps))))
+  (assure sequence
+    (etypecase-of sequence deps
+      (list
+       ;; We want lists of dependencies to be flattened.
+       (let ((deps (mappend #'ensure-list deps)))
+         ;; A single target may resolve into multiple dependencies (e.g.
+         ;; patterns), but only to one level.
+         (assure (list-of atom)
+           (mappend (op (ensure-list (resolve-target _ base))) deps))))
+      (sequence deps))))
 
 (defun call/temp-file (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
@@ -2442,7 +2446,7 @@ actually exported by the module specified by LANG and SOURCE."
                                   ((:binding bindings))
                                   values
                                   prefix
-                             &allow-other-keys)
+                                  &allow-other-keys)
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
@@ -2465,7 +2469,7 @@ the symbols bound in the body of the import form."
                                      &key
                                        ((:binding bindings))
                                        values
-                                     &allow-other-keys))
+                                       &allow-other-keys))
   (declare (ignore body))
   `(defpackage ,package-name
      (:use)
@@ -2480,7 +2484,7 @@ the symbols bound in the body of the import form."
                                                 (&rest body
                                                  &key ((:binding bindings))
                                                       values
-                                                 &allow-other-keys))
+                                                      &allow-other-keys))
   (let ((p (assure package (find-package package-name))))
     (labels ((intern* (sym)
                (intern (string sym) p))
