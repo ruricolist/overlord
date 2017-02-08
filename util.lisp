@@ -7,7 +7,8 @@
     :pathname-parent-directory-pathname
     :file-exists-p
     :run-program
-    :native-namestring)
+    :native-namestring
+    :ensure-pathname)
   (:export
    #:package-exports
    #:locate-dominating-file
@@ -19,7 +20,8 @@
    #:find-external-symbol
    #:coerce-case
    #:eval*
-   #:dx-sxhash))
+   #:dx-sxhash
+   #:ensure-pathnamef))
 (cl:in-package #:overlord/util)
 
 (defun package-exports (p)
@@ -112,3 +114,8 @@ then we set its value inside a critical section."
     `(let ((,temp ,expr))
        (declare (dynamic-extent ,temp))
        (sxhash ,temp))))
+
+(defsubst ensure-pathname* (x)
+  (ensure-pathname x :want-pathname t))
+
+(define-modify-macro ensure-pathnamef () ensure-pathname*)

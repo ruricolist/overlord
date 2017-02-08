@@ -53,6 +53,7 @@
    :etypecase                           ;Use etypecase-of instead.
    :ctypecase                           ;Use ctypecase-of instead.
    :file-write-date                     ;Use file-mtime instead.
+   :pathname                            ;Use ensure-pathname.
    )
   (:export
    ;; Defining and building targets.
@@ -106,6 +107,9 @@
 
 
 ;;; Shadows and preferred alternatives.
+
+(deftype pathname ()
+  'cl:pathname)
 
 ;;; Resolve literal relative pathnames in macro bodies at compile
 ;;; time.
@@ -314,6 +318,7 @@ Lisp/OS/filesystem combinations that support it."
   "Make a pattern reference, or a list of pattern references."
   ;; TODO Should this be absolute?
   ;; Shouldn't this complain about relative vs. absolute?
+  (ensure-pathnamef file)
   (assure (or pattern-ref (list-of pattern-ref))
     (if (wild-pathname-p file)
         (mapcar (op (pattern-ref pattern _))
@@ -366,7 +371,7 @@ forever."))
          `(module-cell ,(lang-name lang) ,path))
         ((or (quoted-symbol? lang) (keywordp lang))
          (typecase-of (or string pathname) path
-           (string `(module-cell ,lang ,(pathname path)))
+           (string `(module-cell ,lang ,(ensure-pathname path :want-pathname t)))
            (pathname
             (let ((path (resolve-target path (base)))) ;Resolve now, while `*base*' is bound.
               `(load-time-value
@@ -1089,16 +1094,12 @@ If any of DEPS is a list, it will be descended into."
   (values))
 
 (defun flatten-deps (base deps)
-  (assure sequence
-    (etypecase-of sequence deps
-      (list
-       ;; We want lists of dependencies to be flattened.
-       (let ((deps (mappend #'ensure-list deps)))
-         ;; A single target may resolve into multiple dependencies (e.g.
-         ;; patterns), but only to one level.
-         (assure (list-of atom)
-           (mappend (op (ensure-list (resolve-target _ base))) deps))))
-      (sequence deps))))
+  ;; We want lists of dependencies to be flattened.
+  (let ((deps (mappend #'ensure-list deps)))
+    ;; A single target may resolve into multiple dependencies (e.g.
+    ;; patterns), but only to one level.
+    (assure (list-of atom)
+      (mappend (op (ensure-list (resolve-target _ base))) deps))))
 
 (defun call/temp-file (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
@@ -1146,11 +1147,21 @@ value and NEW do not match under TEST."
 ;
 ;;; Keyword macros
 
+(defun path (path)
+  (~> path
+      (ensure-pathname :want-pathname t)
+      (merge-pathnames (base))))
+
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
                 `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(depends-on* ,x ,@xs))
+              (:path (path)
+                (assure pathname
+                  (path path)))
+              (:file (file)
+                `(:path ,file))
               (:package-exists (name &key use nicknames)
                 `(package-ref ,name :use ,use :nicknames ,nicknames))
               (:directory-exists (name)
@@ -1181,7 +1192,8 @@ value and NEW do not match under TEST."
   (let ((init
           `(let ((*base* ,(base)))
              (with-defaults-from-base
-               ,init))))
+               (with-keyword-macros
+                 ,init)))))
     `(progn
        (eval-always
          (define-global-var ,name
@@ -1292,9 +1304,7 @@ rebuilt."
        ',name)))
 
 (defmacro file-target (name pathname (tmp) &body (init . deps))
-  ;; An exception to the general rule that a file must always be
-  ;; specified as a pathname.
-  (setf pathname (pathname pathname))
+  (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (setf pathname (resolve-target pathname (base)))
   (with-script-dependency (name init deps)
@@ -1313,8 +1323,7 @@ rebuilt."
        ',pathname)))
 
 (defmacro directory-target (name pathname &body (init . deps))
-  ;; Another exception.
-  (setf pathname (pathname pathname))
+  (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (setf pathname (resolve-target pathname (base)))
   (check-type pathname directory-pathname)
@@ -1514,6 +1523,7 @@ Incrementing this should be sufficient to invalidate old fasls.")
   (push mc *module-chain*))
 
 (defun %require-as (lang source *base* &rest args)
+  (ensure-pathnamef source)
   (with-defaults-from-base
     (apply #'dynamic-require-as
            lang
@@ -1551,7 +1561,7 @@ interoperation with Emacs."
           (resolve-lang lang))
         (source
           (assure absolute-pathname
-            (pathname source))))
+            (ensure-pathname source))))
     (dynamic-require-as lang source)
     (values)))
 
@@ -1590,8 +1600,8 @@ interoperation with Emacs."
          fasl-ext))
 
 (defun load-module (lang source)
-  (let* ((source (pathname source))
-         (*base* source))
+  (ensure-pathnamef source)
+  (let ((*base* source))
     (with-defaults-from-base
       (load-fasl-lang lang source))))
 
@@ -1633,7 +1643,7 @@ if it does not exist."
 (defun module-cell (lang path)
   (let ((path
           (assure absolute-pathname
-            (merge-input-defaults lang (pathname path))))
+            (merge-input-defaults lang (ensure-pathname path :want-pathname t))))
         (lang (lang-name lang)))
     (%ensure-module-cell lang path)))
 
@@ -1760,12 +1770,12 @@ The input defaults override PATH where they conflict."
         (build (module-cell lang source))
         (load-fasl-lang lang source)))))
 
-(defmethod lang-deps ((lang package) (source pathname))
+(defmethod lang-deps ((lang package) (source cl:pathname))
   (let* ((pat (fasl-lang-pattern lang source))
          (ref (pattern-ref pat source)))
     (depends-on ref)))
 
-(defmethod unbuild-lang-deps ((lang package) (source pathname))
+(defmethod unbuild-lang-deps ((lang package) (source cl:pathname))
   (delete-file-if-exists (faslize lang source)))
 
 (defun lang-name (lang)
@@ -1966,7 +1976,7 @@ This should be a superset of the variables bound by CL during calls to
                       &aux (file-locals *file-local-variables*))
   (let* ((package (resolve-package package))
          (*language* (lang-name package))
-         (source (pathname source))
+         (source (ensure-pathname source :want-pathname t))
          (*source* source))
     (with-input-from-source (in source)
       (progv file-locals (mapcar #'symbol-value file-locals)
@@ -2135,8 +2145,10 @@ the #lang declaration ends."
       (setf (gethash module table) new-value))))
 
 (defun resolve-lang+source (lang source module base &optional env)
-  (setf source (macroexpand source env))
-  (flet ((resolve-source (source) (merge-pathnames* source base)))
+  (setf source (macroexpand source env)) ;Allow a symbol macro as the source.
+  (flet ((resolve-source (source)
+           (merge-pathnames* (ensure-pathname source :want-pathname t)
+                             base)))
     (cond
       ;; We have the source and the language.
       ((and source lang)
