@@ -1792,7 +1792,9 @@ The input defaults override PATH where they conflict."
         :init (lambda ()
                 ;; TODO Should we reset the deps first?
                 (let ((*source* *input*)
-                      (*language* (lang-name lang)))
+                      (lang (lang-name lang))
+                      (*language* lang)
+                      (*package* (user-package (resolve-package lang))))
                   (compile-to-file
                    (~> (expand-module lang *input*)
                        (wrap-current-module lang *input*))
