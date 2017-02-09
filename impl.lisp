@@ -2424,7 +2424,6 @@ actually exported by the module specified by LANG and SOURCE."
 (defmacro import/local (mod &body (&key from as binding values prefix)
                         &environment env)
   (mvlet* ((lang source (resolve-lang+source as from mod (base) env))
-           (import-form `(load-module/lazy ',lang ,source))
            (bindings values
             (bindings+values binding values
                              :lang lang
@@ -2434,15 +2433,7 @@ actually exported by the module specified by LANG and SOURCE."
     ;; give the module a local binding and not have to look it up
     ;; every time.
     `(progn
-       ,(etypecase-of import-alias mod
-          (var-alias
-           `(overlord/shadows:define-symbol-macro ,mod ,import-form))
-          (function-alias
-           (let ((fn (second mod)))
-             `(overlord/shadows:defun ,fn (&rest args)
-                (apply ,import-form args))))
-          (macro-alias
-           (error 'module-as-macro :name (second mod))))
+       (import-module/lazy ,mod :as ',lang :from ,source)
        (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
