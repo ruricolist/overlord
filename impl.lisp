@@ -2421,10 +2421,15 @@ actually exported by the module specified by LANG and SOURCE."
       (make-keyword import)
       (make-keyword (second import))))
 
-(defmacro import/local (mod &body (&key from as binding values)
+(defmacro import/local (mod &body (&key from as binding values prefix)
                         &environment env)
   (mvlet* ((lang source (resolve-lang+source as from mod (base) env))
-           (import-form `(load-module/lazy ',lang ,source)))
+           (import-form `(load-module/lazy ',lang ,source))
+           (bindings values
+            (bindings+values binding values
+                             :lang lang
+                             :source source
+                             :prefix prefix)))
     ;; TODO If we knew that no macros were being imported, we could
     ;; give the module a local binding and not have to look it up
     ;; every time.
@@ -2438,7 +2443,7 @@ actually exported by the module specified by LANG and SOURCE."
                 (apply ,import-form args))))
           (macro-alias
            (error 'module-as-macro :name (second mod))))
-       (import-bindings ,mod ,@binding)
+       (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
 (defmacro with-imports ((mod &key from as binding values) &body body)
