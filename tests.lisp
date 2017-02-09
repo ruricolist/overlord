@@ -132,3 +132,15 @@
    (= 2432902008176640000
       (overlord:with-imports (factorializer :from "tests/factorial.lsp" :binding (#'fact))
         (fact 20)))))
+
+
+;;; Prefixes and renaming.
+
+(test party
+  ;; Reproduces an example from the R6RS spec.
+  (touch "tests/party/party.lisp")
+  (overlord:with-imports (party :from "tests/party/party.lisp" :binding :all-as-functions)
+    (let ((p (make-party)))
+      (is (equal (pop! p) "Boom! 108"))
+      (push! p (push* (make 5 5) 1))
+      (is (equal (pop! p) "Boom! 24")))))

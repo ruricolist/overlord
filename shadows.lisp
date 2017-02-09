@@ -35,7 +35,12 @@
 
    #:eval
    #:apply
-   #:funcall)
+   #:funcall
+
+   #:push
+   #:pop
+
+   #:import)
   (:export
    :def :define-values
    :defalias :defsubst
@@ -138,3 +143,12 @@
 
 (defsubst funcall (function &rest args)
   (cl:apply #'cl:funcall function args))
+
+(defmacro push (value place)
+  `(cl:push ,value ,place))
+
+(defmacro pop (place)
+  `(cl:pop ,place))
+
+(defun import (sym-or-syms &optional (package *package*))
+  (cl:import sym-or-syms package))

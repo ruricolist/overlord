@@ -5,10 +5,15 @@
   (:import-from :serapeum :op :car-safe :keep)
   (:import-from :overlord/module :module-ref :module-ref* :module-exports)
   (:import-from :overlord/parsers :slurp-stream :slurp-file)
+  (:import-from :overlord/impl :with-imports)
   (:export
    :read-module :module-progn
    :simple-module
    :static-exports))
+
+(defpackage :overlord/simple-module-user
+  (:use :overlord/simple-module :overlord/shadows))
+
 (in-package :overlord/simple-module)
 
 (defun read-module (source stream)
@@ -19,9 +24,22 @@
 (defmacro module-progn (&body body)
   (let* ((export-forms (keep :export body :key #'car-safe))
          (exports (mappend #'rest export-forms))
-         (body (remove-if (op (member _ export-forms)) body)))
-    `(simple-module ,exports
-       ,@body)))
+
+         (import-forms (keep :import body :key #'car-safe))
+         (import-specs (mapcar #'rest import-forms))
+
+         (body (remove-if (lambda (form)
+                            (or (member form export-forms)
+                                (member form import-forms)))
+                          body))
+
+         (module-form
+           `(simple-module ,exports
+              ,@body)))
+    (reduce (curry #'list 'with-imports)
+            import-specs
+            :initial-value module-form
+            :from-end t)))
 
 (defun static-exports (source)
   (let* ((forms (slurp-file source))
