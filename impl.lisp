@@ -2440,14 +2440,15 @@ actually exported by the module specified by LANG and SOURCE."
        (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
-(defmacro with-imports ((mod &key from as binding values) &body body)
+(defmacro with-imports ((mod &key from as binding values prefix) &body body)
   "A version of `import' with local scope."
   `(local*
      (import/local ,mod
        :from ,from
        :as ,as
        :binding ,binding
-       :values ,values)
+       :values ,values
+       :prefix ,prefix)
      (progn ,@body)))
 
 (defmacro import-as-package (package-name
