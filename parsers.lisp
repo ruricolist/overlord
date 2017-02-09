@@ -11,7 +11,7 @@
 
 (defun slurp-stream (in
                      &key (readtable :standard)
-                          (package :cl-user)
+                          (package *package*)
                           (read-eval nil)
                           (read-base 10)
                           (read-default-float-format 'single-float))
