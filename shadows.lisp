@@ -31,6 +31,8 @@
    #:list
    #:list*
 
+   #:caar #:cddr #:cadr #:cdar
+
    #:eval
    #:apply
    #:funcall)
@@ -92,25 +94,32 @@
 (deftype cons (&optional x y)
   `(cl:cons ,x ,y))
 
-(defmacro trivial-shadow (sym args)
-  (let* ((name (symbol-name sym))
-         (cl-sym (find-symbol name :cl)))
-    (unless cl-sym
-      (error "No such symbol in CL: ~a" name))
-    `(defsubst ,sym ,args
-       (,cl-sym ,@args))))
+(defsubst cons  (x y) (cl:cons x y))
+(defsubst car   (x)   (cl:car x))
+(defsubst first (x)   (cl:first x))
+(defsubst cdr   (x)   (cl:cdr x))
+(defsubst rest  (x)   (cl:rest x))
 
-(defmacro trivial-shadows (&body body)
+(defsubst set-car! (x val) (setf (cl:car x) val))
+(defsubst set-cdr! (x val) (setf (cl:cdr x) val))
+
+(defsetf car   set-car!)
+(defsetf first set-car!)
+(defsetf cdr   set-cdr!)
+(defsetf rest  set-cdr!)
+
+(defmacro define-cxr (name &rest path)
   `(progn
-     ,@(mapply (serapeum:op `(trivial-shadow ,_ ,_))
-               (batches body 2))))
+     (defsubst ,name (x)
+       ,(reduce #'cl:list path :initial-value 'x :from-end t))
+     (defsetf name (x) (v)
+       (let ((acc (reduce #'cl:list ',path :initial-value x :from-end t)))
+         `(setf ,acc ,v)))))
 
-(trivial-shadows
-  cons (x y)
-  car (x)
-  cdr (x)
-  first (x)
-  rest (x))
+(define-cxr caar car car)
+(define-cxr cddr cdr cdr)
+(define-cxr cadr car cdr)
+(define-cxr cdar cdr car)
 
 (deftype list ()
   'cl:list)
