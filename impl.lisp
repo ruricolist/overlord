@@ -1517,10 +1517,10 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defun save-module-dependency (mc)
   (check-type mc module-cell)
-  (assert (boundp '*module-chain*))
-  (when-let (prev (first *module-chain*))
-    (pushnew mc (module-deps prev)))
-  (push mc *module-chain*))
+  (when (boundp '*module-chain*)
+    (when-let (prev (first *module-chain*))
+      (pushnew mc (module-deps prev)))
+    (push mc *module-chain*)))
 
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
@@ -2291,6 +2291,7 @@ actually exported by the module specified by LANG and SOURCE."
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
+  (save-module-dependency (module-cell as from))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias
@@ -2435,7 +2436,7 @@ actually exported by the module specified by LANG and SOURCE."
     ;; give the module a local binding and not have to look it up
     ;; every time.
     `(progn
-       (import-module/lazy ,mod :as ',lang :from ,source)
+       (import-module/lazy ,mod :as ,lang :from ,source)
        (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
