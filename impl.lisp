@@ -1006,8 +1006,10 @@ Don't know how to build missing prerequisite ~s."
            ;; Wait to check FORCE until after DEPS has been evaluated, in
            ;; case it has side effects.
            (or force
-               ;; NB Just because it's never been built doesn't
-               ;; mean it has no dependencies.
+               ;; Checking if the target has *ever* been built also
+               ;; has to wait until after DEPS has been evaluated.
+               ;; Just because it's never been built doesn't mean it
+               ;; has no dependencies.
                (or (eql timestamp never)
                    (some (op (timestamp-newer? _ timestamp))
                          (mapcar #'target-timestamp deps))))))
