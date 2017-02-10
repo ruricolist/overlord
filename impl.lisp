@@ -1779,10 +1779,11 @@ The input defaults override PATH where they conflict."
   (delete-file-if-exists (faslize lang source)))
 
 (defun lang-name (lang)
-  (etypecase-of (or keyword lang-name package) lang
-    (keyword lang)
-    (lang-name (make-keyword lang))
-    (package (package-name-keyword lang))))
+  (assure lang-name
+    (etypecase-of (or keyword lang-name package) lang
+      (keyword lang)
+      (lang-name (make-keyword lang))
+      (package (package-name-keyword lang)))))
 
 (defun fasl-lang-pattern (lang source)
   (make 'pattern
