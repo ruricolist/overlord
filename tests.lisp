@@ -37,6 +37,14 @@
 
 ;;; Utilities.
 
+;;; Force reload whenever run.
+(defmacro with-imports* ((mod &rest args &key from as &allow-other-keys) &body body)
+  `(progn
+     (touch ,from)
+     (require-as ,as ,from)
+     (with-imports (,mod ,@args)
+       ,@body)))
+
 (defun resolve-file (file)
   (uiop:native-namestring
    (if (absolute-pathname-p file)
@@ -112,25 +120,22 @@
 ;;; JS demo.
 
 (test js-demo
-  (touch "demo/demo1.js")
   (is
    (equal "moooooooooooo"
-          (overlord:with-imports (demo1 :from "demo/demo1.js" :binding (#'moo))
+          (with-imports* (demo1 :from "demo/demo1.js" :binding (#'moo))
             (moo 5)))))
 
 ;;; Meta-languages.
 
 (test s-exp
-  (touch "tests/s-exp-test.sexp")
   (is (= 42
-         (overlord:with-imports (answer :from "tests/s-exp-test.sexp")
+         (with-imports* (answer :from "tests/s-exp-test.sexp")
            answer))))
 
 (test sweet-exp
-  (touch "tests/factorial.lsp")
   (is
    (= 2432902008176640000
-      (overlord:with-imports (factorializer :from "tests/factorial.lsp" :binding (#'fact))
+      (with-imports* (factorializer :from "tests/factorial.lsp" :binding (#'fact))
         (fact 20)))))
 
 
@@ -138,8 +143,7 @@
 
 (test party
   ;; Reproduces an example from the R6RS spec.
-  (touch "tests/party/party.lisp")
-  (overlord:with-imports (party :from "tests/party/party.lisp" :binding :all-as-functions)
+  (with-imports* (party :from "tests/party/party.lisp" :binding :all-as-functions)
     (let ((p (make-party)))
       (is (equal (pop! p) "Boom! 108"))
       (push! p (push* (make 5 5) 1))
