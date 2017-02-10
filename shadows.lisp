@@ -40,11 +40,14 @@
    #:push
    #:pop
 
-   #:import)
+   #:import
+
+   #:make)
   (:export
    :def :define-values
    :defalias :defsubst
-   :defconst :define-constant)
+   :defconst :define-constant
+   :make)
   (:import-from :serapeum :batches :mapply)
   (:use-reexport :cl)
   (:documentation "Just like CL, except that some forms are shadowed
@@ -152,3 +155,6 @@
 
 (defun import (sym-or-syms &optional (package *package*))
   (cl:import sym-or-syms package))
+
+(defsubst make (class &rest initargs &key &allow-other-keys)
+  (apply #'serapeum:make class initargs))
