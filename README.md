@@ -184,18 +184,18 @@ The package must at least export a binding for one of `read-module`,
 for direct use, or `module-progn`, for use with a meta-language.
 Preferably, it would export both.
 
-There are other special exports. For example, if there is a function
-binding for `module-static-exports`, it is used, unsurprisingly, to
-statically determine the module’s exports.
+There are other special exports. For example, if the package has a
+function binding for `module-static-exports`, it is used,
+unsurprisingly, to statically determine the module’s exports.
 
-## Imports and exports.
+## Imports and exports
 
 Overlord is very liberal about what can be a module. In Overlord, any
 value can be a module – a string, a function, a hash table, anything –
 and any module can provide exports as long as it specializes certain
 generic functions, like `module-ref`.
 
-Most of the time, however, what you want is `simple-module` (see below).
+(Most of the time, however, what you want is [`simple-module`](#simple-modules).)
 
 What Overlord imports and exports are not values, but bindings. Bindings
 are indirect (and immutable): they refer to the module, rather than to
