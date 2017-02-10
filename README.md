@@ -24,6 +24,33 @@ This code is not ready for use. It may not even be ready for release.
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
+# Language examples
+
+Although Overlord is a general-purpose build system, and does anything
+you might want a build system to do, its most common use is likely to
+be as a module system for embedding other languages into Common Lisp.
+
+Here are some example language embeddings:
+
+1. [overlord/demo/js](demo/js.lisp). A simple demo language built
+   on [CL-JavaScript][]. Shows how to convert an existing CL language
+   implementation to work with Overlord.
+
+2. [Bosom Serpent][]. Shows how to wrap a foreign runtime (Python,
+   using [burgled-batteries][]) as an Overlord module.
+
+3. [cl-yesql][]. Lisp port of Clojure’s [yesql][]. Includes a parser,
+   and shows how (and why) to load the same file in different
+   languages.
+
+4. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets.
+   Shows how to combine Overlord’s support for languages with direct
+   use of the build system.
+
+5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
+   dialect [ISLISP][] (itself a conceptual subset of Common Lisp).
+   Shows how to use Overlord to build “language towers.”
+
 # Overlord vs. ASDF
 
 Overlord expects to be used alongside ASDF, with ASDF responsible for
@@ -281,39 +308,6 @@ This version of Core Lisp lives in [its own repository][Core Lisp].
 
 How macro exports are supported is one aspect of the Overlord module
 system that is very likely to change.
-
-# Language examples
-
-Examples in general are hard. I think closures and macros are useful,
-but I would have trouble producing an example of a problem that could
-only be solved with closures, or a problem that could only be solved
-with macros. The value of abstractions on the order of closures or
-macros is not in solving any particular problem, but in the fluency
-gained by having a single solution to a wide range of superficially
-heterogenous problems. Likewise, I define languages all the time, but
-most of them are too simple to serve as good examples.
-
-Nonetheless, examples are necessary, so here are a few:
-
-1. [overlord/demo/js](demo/js.lisp). A simple demo language built
-   on [CL-JavaScript][]. It should succinctly illustrate the
-   challenges of converting an existing CL language implementation to
-   work with Overlord.
-
-2. [Bosom Serpent][]. Shows how to wrap a foreign runtime (Python,
-   using [burgled-batteries][]) as an Overlord module.
-
-3. [cl-yesql][]. Lisp port of Clojure’s [yesql][]. Includes a parser,
-   and shows how (and why) to load the same file in different
-   languages.
-
-4. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets.
-   Shows how to combine Overlord’s support for languages with direct
-   use of the build system.
-
-5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
-   dialect [ISLISP][] (itself a conceptual subset of Common Lisp),
-   hopefully suitable as a base for building “language towers.”
 
 # Future work
 
