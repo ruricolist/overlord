@@ -1791,13 +1791,14 @@ The input defaults override PATH where they conflict."
         ;; Bear in mind *input* may have been resolved.
         :init (lambda ()
                 ;; TODO Should we reset the deps first?
-                (let ((*source* *input*)
-                      (lang (lang-name lang))
-                      (*language* lang)
-                      (*package* (user-package (resolve-package lang))))
+                (let* ((*source* *input*)
+                       (lang (lang-name lang))
+                       (*language* lang)
+                       (*package* (user-package (resolve-package lang))))
                   (compile-to-file
-                   (~> (expand-module lang *input*)
-                       (wrap-current-module lang *input*))
+                   (wrap-current-module
+                    (expand-module lang *input*)
+                    lang *input*)
                    (ensure-directories-exist *output*)
                    :top-level (package-compile-top-level? lang)))
                 (save-module-deps lang *input*))
