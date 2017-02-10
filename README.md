@@ -13,7 +13,7 @@ can use the build system without knowing about the module system.
 Overlord is experimental. Trying to document the API at this stage
 would be futile. Instead, this README discusses the concepts behind
 Overlord. If you’re looking for the current syntax, consult
-the [test suite](test.lisp) and the files it uses in `test/`.
+the [test suite](tests.lisp) and the [files it uses](tests/).
 
 (If you are interested in reading the code, the substance is
 in [impl.lisp](impl.lisp); the rest is support.)
