@@ -2462,7 +2462,7 @@ actually exported by the module specified by LANG and SOURCE."
                                   ((:binding bindings))
                                   values
                                   prefix
-                                  &allow-other-keys)
+                             &allow-other-keys)
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
@@ -2485,7 +2485,7 @@ the symbols bound in the body of the import form."
                                      &key
                                        ((:binding bindings))
                                        values
-                                       &allow-other-keys))
+                                     &allow-other-keys))
   (declare (ignore body))
   `(defpackage ,package-name
      (:use)
@@ -2500,7 +2500,7 @@ the symbols bound in the body of the import form."
                                                 (&rest body
                                                  &key ((:binding bindings))
                                                       values
-                                                      &allow-other-keys))
+                                                 &allow-other-keys))
   (let ((p (assure package (find-package package-name))))
     (labels ((intern* (sym)
                (intern (string sym) p))
