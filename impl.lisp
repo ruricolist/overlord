@@ -906,11 +906,11 @@ E.g. delete a file, unbind a variable."
                (with-defaults-from-base
                  ;; Depend on the source file.
                  (depends-on (.source target))
-                 ;; Let the language tell you what else to depend on.
-                 (lang-deps (.lang target) (.source target))
                  ;; The stashed recursive dependencies of the module.
                  (dolist (dep (module-deps target))
-                   (depends-on dep)))))))))
+                   (depends-on dep))
+                 ;; Let the language tell you what else to depend on.
+                 (lang-deps (.lang target) (.source target)))))))))
 
 (defcondition no-such-task (overlord-error)
   ((target :type target :initarg :target :reader .target))
