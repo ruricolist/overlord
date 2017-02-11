@@ -24,6 +24,10 @@ This code is not ready for use. It may not even be ready for release.
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
+Note that, to run the test suite, you will need to
+download [Core Lisp][], and you must have the `touch` program in your
+search path.
+
 # Language examples
 
 Although Overlord is a general-purpose build system, and does anything

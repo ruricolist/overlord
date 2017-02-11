@@ -152,3 +152,49 @@
       (is (equal (pop! p) "Boom! 108"))
       (push! p (push* (make 5 5) 1))
       (is (equal (pop! p) "Boom! 24")))))
+
+
+;;; Core Lisp.
+
+(def-suite islisp :in overlord)
+
+(in-suite islisp)
+
+(test hello-islisp
+  (is (equal "hello world"
+             (with-imports* (m :from "tests/islisp/islisp.lsp" :binding (hello))
+               hello))))
+
+(test islisp-dont-be-shadowed
+  (is (equal '(:right :right :right)
+             (with-imports* (m :from "tests/islisp/dont-be-shadowed.lsp" :binding (syms (xyz #'expand-xyz)))
+               (destructuring-bind (x y z) syms
+                 (eval
+                  `(let ((,x :wrong)) (declare (ignorable ,x))
+                     (flet ((,y () :wrong)) (declare (ignore #',y))
+                       (macrolet ((,z () :wrong))
+                         ,(expand-xyz nil nil))))))))))
+
+(test islisp-imports
+  (is (equal '(:var :fn :macro) (require-as nil "tests/islisp/imports.lsp"))))
+
+(test islisp-auto-alias
+  (is (equal '(0 1) (require-as nil "tests/islisp/shadowing.lsp"))))
+
+(test islisp-hygiene
+  (touch #1="tests/islisp/hygiene.lsp")
+  ;; Not the desired results, just the ones we expect.
+  (handler-bind ((warning #'muffle-warning))
+    (is (equal '(4 6 :ERROR 4 16 :ERROR) (require-as nil #1#)))))
+
+(test islisp-globals-can-close
+  "Test that globals defined with `defglobal' close over themselves."
+  (with-imports* (m :from "tests/islisp/globals-can-close.lsp" :binding (x))
+    (is (eql x (funcall x)))))
+
+(test islisp-phasing
+  "Test that state is not preserved across rebuilds."
+  (overlord:require-as :core-lisp #1="tests/islisp/phasing.lsp")
+  (with-imports* (m :from #1# :binding (#'inc-count))
+    (is (= (inc-count) 0))))
+
