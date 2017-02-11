@@ -1620,11 +1620,59 @@ interoperation with Emacs."
       (load-fasl-lang lang source))))
 
 (defun module-static-exports (lang source)
+  (ensure-static-exports lang source)
+  (assure list
+    (snarf-static-exports lang source)))
+
+(defun ensure-static-exports (lang source)
+  (let ((*base* source))
+    (~> lang
+        (static-exports-pattern source)
+        (pattern-ref source)
+        build)))
+
+(defun extract-static-exports (lang source)
   (check-type source absolute-pathname)
   (let ((lang (resolve-lang-package lang)))
     (if-let (sym (find-external-symbol 'static-exports lang))
       (funcall sym source)
       (module-exports (dynamic-require-as lang source)))))
+
+(defun static-exports-pattern (lang source)
+  ;; The static export file depends on the fasl.
+  (let* ((ref (fasl-lang-pattern-ref lang source))
+         (fasl (faslize lang source))
+         (ext (extension "static-exports"))
+         (output (merge-pathnames* ext fasl)))
+    (make 'pattern
+          :name (symbolicate (lang-name lang) '| (static exports)|)
+          :output-defaults output
+          :init (lambda ()
+                  (save-static-exports lang source))
+          :deps (lambda ()
+                  (depends-on ref)))))
+
+(defun snarf-static-exports (lang source)
+  (let ((file (static-exports-file lang source)))
+    (assert (file-exists-p file))
+    (with-input-from-file (in file)
+      (read in))))
+
+(defun save-static-exports (lang source)
+  (let ((exports (extract-static-exports lang source))
+        (file (static-exports-file lang source)))
+    (with-output-to-file (out file :if-exists :supersede)
+      (write exports :stream out :readably t))))
+
+(def static-exports-extension (extension "static-exports"))
+
+(defun static-exports-file (lang source)
+  (merge-pathnames*
+   static-exports-extension
+   (faslize lang source)))
+
+(defun module-dynamic-exports (lang source)
+  (module-exports (dynamic-require-as lang source)))
 
 ;;; Module cells.
 
@@ -1799,6 +1847,10 @@ The input defaults override PATH where they conflict."
       (lang-name (make-keyword lang))
       (package (package-name-keyword lang)))))
 
+;;; Why not (here and for static-exports-pattern) use defpattern?
+;;; Because defpattern takes defaults specified as a pathname, and
+;;; uses merge-pathnames* to combine said defaults with the input.
+
 (defun fasl-lang-pattern (lang source)
   (make 'pattern
         :name (lang-name lang)
@@ -1820,6 +1872,9 @@ The input defaults override PATH where they conflict."
         :deps (lambda ()
                 (loop for dep in (module-static-dependencies lang *input*) do
                   (depends-on dep)))))
+
+(defun fasl-lang-pattern-ref (lang source)
+  (pattern-ref (fasl-lang-pattern lang source) source))
 
 (defun save-module-deps (lang source)
   (setf lang (lang-name lang))
