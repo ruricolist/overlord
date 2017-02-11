@@ -24,9 +24,14 @@
 
 ;;; Running tests.
 (defun run-overlord-tests ()
+  ;; Use a ridiculous fasl version so we can be reasonably sure
+  ;; everything is being compiled clean.
   (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
-        (fiveam:*on-error* :debug))
-    (run! 'overlord)))
+        (fiveam:*on-error* :debug)
+        (overlord/impl::*fasl-version* most-positive-fixnum))
+    (unwind-protect
+         (run! 'overlord)
+      (overlord/impl::delete-versioned-fasls))))
 
 ;;; Internal use.
 (defun debug-test (test)
@@ -40,7 +45,6 @@
 ;;; Force reload whenever run.
 (defmacro with-imports* ((mod &rest args &key from as &allow-other-keys) &body body)
   `(progn
-     (touch ,from)
      (require-as ,as ,from)
      (with-imports (,mod ,@args)
        ,@body)))

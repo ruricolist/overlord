@@ -1474,10 +1474,22 @@ depends on that."
 ;;; language is an abstract relationship between a file and Lisp
 ;;; binding.
 
+(deftype fasl-version () '(integer 1 *))
+
 (defparameter *fasl-version* 1
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
-(declaim (type (integer 1 *) *fasl-version*))
+(declaim (type fasl-version *fasl-version*))
+
+(defun delete-versioned-fasls (&optional (version *fasl-version*))
+  (uiop:delete-directory-tree
+   (fasl-version-dir version)
+   :validate (op (subpathp _ (xdg-cache-home)))))
+
+(defun fasl-version-dir (&optional (version *fasl-version*))
+  (check-type version fasl-version)
+  (ensure-directory-pathname
+   (xdg-cache-home "overlord" (fmt "v~a" version))))
 
 ;;; Module dependencies: when compiling module X requires module Y,
 ;;; save the information that X depends on Y so Y can be checked when
