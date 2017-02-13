@@ -2,14 +2,6 @@ Overlord is an experimental build/module system for Common Lisp,
 inspired by [Redo][] and [Racket][]. It is not another `defsystem`,
 but a completely new approach.
 
-A phrase like “inspired by Redo and Racket” needs unpacking. Overlord has
-a stratified design. The bottom layer is a build system, inspired by
-Redo. What makes Overlord different is that its dependency graph allows
-both files and Lisp bindings as targets. The top layer is a module
-system, inspired by Racket, for embedding languages into Lisp. You can
-use the module system without knowing about the build system; you
-can use the build system without knowing about the module system.
-
 Overlord is experimental. Trying to document the API at this stage
 would be futile. Instead, this README discusses the concepts behind
 Overlord. If you’re looking for the current syntax, consult
@@ -33,6 +25,11 @@ search path.
 Although Overlord is a general-purpose build system, and does anything
 you might want a build system to do, its most common use is likely to
 be as a module system for embedding other languages into Common Lisp.
+
+An Overlord language embedding means more than using Lisp as a
+runtime; it means that modules written in the hosted language can be
+used in ordinary Lisp programs, and even (for languages implemented in
+Lisp) from modules written in other languages.
 
 Here are some example language embeddings:
 
@@ -76,6 +73,14 @@ unfortunately, unlikely to change.)
 
 # Overlord vs. Redo
 
+A phrase like “inspired by Redo and Racket” needs unpacking. Overlord has
+a stratified design. The bottom layer is a build system, inspired by
+Redo. What makes Overlord different is that its dependency graph allows
+both files and Lisp bindings as targets. The top layer is a module
+system, inspired by Racket, for embedding languages into Lisp. You can
+use the module system without knowing about the build system; you
+can use the build system without knowing about the module system.
+
 The most obvious, but least important, difference between Overlord and
 Redo is that Redo uses shell scripts, while Overlord’s “scripts” are
 written in Lisp. (It is unimportant because, after all, you can run
@@ -90,7 +95,7 @@ target: one for building the target, and another for computing its
 dependencies. This (mostly) replaces the need to maintain a database
 of dependencies.
 
-# Overlord and images
+# Overlord and Lisp images
 
 During development, as targets are defined and re-defined, or rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
