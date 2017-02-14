@@ -342,7 +342,7 @@ Lisp/OS/filesystem combinations that support it."
     :initarg :source
     :type (and file-pathname tame-pathname)
     :reader .source
-    :reader module-cell-source
+    :accessor module-cell-source
     :reader module-source)
    (meta
     :initform nil
@@ -788,7 +788,7 @@ E.g. delete a file, unbind a variable."
              (clrhash (symbol-value '*tasks*))
              (clrhash (symbol-value '*patterns*))
              (clrhash (symbol-value '*module-deps*))
-             (clrhash (symbol-value '*module-cells*))
+             (clear-module-cells)
              (clrhash (symbol-value '*claimed-module-names*))
              (dolist (fn '(unfreeze build unbuild run dynamic-require-as))
                (fmakunbound fn))))
@@ -1683,6 +1683,17 @@ interoperation with Emacs."
 
 (defun list-module-cells ()
   (hash-table-values *module-cells*))
+
+(defun clear-module-cells ()
+  "Delete information not needed at runtime from module cells."
+  ;; We don't actually clear the table because there may be cases
+  ;; where expansion of compiler macros has been suppressed by
+  ;; optimization settings and there is no reference to the module
+  ;; cell.
+  (maphash (lambda (k mc) (declare (ignore k))
+             (setf (module-cell-source mc) *nil-pathname*
+                   (.timestamp mc) never))
+           *module-cells*))
 
 (defun %ensure-module-cell (lang path)
   "Get the module cell for LANG and PATH, creating and interning one
