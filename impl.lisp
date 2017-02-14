@@ -271,13 +271,13 @@ Lisp/OS/filesystem combinations that support it."
                      :use-list use-list))
 
 (defclass pattern-ref (ref)
-  ;; Note that the pattern slot has no type: a pattern ref can be
+  ;; Note that the pattern slot has a silly type: a pattern ref can be
   ;; either a symbol or an instance of `pattern', which is not yet
   ;; defined. Being able to directly pass in patterns will be useful
   ;; later when we bootstrap support for languages.
   ((pattern
     :initarg :pattern
-    :type t
+    :type (or symbol standard-object)
     :accessor .pattern)
    (name
     :type pathname
