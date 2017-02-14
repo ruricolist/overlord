@@ -1476,7 +1476,7 @@ depends on that."
 
 (deftype fasl-version () '(integer 1 *))
 
-(defparameter *fasl-version* 1
+(defparameter *fasl-version* 2
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type fasl-version *fasl-version*))
@@ -1655,14 +1655,12 @@ interoperation with Emacs."
 (defun snarf-static-exports (lang source)
   (let ((file (static-exports-file lang source)))
     (assert (file-exists-p file))
-    (with-input-from-file (in file)
-      (read in))))
+    (read-file-form file)))
 
 (defun save-static-exports (lang source)
   (let ((exports (extract-static-exports lang source))
         (file (static-exports-file lang source)))
-    (with-output-to-file (out file :if-exists :supersede)
-      (write exports :stream out :readably t))))
+    (write-form-as-file exports file)))
 
 (def static-exports-extension (extension "static-exports"))
 
@@ -1891,26 +1889,14 @@ The input defaults override PATH where they conflict."
   (setf lang (lang-name lang))
   (let* ((mc (module-cell lang source))
          (deps (module-deps mc))
-         (file (deps-file lang source)))
-    (with-output-to-file (s file :if-exists :supersede)
-      (with-standard-io-syntax
-        (loop for mc in deps
-              for lang = (.lang mc)
-              for source = (.source mc)
-              do (write (list lang source)
-                        :stream s
-                        :readably t))))))
+         (file (deps-file lang source))
+         (deps-table (mapcar (juxt #'.lang #'.source) deps)))
+    (write-form-as-file deps-table file)))
 
 (defun snarf-module-deps (lang source)
   (let ((file (deps-file lang source)))
-    (when (file-exists-p file)
-      (with-input-from-file (s file :if-does-not-exist nil)
-        (and s
-             (with-standard-io-syntax
-               (loop for form = (read s nil nil)
-                     while form
-                     for (lang source) = form
-                     collect (module-cell lang source))))))))
+    (mapply #'module-cell
+            (read-file-form file))))
 
 (defun module-static-dependencies (lang source)
   (snarf-module-deps lang source))

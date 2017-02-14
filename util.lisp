@@ -21,7 +21,9 @@
    #:coerce-case
    #:eval*
    #:dx-sxhash
-   #:ensure-pathnamef))
+   #:ensure-pathnamef
+   #:read-file-form
+   #:write-form-as-file))
 (cl:in-package #:overlord/util)
 
 (defun package-exports (p)
@@ -119,3 +121,24 @@ then we set its value inside a critical section."
   (ensure-pathname x :want-pathname t))
 
 (define-modify-macro ensure-pathnamef () ensure-pathname*)
+
+(defun read-file-form (file)
+  (when (file-exists-p file)
+    (with-standard-io-syntax
+      (with-open-file (in file :direction :input
+                               :if-does-not-exist nil)
+        (when in
+          (prog1 (read in)
+            (ignoring end-of-file
+              (read in)
+              (error "More than one form in ~a" file))))))))
+
+(defun write-form-as-file (form file)
+  (with-standard-io-syntax
+    (with-open-file (out file
+                         :direction :output
+                         ;; It is possible, when using :supersede, for
+                         ;; the old timestamp to be preserved.
+                         :if-exists :rename-and-delete)
+      (write form :stream out
+                  :readably t))))
