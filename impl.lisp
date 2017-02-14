@@ -1870,6 +1870,8 @@ The input defaults override PATH where they conflict."
                 (let* ((*source* *input*)
                        (lang (lang-name lang))
                        (*language* lang)
+                       ;; Must be bound here for macros that intern
+                       ;; symbols.
                        (*package* (user-package (resolve-package lang))))
                   (compile-to-file
                    (wrap-current-module
