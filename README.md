@@ -95,6 +95,14 @@ target: one for building the target, and another for computing its
 dependencies. This (mostly) replaces the need to maintain a database
 of dependencies.
 
+## A word of warning
+
+One thing that might not be obvious about Redo-style build systems is
+that they afford unusually good opportunities for parallelism.
+Although Overlord does not (yet) support parallelism, it tries to
+discourage reliance on side effects by, whenever possible, randomizing
+the order in which targets are built.
+
 # Overlord and Lisp images
 
 During development, as targets are defined and re-defined, or rebuilt
