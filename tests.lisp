@@ -142,6 +142,10 @@
       (with-imports* (factorializer :from "tests/factorial.lsp" :binding (#'fact))
         (fact 20)))))
 
+(test import-as-function
+  (is (= 2432902008176640000
+         (with-imports* (#'fact :from "tests/import-as-function.lsp")
+           (fact 20)))))
 
 ;;; Prefixes and renaming.
 

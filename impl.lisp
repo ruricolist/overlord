@@ -2370,7 +2370,8 @@ actually exported by the module specified by LANG and SOURCE."
        (let ((fn (second module)))
          `(progn
             (declaim (notinline ,fn))
-            (overlord/shadows:defun ,fn () ,lazy-load))))
+            (overlord/shadows:defun ,fn (&rest args)
+              (apply ,lazy-load args)))))
       (macro-alias
        (error 'module-as-macro :name (second module))))))
 
