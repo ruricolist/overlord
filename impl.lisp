@@ -2244,6 +2244,13 @@ the #lang declaration ends."
           (required-argument :as)
           (required-argument :from))))))
 
+(defun imports-with-module-as-function-not-supported (mod bindings values)
+  (when (and (typep mod 'function-alias)
+             (or bindings values))
+    (error* "~
+Binding imports (~a) from a module imported as a function (~a) is not currently supported."
+            (append bindings values) mod)))
+
 (defmacro import (module &body (&key
                                   ((:as lang))
                                   ((:from source))
@@ -2267,6 +2274,8 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                          :lang lang
                          :source source
                          :prefix prefix))
+
+  (imports-with-module-as-function-not-supported module bindings values)
 
   (let ((lazy? (null values)))
     `(progn
@@ -2503,6 +2512,7 @@ actually exported by the module specified by LANG and SOURCE."
                              :lang lang
                              :source source
                              :prefix prefix)))
+    (imports-with-module-as-function-not-supported mod bindings values)
     ;; TODO If we knew that no macros were being imported, we could
     ;; give the module a local binding and not have to look it up
     ;; every time.

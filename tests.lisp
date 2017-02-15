@@ -3,6 +3,7 @@
   (:mix :overlord/shadows :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as)
   (:import-from :overlord/impl :target-timestamp)
+  (:import-from :overlord/types :overlord-error)
   (:import-from :local-time :now)
   (:import-from :uiop :absolute-pathname-p)
   ;; Languages.
@@ -146,6 +147,17 @@
   (is (= 2432902008176640000
          (with-imports* (#'fact :from "tests/import-as-function.lsp")
            (fact 20)))))
+
+;;; This test doesn't work in SBCL.
+#-sbcl
+(test import-as-function-with-exports
+  (signals overlord-error
+    (compile nil
+             '(cl:lambda ()
+               (= 2432902008176640000
+                (with-imports* (#'m :from "tests/import-as-function.lsp" :binding (#'fact))
+                  (fact 20)))))))
+
 
 ;;; Prefixes and renaming.
 
