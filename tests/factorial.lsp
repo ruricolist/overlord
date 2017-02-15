@@ -1,6 +1,6 @@
 #lang overlord/lang/sweet-exp overlord/simple-module
 
-(:export #'fact)
+:export #'fact
 
 defun fact (n)
   if {n <= 1}
