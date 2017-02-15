@@ -40,7 +40,8 @@
    #:function-alias
    #:macro-alias
    #:binding-spec
-   #:binding-designator))
+   #:binding-designator
+   #:canonical-binding))
 
 (in-package :overlord/types)
 
@@ -187,9 +188,9 @@
   '(or non-keyword
     function-spec
     macro-spec
-    (tuple non-keyword export-alias)
-    (tuple function-spec export-alias)
-    (tuple macro-spec export-alias)))
+    (tuple non-keyword :as export-alias)
+    (tuple function-spec :as export-alias)
+    (tuple macro-spec :as export-alias)))
 
 ;;; Imports.
 
@@ -201,10 +202,13 @@
 (deftype binding-spec ()
   '(or (member :all :all-as-functions) list))
 
+(deftype canonical-binding ()
+  '(tuple keyword import-alias))
+
 (deftype binding-designator ()
   '(or atom
     function-alias
     macro-alias
-    (tuple symbol import-alias)
-    (tuple (tuple 'function symbol) import-alias)
-    (tuple (tuple 'macro-function symbol) import-alias)))
+    (tuple symbol :as import-alias)
+    (tuple (tuple 'function symbol) :as import-alias)
+    (tuple (tuple 'macro-function symbol) :as import-alias)))

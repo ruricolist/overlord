@@ -45,10 +45,7 @@
   (let* ((forms (slurp-file source))
          (export-forms (keep :export forms :key #'car))
          (exports (mappend #'rest export-forms)))
-    (loop for export in exports
-          if (listp export)
-            collect (second export)
-          else collect export)))
+    (mapcar #'export-keyword exports)))
 
 
 
@@ -57,10 +54,10 @@
     (etypecase-of export-spec spec
       (non-keyword (make-keyword spec))
       (function-spec (export-keyword (second spec)))
-      ((or (tuple non-keyword export-alias)
-           (tuple function-spec export-alias))
-       (make-keyword (second spec)))
-      ((or macro-spec (tuple macro-spec export-alias))
+      ((or (tuple non-keyword :as export-alias)
+           (tuple function-spec :as export-alias))
+       (make-keyword (third spec)))
+      ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
 
 (defun export-binding (spec)
@@ -68,9 +65,9 @@
     (etypecase-of export-spec spec
       (non-keyword spec)
       (function-spec spec)
-      ((tuple non-keyword export-alias) (first spec))
-      ((tuple function-spec export-alias) (first spec))
-      ((or macro-spec (tuple macro-spec export-alias))
+      ((tuple non-keyword :as export-alias) (first spec))
+      ((tuple function-spec :as export-alias) (first spec))
+      ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
 
 (defstruct-read-only (simple-module (:conc-name sm.))

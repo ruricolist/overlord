@@ -2419,23 +2419,28 @@ actually exported by the module specified by LANG and SOURCE."
 (defmacro import-bindings (module &body bindings &environment env)
   `(progn
      ,@(mapcar (op (import-binding _ module env))
-               (canonicalize-bindings bindings))))
+               bindings)))
 
 (defmacro import-values (module &body values)
   `(progn
      ,@(mapcar (op (import-value _ module)) values)))
 
 (defun canonicalize-binding (clause)
-  (typecase-of binding-designator clause
-    (atom (list clause clause))
-    ((or function-alias macro-alias) (list (make-keyword (second clause)) clause))
-    ((tuple symbol import-alias) clause)
-    ((or (tuple (tuple 'macro-function symbol) import-alias)
-         (tuple (tuple 'function symbol) import-alias))
-     clause)
-    (otherwise
-     (destructuring-bind (import &key ((:as alias) import)) clause
-       (list import alias)))))
+  (assure canonical-binding
+    (if (typep clause 'canonical-binding)
+        clause
+        (etypecase-of binding-designator clause
+          (atom
+           (list (make-keyword clause) clause))
+          (function-alias
+           (list (make-keyword (second clause)) clause))
+          (macro-alias
+           (list (make-keyword (second clause)) clause))
+          ((or (tuple symbol :as import-alias)
+               (tuple (tuple 'function symbol) :as import-alias)
+               (tuple (tuple 'macro-function symbol) :as import-alias))
+           (destructuring-bind (import &key ((:as alias))) clause
+             (list (make-keyword import) alias)))))))
 
 (defun canonicalize-bindings (clauses)
   (mapcar #'canonicalize-binding clauses))
@@ -2539,7 +2544,7 @@ actually exported by the module specified by LANG and SOURCE."
                                   ((:binding bindings))
                                   values
                                   prefix
-                             &allow-other-keys)
+                                  &allow-other-keys)
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
@@ -2562,7 +2567,7 @@ the symbols bound in the body of the import form."
                                      &key
                                        ((:binding bindings))
                                        values
-                                     &allow-other-keys))
+                                       &allow-other-keys))
   (declare (ignore body))
   `(defpackage ,package-name
      (:use)
@@ -2583,14 +2588,14 @@ the symbols bound in the body of the import form."
                (intern (string sym) p))
              (intern-spec (spec)
                (loop for (key alias) in spec
-                     collect `(,key ,(etypecase-of import-alias alias
-                                       (var-alias (intern* alias))
-                                       (function-alias
-                                        (let ((alias (second alias)))
-                                          `(function ,(intern* alias))))
-                                       (macro-alias
-                                        (let ((alias (second alias)))
-                                          `(macro-function ,(intern* alias)))))))))
+                     collect `(,key :as ,(etypecase-of import-alias alias
+                                           (var-alias (intern* alias))
+                                           (function-alias
+                                            (let ((alias (second alias)))
+                                              `(function ,(intern* alias))))
+                                           (macro-alias
+                                            (let ((alias (second alias)))
+                                              `(macro-function ,(intern* alias)))))))))
       (let ((module-binding (symbolicate '%module-for-package- (package-name p))))
         `(import ,module-binding
            :binding ,(intern-spec bindings)

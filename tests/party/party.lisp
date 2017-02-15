@@ -1,10 +1,10 @@
 #lang overlord/simple-module
 
-(:export (#'balloon/make make)
-         (#'balloon/push push*)
+(:export (#'balloon/make :as make)
+         (#'balloon/push :as push*)
          #'push!
          #'make-party
-         (#'party-pop! pop!))
+         (#'party-pop! :as pop!))
 
 (:import stack
   :from "stack.lisp"
