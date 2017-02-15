@@ -195,7 +195,7 @@
 
 (deftype var-alias () 'bindable-symbol)
 (deftype function-alias () '(tuple 'function bindable-symbol))
-(deftype macro-alias () '(tuple :macro bindable-symbol))
+(deftype macro-alias () '(tuple 'macro-function bindable-symbol))
 (deftype import-alias () '(or var-alias function-alias macro-alias))
 
 (deftype binding-spec ()
@@ -207,4 +207,4 @@
     macro-alias
     (tuple symbol import-alias)
     (tuple (tuple 'function symbol) import-alias)
-    (tuple (tuple :macro symbol) import-alias)))
+    (tuple (tuple 'macro-function symbol) import-alias)))

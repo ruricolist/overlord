@@ -2430,7 +2430,7 @@ actually exported by the module specified by LANG and SOURCE."
     (atom (list clause clause))
     ((or function-alias macro-alias) (list (make-keyword (second clause)) clause))
     ((tuple symbol import-alias) clause)
-    ((or (tuple (tuple :macro symbol) import-alias)
+    ((or (tuple (tuple 'macro-function symbol) import-alias)
          (tuple (tuple 'function symbol) import-alias))
      clause)
     (otherwise
@@ -2448,7 +2448,7 @@ actually exported by the module specified by LANG and SOURCE."
                             (etypecase-of import-alias alias
                               (var-alias (prefix alias))
                               (function-alias `(function ,(prefix (second alias))))
-                              (macro-alias `(:macro ,(prefix (second alias))))))))))
+                              (macro-alias `(macro-function ,(prefix (second alias))))))))))
 
 (defun import-binding (clause module &optional env)
   (multiple-value-bind (import alias ref) (import+alias+ref clause module)
@@ -2577,7 +2577,7 @@ the symbols bound in the body of the import form."
                                                 (&rest body
                                                  &key ((:binding bindings))
                                                       values
-                                                 &allow-other-keys))
+                                                      &allow-other-keys))
   (let ((p (assure package (find-package package-name))))
     (labels ((intern* (sym)
                (intern (string sym) p))
@@ -2590,7 +2590,7 @@ the symbols bound in the body of the import form."
                                           `(function ,(intern* alias))))
                                        (macro-alias
                                         (let ((alias (second alias)))
-                                          `(:macro ,(intern* alias)))))))))
+                                          `(macro-function ,(intern* alias)))))))))
       (let ((module-binding (symbolicate '%module-for-package- (package-name p))))
         `(import ,module-binding
            :binding ,(intern-spec bindings)
