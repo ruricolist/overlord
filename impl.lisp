@@ -1878,7 +1878,8 @@ The input defaults override PATH where they conflict."
                     (expand-module lang *input*)
                     lang *input*)
                    (ensure-directories-exist *output*)
-                   :top-level (package-compile-top-level? lang)))
+                   :top-level (package-compile-top-level? lang)
+                   :source *source*))
                 (save-module-deps lang *input*))
         :deps (lambda ()
                 (loop for dep in (module-static-dependencies lang *input*) do
