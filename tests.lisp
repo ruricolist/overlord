@@ -170,6 +170,23 @@
       (is (equal (pop! p) "Boom! 24")))))
 
 
+;;; Import as package.
+
+(test import-as-package
+  (let ((pkg :overlord-test/as-package))
+    (when (find-package pkg)
+      (delete-package pkg))
+    (eval `(overlord:import-as-package ,pkg
+             :from "tests/islisp/exports.lsp"
+             :as :core-lisp
+             :binding (x #'y (macro-function z))))
+    (is-true (find-package pkg))
+    (is (equal '(:var :fn :macro)
+               (eval `(list ,(find-symbol (string 'x) pkg)
+                            (,(find-symbol (string 'y) pkg))
+                            (,(find-symbol (string 'z) pkg))))))))
+
+
 ;;; Core Lisp.
 
 (def-suite islisp :in overlord)

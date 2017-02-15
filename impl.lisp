@@ -2544,15 +2544,18 @@ actually exported by the module specified by LANG and SOURCE."
                                   ((:binding bindings))
                                   values
                                   prefix
-                                  &allow-other-keys)
+                             &allow-other-keys
+                             &environment env)
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
-  (multiple-value-bind (bindings values)
-      (bindings+values bindings values
-                       :lang lang
-                       :source source
-                       :prefix prefix)
+  (mvlet* ((lang source
+            (resolve-lang+source lang source 'package-module (base) env))
+           (bindings values
+            (bindings+values bindings values
+                             :lang lang
+                             :source source
+                             :prefix prefix)))
     (let ((body (list* :binding bindings
                        :values values
                        (remove-from-plist body :prefix :binding :values))))
