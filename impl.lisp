@@ -907,8 +907,7 @@ E.g. delete a file, unbind a variable."
                  ;; Depend on the source file.
                  (depends-on (.source target))
                  ;; The stashed recursive dependencies of the module.
-                 (dolist (dep (module-deps target))
-                   (depends-on dep))
+                 (depends-on-all/unordered (module-deps target))
                  ;; Let the language tell you what else to depend on.
                  (lang-deps (.lang target) (.source target)))))))))
 
@@ -1882,8 +1881,8 @@ The input defaults override PATH where they conflict."
                    :source *source*))
                 (save-module-deps lang *input*))
         :deps (lambda ()
-                (loop for dep in (module-static-dependencies lang *input*) do
-                  (depends-on dep)))))
+                (depends-on-all/unordered
+                 (module-static-dependencies lang *input*)))))
 
 (defun fasl-lang-pattern-ref (lang source)
   (pattern-ref (fasl-lang-pattern lang source) source))
