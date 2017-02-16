@@ -169,6 +169,17 @@
       (push! p (push* (make 5 5) 1))
       (is (equal (pop! p) "Boom! 24")))))
 
+(test grid
+  ;; Reproduces an example from the R7RS spec.
+  (with-imports* (main :from "tests/grid/main.lisp" :binding ((run :as #'run*)))
+    (let* ((sep #\Page)
+           (s (with-output-to-string (*standard-output*)
+                (run* sep))))
+      (is (= (count sep s) 80))
+      (let ((frames (split-sequence sep s :remove-empty-subseqs t)))
+        (is (= (length frames) 80))
+        (is-true (notany #'equal frames (rest frames)))))))
+
 
 ;;; Import as package.
 
