@@ -2216,7 +2216,7 @@ the #lang declaration ends."
           (warn "~s was claimed for ~a in ~a" module source lang)))
       (setf (gethash module table) new-value))))
 
-(defun resolve-lang+source (lang source module base &optional env)
+(defun lang+source (lang source module base &optional env)
   (setf source (macroexpand source env)) ;Allow a symbol macro as the source.
   (flet ((resolve-source (source)
            (merge-pathnames* (ensure-pathname source :want-pathname t)
@@ -2251,6 +2251,18 @@ the #lang declaration ends."
 Binding imports (~a) from a module imported as a function (~a) is not currently supported."
             (append bindings values) mod)))
 
+(defun resolve-import-spec
+    (&key lang source bindings values module (base (base)) env prefix)
+  (check-type base absolute-pathname)
+  (check-type prefix string-designator)
+  (mvlet* ((lang source (lang+source lang source module base env))
+           (bindings values (bindings+values bindings values
+                                             :lang lang
+                                             :source source
+                                             :prefix prefix)))
+    (imports-with-module-as-function-not-supported module bindings values)
+    (values lang source bindings values)))
+
 (defmacro import (module &body (&key
                                   ((:as lang))
                                   ((:from source))
@@ -2263,47 +2275,44 @@ Binding imports (~a) from a module imported as a function (~a) is not currently 
 
 Note you can do (import #'foo ...), and the module will be bound as a function."
   ;; Ensure we have both the lang and the source.
-  (setf (values lang source)
-        (resolve-lang+source lang source module (base) env))
-  ;; Warn if MODULE is already in use with an incompatible language
-  ;; and source.
-  (claim-module-name module lang source)
-  ;; Expand the binding and value specs.
-  (setf (values bindings values)
-        (bindings+values bindings values
-                         :lang lang
-                         :source source
-                         :prefix prefix))
+  (multiple-value-bind (lang source bindings values)
+      (resolve-import-spec :lang lang
+                           :source source
+                           :module module
+                           :bindings bindings
+                           :values values
+                           :prefix prefix
+                           :env env)
+    ;; Warn if MODULE is already in use with an incompatible language
+    ;; and source.
+    (claim-module-name module lang source)
+    (let ((lazy? (null values)))
+      `(progn
+         ;; Importing modules non-lazily has a speed advantage when
+         ;; there are no bindings, but it also makes maintenance more
+         ;; complex to have two import forms. For now, just use lazy
+         ;; imports; maybe re-enable eager loading later.
 
-  (imports-with-module-as-function-not-supported module bindings values)
-
-  (let ((lazy? (null values)))
-    `(progn
-       ;; Importing modules non-lazily has a speed advantage when
-       ;; there are no bindings, but it also makes maintenance more
-       ;; complex to have two import forms. For now, just use lazy
-       ;; imports; maybe re-enable eager loading later.
-
-       ;; Also: while it happens to be the case that Serapeum's `def'
-       ;; expands into a symbol macro definition, so switching between
-       ;; lazy and eager imports works, it is *conceptually* weird
-       ;; that we can just go ahead and redefine a global lexical as a
-       ;; symbol macro.
-       (import-module/lazy ,module :as ,lang :from ,source)
-       #+ () (,(if lazy? 'import-module/lazy 'import-module)
-              ,module :as ,lang :from ,(merge-pathnames* source (base)))
-       ;; We push the check down into a separate macro so we can
-       ;; inspect overall macroexpansion without side effects.
-       (check-static-bindings-now ,lang ,source ,(append bindings values))
-       (macrolet ((function-wrapper (fn)
-                    ,(if function-wrapper
-                         `(list ',function-wrapper fn)
-                         'fn)))
-         (import-bindings ,module ,@bindings)
-         (import-values ,module ,@values))
-       (import-task ,module :as ,lang :from ,source :values ,values :lazy ,lazy?)
-       ;; Strictly for debuggability.
-       (values ',module ',(append bindings values)))))
+         ;; Also: while it happens to be the case that Serapeum's `def'
+         ;; expands into a symbol macro definition, so switching between
+         ;; lazy and eager imports works, it is *conceptually* weird
+         ;; that we can just go ahead and redefine a global lexical as a
+         ;; symbol macro.
+         (import-module/lazy ,module :as ,lang :from ,source)
+         #+ () (,(if lazy? 'import-module/lazy 'import-module)
+                ,module :as ,lang :from ,(merge-pathnames* source (base)))
+         ;; We push the check down into a separate macro so we can
+         ;; inspect overall macroexpansion without side effects.
+         (check-static-bindings-now ,lang ,source ,(append bindings values))
+         (macrolet ((function-wrapper (fn)
+                      ,(if function-wrapper
+                           `(list ',function-wrapper fn)
+                           'fn)))
+           (import-bindings ,module ,@bindings)
+           (import-values ,module ,@values))
+         (import-task ,module :as ,lang :from ,source :values ,values :lazy ,lazy?)
+         ;; Strictly for debuggability.
+         (values ',module ',(append bindings values))))))
 
 (defun bindings+values (bindings values &key lang source prefix)
   ;; Avoid redundant calls to module-static-bindings.
@@ -2511,13 +2520,14 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import/local (mod &body (&key from as binding values prefix)
                         &environment env)
-  (mvlet* ((lang source (resolve-lang+source as from mod (base) env))
-           (bindings values
-            (bindings+values binding values
-                             :lang lang
-                             :source source
-                             :prefix prefix)))
-    (imports-with-module-as-function-not-supported mod bindings values)
+  (multiple-value-bind (lang source bindings values)
+      (resolve-import-spec :lang as
+                           :source from
+                           :prefix prefix
+                           :module mod
+                           :bindings binding
+                           :values values
+                           :env env)
     ;; TODO If we knew that no macros were being imported, we could
     ;; give the module a local binding and not have to look it up
     ;; every time.
@@ -2549,13 +2559,15 @@ actually exported by the module specified by LANG and SOURCE."
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
-  (mvlet* ((lang source
-            (resolve-lang+source lang source 'package-module (base) env))
-           (bindings values
-            (bindings+values bindings values
-                             :lang lang
-                             :source source
-                             :prefix prefix)))
+  (multiple-value-bind (lang source bindings values)
+      (resolve-import-spec :lang lang
+                           :source source
+                           :bindings bindings
+                           :values values
+                           :module 'package-module
+                           :prefix prefix
+                           :env env)
+    (declare (ignore source lang))
     (let ((body (list* :binding bindings
                        :values values
                        (remove-from-plist body :prefix :binding :values))))
