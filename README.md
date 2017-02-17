@@ -1,16 +1,27 @@
 Overlord is an experimental build/module system for Common Lisp,
 inspired by [Redo][] and [Racket][].
 
-Overlord is experimental. Trying to document the API at this stage
+Overlord enables *languages as libraries*. All Lisps handle language
+extension through macros. Common Lisp even allows extension at the
+syntactic level, with reader macros. But projects that go beyond
+internal DSLs, into full language implementations, end up in their own
+silos. With Overlord, modules written in hosted languages can be used
+in ordinary Lisp programs, and even (for languages implemented in
+Lisp) from modules written in other languages.
+
+Besides a module system, Overlord also offers a general-purpose build
+system. This is a case of what is good for the implementer being good
+for the user. Supporting a flexible module system requires an
+expressive build system. This build system is also made available to
+users of Overlord.
+
+*Overlord is experimental*. Trying to document the API at this stage
 would be futile. Instead, this README discusses the concepts behind
 Overlord. If you’re looking for the current syntax, consult
 the [test suite](tests.lisp) and the [files it uses](tests/).
 
 (If you are interested in reading the code, the substance is
 in [impl.lisp](impl.lisp); the rest is support.)
-
-When I say “experimental”, I mean it. Anything may change at any time.
-This code is not ready for use. It may not even be ready for release.
 
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
@@ -19,16 +30,10 @@ Note that, to run the test suite, you will need to
 download [Core Lisp][], and you must have the `touch` program in your
 search path.
 
+When I say “experimental”, I mean it. Anything may change at any time.
+This code is not ready for use. It may not even be ready for release.
+
 # Language examples
-
-Although Overlord is a general-purpose build system, and does anything
-you might want a build system to do, its most common use is likely to
-be as a module system for embedding other languages into Common Lisp.
-
-An Overlord language embedding means more than using Lisp as a
-runtime; it means that modules written in the hosted language can be
-used in ordinary Lisp programs, and even (for languages implemented in
-Lisp) from modules written in other languages.
 
 Here are some example language embeddings:
 
