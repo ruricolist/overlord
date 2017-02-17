@@ -29,19 +29,16 @@
    ;; Imports and exports.
    #:bindable-symbol
    #:export-alias
-   #:import-alias
-   #:non-keyword
+   #:var-spec
    #:function-spec
    #:macro-spec
-   #:binding
+   #:binding-spec
    #:export-spec
    #:definable-symbol
-   #:var-alias
-   #:function-alias
-   #:macro-alias
-   #:binding-spec
+   #:import-spec
    #:binding-designator
-   #:canonical-binding))
+   #:canonical-binding
+   #:non-keyword))
 
 (in-package :overlord/types)
 
@@ -170,14 +167,17 @@
         ;; This would just be confusing.
         (not (member quote function))))
 
+(deftype var-spec ()
+  'non-keyword)
+
 (deftype function-spec ()
-  '(tuple 'function symbol))
+  '(tuple 'function bindable-symbol))
 
 (deftype macro-spec ()
-  '(tuple 'macro-function symbol))
+  '(tuple 'macro-function bindable-symbol))
 
-(deftype binding ()
-  '(or non-keyword function-spec macro-spec))
+(deftype binding-spec ()
+  '(or var-spec function-spec macro-spec))
 
 ;;; Exports.
 
@@ -185,30 +185,24 @@
   '(and symbol (not (member t nil function quote))))
 
 (deftype export-spec ()
-  '(or non-keyword
+  '(or var-spec
     function-spec
     macro-spec
-    (tuple non-keyword :as export-alias)
+    (tuple var-spec :as export-alias)
     (tuple function-spec :as export-alias)
     (tuple macro-spec :as export-alias)))
 
 ;;; Imports.
 
-(deftype var-alias () 'bindable-symbol)
-(deftype function-alias () '(tuple 'function bindable-symbol))
-(deftype macro-alias () '(tuple 'macro-function bindable-symbol))
-(deftype import-alias () '(or var-alias function-alias macro-alias))
-
-(deftype binding-spec ()
+(deftype import-spec ()
   '(or (member :all :all-as-functions) list))
 
 (deftype canonical-binding ()
-  '(tuple keyword import-alias))
+  '(tuple keyword binding-spec))
 
 (deftype binding-designator ()
-  '(or atom
-    function-alias
-    macro-alias
-    (tuple symbol :as import-alias)
-    (tuple (tuple 'function symbol) :as import-alias)
-    (tuple (tuple 'macro-function symbol) :as import-alias)))
+  '(or
+    var-spec
+    function-spec
+    macro-spec
+    (tuple symbol :as binding-spec)))

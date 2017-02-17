@@ -52,20 +52,20 @@
 (defun export-keyword (spec)
   (assure keyword
     (etypecase-of export-spec spec
-      (non-keyword (make-keyword spec))
+      (var-spec (make-keyword spec))
       (function-spec (export-keyword (second spec)))
-      ((or (tuple non-keyword :as export-alias)
+      ((or (tuple var-spec :as export-alias)
            (tuple function-spec :as export-alias))
        (make-keyword (third spec)))
       ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
 
 (defun export-binding (spec)
-  (assure (or non-keyword function-spec)
+  (assure (or var-spec function-spec)
     (etypecase-of export-spec spec
-      (non-keyword spec)
+      (var-spec spec)
       (function-spec spec)
-      ((tuple non-keyword :as export-alias) (first spec))
+      ((tuple var-spec :as export-alias) (first spec))
       ((tuple function-spec :as export-alias) (first spec))
       ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
