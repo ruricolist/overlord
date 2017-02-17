@@ -101,7 +101,8 @@
    :require-for-emacs
    :expand-module-for-emacs
    :freeze :freeze-policy
-   :unfreeze))
+   :unfreeze
+   :file))
 
 (in-package :overlord/impl)
 
@@ -1152,6 +1153,9 @@ value and NEW do not match under TEST."
   (~> path
       (ensure-pathname :want-pathname t)
       (merge-pathnames (base))))
+
+(defun file (file)
+  (assure file-pathname (path file)))
 
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
