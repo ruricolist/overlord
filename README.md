@@ -1,6 +1,5 @@
 Overlord is an experimental build/module system for Common Lisp,
-inspired by [Redo][] and [Racket][]. It is not another `defsystem`,
-but a completely new approach.
+inspired by [Redo][] and [Racket][].
 
 Overlord is experimental. Trying to document the API at this stage
 would be futile. Instead, this README discusses the concepts behind
