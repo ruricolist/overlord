@@ -2535,6 +2535,7 @@ actually exported by the module specified by LANG and SOURCE."
     ;; every time.
     `(progn
        (import-module/lazy ,mod :as ,lang :from ,source)
+       (check-static-bindings-now ,lang ,source ,(append bindings values))
        (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
