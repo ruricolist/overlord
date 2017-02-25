@@ -1043,11 +1043,6 @@ Don't know how to build missing prerequisite ~s."
       (setf (symbol-value symbol)     (funcall thunk)
             (target-timestamp symbol) (now)))))
 
-(defun build-symbol (symbol thunk deps)
-  (build-task symbol
-              (rebuild-symbol symbol thunk)
-              deps))
-
 (defcondition dependency ()
   ((target :initarg :target
            ;; Nothing can depend on the root target.
@@ -1264,9 +1259,10 @@ rebuilt."
   (with-script-dependency (name expr deps)
     `(progn
        (defvar ,name)
-       (build-symbol ',name
-                     (init-thunk ,expr)
-                     (deps-thunk ,@deps))
+       (build-task ',name
+                   (rebuild-symbol ',name
+                                   (init-thunk ,expr))
+                   (deps-thunk ,@deps))
        ',name)))
 
 (defmacro defconst/deps (name expr &body deps)
@@ -1293,8 +1289,8 @@ rebuilt."
               (if (boundp name)
                   (build name)
                   (let ((deps-thunk (eval* `(deps-thunk ,@deps)))
-                        (init-thunk (eval* `(init-thunk ,expr))))
-                    (build-symbol name init-thunk deps-thunk)))
+                        (init-thunk (rebuild-symbol name (eval* `(init-thunk ,expr)))))
+                    (build-task name init-thunk deps-thunk)))
               (values (symbol-value name)
                       (target-timestamp name)))))
     `(progn
@@ -1303,9 +1299,9 @@ rebuilt."
              (prog1 ',init
                (setf (target-timestamp ',name) ,timestamp))))
        (eval-always
-         (build-symbol ',name
-                       (init-thunk ,expr)
-                       (deps-thunk ,@deps)))
+         (build-task ',name
+                     (rebuild-symbol ',name (init-thunk ,expr))
+                     (deps-thunk ,@deps)))
        ',name)))
 
 (defmacro file-target (name pathname (tmp) &body (init . deps))
