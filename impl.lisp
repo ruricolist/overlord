@@ -1941,19 +1941,29 @@ If PACKAGE does not export an expander, `progn' is used instead."
          (form `(,module-progn ,@body)))
     (expand-in-package form package env)))
 
-(defun user-package (package)
+(defun suffix-package (package suffix)
   "Like `resolve-package' but, if a package exists with the same name,
-but ending in -USER, and inheriting from that package, return that
+but ending in SUFFIX, and inheriting from that package, return that
 instead."
+  (assert (string^= "-" suffix))
   (assure package
     (with-absolute-package-names ()
       (when-let (base-package (resolve-package package))
-        (let* ((user-package-name (fmt "~a-USER" (package-name base-package)))
+        (let* ((user-package-name
+                 (concatenate 'string
+                              (package-name base-package)
+                              suffix))
                (user-package (find-package user-package-name)))
           (or (and user-package
                    (find base-package (package-use-list user-package))
                    user-package)
               base-package))))))
+
+(defun user-package (package)
+  "Like `resolve-package' but, if a package exists with the same name,
+but ending in `-user', and inheriting from that package, return that
+instead."
+  (suffix-package package "-USER"))
 
 ;;; TODO Is this useful?
 (defun expand-in-package (form package env)
