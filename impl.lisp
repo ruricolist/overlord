@@ -47,13 +47,14 @@
    :if                                  ;Always ternary.
    :if-let                              ;Ditto.
    :cond                                ;Require exhaustive.
-   :set                                 ;Use `symbol-value'.
+   :set                                 ;Use symbol-value.
    :defclass                            ;Force checking slot types.
    :typecase                            ;Use typecase-of instead.
    :etypecase                           ;Use etypecase-of instead.
    :ctypecase                           ;Use ctypecase-of instead.
    :file-write-date                     ;Use file-mtime instead.
    :pathname                            ;Use ensure-pathname.
+   :multiple-value-bind                 ;Use receive.
    )
   (:export
    ;; Defining and building targets.
@@ -116,7 +117,7 @@
 ;;; time.
 
 (cl:defmacro defmacro (name args &body body)
-  (multiple-value-bind (body decls docstring)
+  (receive (body decls docstring)
       (parse-body body :documentation t)
     `(cl:defmacro ,name ,args
        ,@(unsplice docstring)
@@ -954,7 +955,7 @@ Don't know how to build missing prerequisite ~s."
 (defun build (&optional (target nil target-supplied?) &key (errorp t) force)
   (check-not-frozen)
   (if target-supplied?
-      (multiple-value-bind (target thunk deps)
+      (receive (target thunk deps)
           (target-task-values target errorp)
         (build-task target thunk deps :force force))
       (build root-target)))
@@ -1021,7 +1022,7 @@ Don't know how to build missing prerequisite ~s."
                (progn
                  (setf (target-table-member *already-built* target) t)
                  (let ((*target* target))
-                   (multiple-value-bind (target thunk deps)
+                   (receive (target thunk deps)
                        (target-task-values target)
                      (when (needs-building? target deps)
                        (funcall thunk))
@@ -1410,7 +1411,7 @@ specify the dependencies you want on build."
     (etypecase-of (or symbol pattern) pattern
       (pattern pattern)
       (symbol
-       (multiple-value-bind (pat pat?)
+       (receive (pat pat?)
            (gethash pattern *patterns*)
          (cond (pat? pat)
                (errorp (error* "No such pattern: ~s" pattern))
@@ -1993,7 +1994,7 @@ instead."
       (let ((p (resolve-package package)))
         (if (eql p (find-package :cl))
             'cl-read-module
-            (multiple-value-bind (sym status) (find-symbol reader-string p)
+            (receive (sym status) (find-symbol reader-string p)
               (cond ((no sym)
                      ;; There is no symbol.
                      (error* "No reader defined in package ~a" p))
@@ -2028,7 +2029,7 @@ instead."
                (return-from package-expander nil))))
     (assure (or symbol null)
       (let ((p (resolve-package package)))
-        (multiple-value-bind (sym status) (find-symbol module-string p)
+        (receive (sym status) (find-symbol module-string p)
           (cond ((no sym)
                  (error* "No expander defined in package ~a" p))
                 ((not (eql status :external))
@@ -2116,7 +2117,7 @@ This should be a superset of the variables bound by CL during calls to
 (defun guess-lang+pos (file)
   "If FILE has a #lang line, return the lang and the position at which
 the #lang declaration ends."
-  (multiple-value-bind (lang pos)
+  (receive (lang pos)
       (file-hash-lang file)
     (if (stringp lang)
         (values (lookup-hash-lang lang) pos)
@@ -2285,7 +2286,7 @@ Binding imports (~a) from a module imported as a function (~a) is not currently 
 
 Note you can do (import #'foo ...), and the module will be bound as a function."
   ;; Ensure we have both the lang and the source.
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang lang
                            :source source
                            :module module
@@ -2424,7 +2425,7 @@ actually exported by the module specified by LANG and SOURCE."
   `(progn
      ,@(collecting
          (dolist (clause values)
-           (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+           (receive (import alias ref) (import+alias+ref clause module)
              (declare (ignore import))
              (collect
                  (etypecase-of import-alias alias
@@ -2475,7 +2476,7 @@ actually exported by the module specified by LANG and SOURCE."
                               (macro-alias `(macro-function ,(prefix (second alias))))))))))
 
 (defun import-binding (clause module &optional env)
-  (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+  (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of import-alias alias
       (var-alias
@@ -2505,7 +2506,7 @@ actually exported by the module specified by LANG and SOURCE."
               (funcall ,ref ,whole ,env))))))))
 
 (defun import-value (clause module)
-  (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+  (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of import-alias alias
       (var-alias
@@ -2530,7 +2531,7 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import/local (mod &body (&key from as binding values prefix)
                         &environment env)
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang as
                            :source from
                            :prefix prefix
@@ -2569,7 +2570,7 @@ actually exported by the module specified by LANG and SOURCE."
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang lang
                            :source source
                            :bindings bindings
