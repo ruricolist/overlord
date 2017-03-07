@@ -22,7 +22,8 @@
                #:overlord/demo/js
                #:overlord/lang/sweet-exp
                #:overlord/lang/s-exp
-               #:core-lisp)
+               #:core-lisp
+               #:trivial-features)
   :perform (test-op (o s)
                     (uiop:symbol-call :overlord-tests '#:run-overlord-tests))
   :components ((:file "tests")))

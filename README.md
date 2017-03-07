@@ -27,8 +27,9 @@ Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
 Note that, to run the test suite, you will need to
-download [Core Lisp][], and you must have the `touch` program in your
-search path.
+download [Core Lisp][], and, if not on Windows, you must have the
+`touch` program in your search path. (If on Windows, Powershell is
+used instead).
 
 When I say “experimental”, I mean it. Anything may change at any time.
 This code is not ready for use. It may not even be ready for release.

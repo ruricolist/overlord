@@ -58,6 +58,12 @@
 
 (defun touch-file (file)
   (lret ((file-string (resolve-file file)))
+    (assert (uiop:file-exists-p file-string))
+    #+windows
+    (uiop:run-program
+     (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
+          (uiop:native-namestring file)))
+    #-windows
     (uiop:run-program `("touch" ,file-string))))
 
 (defun touch (&rest targets)
