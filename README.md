@@ -268,10 +268,17 @@ always loaded lazily. A module is never actually loaded until a
 function imported from it is called, or a variable imported from it is
 looked up.
 
-Finally, Overlord allows local imports. The combination of lazy loading
-and local imports means that needless imports are minimized. For
-example, a module that is only used inside of a macro will only be
-loaded when the macro is expanded at compile time.
+Finally, Overlord allows local imports: imports that only take effect
+within the body of a `with-imports` form.
+
+The combination of lazy loading and local imports may mean that, in
+some cases, needless imports are minimized. For example, a module that
+is only used inside of a macro might only be loaded when the macro is
+expanded at compile time. However, this does not apply when saving
+images: all known modules are loaded before the image is saved. The
+real effect of pervasive lazy loading is that, since you do not know
+when, or in what order, modules will be loaded, you must not rely on
+load-time side effects.
 
 ## Simple modules
 
