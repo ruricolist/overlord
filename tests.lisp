@@ -62,7 +62,7 @@
     #+windows
     (uiop:run-program
      (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
-          (uiop:native-namestring file)))
+          (uiop:native-namestring file-string)))
     #-windows
     (uiop:run-program `("touch" ,file-string))))
 
@@ -118,6 +118,8 @@
     (def string2 *literal-string*)
     (is (stringp string2))
     (is (not (eq string1 string2)))
+
+    (sleep 1)
 
     (touch '+literal-string-file+)
     (overlord:build '*literal-string*)
