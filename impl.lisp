@@ -1069,10 +1069,7 @@ particular order."
 (defun depends-on-all (deps)
   ;; NB This is where you would add parallelism.
   (assert (boundp '*base*))
-  (~>> deps
-       (flatten-deps *base*)
-       shuffle*
-       (map nil #'depends-on/1))
+  (map nil #'depends-on/1 (shuffle* deps))
   (values))
 
 (defun depends-on* (&rest deps)
@@ -1082,18 +1079,8 @@ If any of DEPS is a list, it will be descended into."
 
 (defun depends-on-all* (deps)
   (assert (boundp '*base*))
-  (~> deps
-      (flatten-deps *base*)
-      (mapc #'depends-on/1 _))
+  (mapc #'depends-on/1 deps)
   (values))
-
-(defun flatten-deps (base deps)
-  ;; We want lists of dependencies to be flattened.
-  (let ((deps (mappend #'ensure-list deps)))
-    ;; A single target may resolve into multiple dependencies (e.g.
-    ;; patterns), but only to one level.
-    (assure (list-of atom)
-      (mappend (op (ensure-list (resolve-target _ base))) deps))))
 
 (defun call/temp-file (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
