@@ -381,6 +381,7 @@ system that is very likely to change.
 - Lots of tests.
 - More portability testing.
 - Leverage UIOP more.
+- Stop relying on timestamps.
 - Source locations for functions in embedded languages.
 - Convenient logging protocol/syntax.
 - More convenient shell command syntax.
