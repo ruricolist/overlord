@@ -1154,6 +1154,10 @@ value and NEW do not match under TEST."
                 `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(depends-on* ,x ,@xs))
+              (:depends-on-all (xs)
+                `(depends-on-all ,xs))
+              (:depends-on-all* (xs)
+                `(depends-on-all* ,xs))
               (:path (path)
                 (assure pathname
                   (path path)))
