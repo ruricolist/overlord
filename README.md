@@ -151,9 +151,31 @@ image is saved.
 
 # Overlord vs. Racket
 
-The following assumes some familiarity
-with [Racket][Racket Manifesto], and with subsequent work in Scheme
-module systems.
+Racket is a language in the Lisp family, descended from Scheme. Its
+distinction is its focus on making languages. An impressive amount of
+thought and effort has gone into making the whole Racket environment
+act as a toolkit for making languages. Racket users are both encouraged
+and expected to solve their problems by making special-purpose
+languages; and Racket itself is implemented, from a simple,
+Scheme-like core, as a tower of languages.
+
+(If you want to investigate for yourself, you can find a gentle
+introduction to making languages with Racket in [Beautiful Racket][].)
+
+You might be wondering what making languages has to do with a build
+system. The answer is that, once we have a build system that allows
+Lisp bindings as targets, the idea of a language falls out naturally.
+The most abstraction a file-to-file build system can support is a
+*pattern* – an abstract relationship between two files. But what is an
+abstract relationship between a file and a Lisp binding? The
+relationship is a *language*; the Lisp object is a *module*.
+
+Overlord models its support for making languages on Racket. It is not
+a direct imitation of Racket, however. It also draws on subsequent and
+related work in Scheme module systems. And unlike Racket’s module
+system, Overlord’s module system is fundamentally dynamic.
+
+## Modules
 
 A Overlord module is a *file* in a *language*. Overlord supports a
 Racket-like hash-lang (`#lang`) syntax, but in Overlord the language
@@ -428,6 +450,11 @@ You might want them again later. -->
 [LoL]: http://www.letoverlambda.com/
 [djb-redo]: https://cr.yp.to/redo.html
 [djb]: https://cr.yp.to/djb.html
+[Beautiful Racket]: http://beautifulracket.com
+[Maxima]: https://sourceforge.net/projects/maxima/
+[ACL2]: https://www.cs.utexas.edu/users/moore/acl2/
+[hopeless]: https://gist.github.com/samth/3083053
+[REPL scripting]:
 
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
