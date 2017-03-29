@@ -78,13 +78,28 @@ unfortunately, unlikely to change.)
 
 # Overlord vs. Redo
 
-A phrase like “inspired by Redo and Racket” needs unpacking. Overlord has
-a stratified design. The bottom layer is a build system, inspired by
-Redo. What makes Overlord different is that its dependency graph allows
-both files and Lisp bindings as targets. The top layer is a module
-system, inspired by Racket, for embedding languages into Lisp. You can
-use the module system without knowing about the build system; you
-can use the build system without knowing about the module system.
+[Redo][] is a build system. Actually, Redo is a family of build
+systems, sharing [a design][djb-redo] due
+to [Daniel J. Bernstein][djb] (although he has never released an
+implementation). In the space of build systems, Redo is a remarkable
+local optimum: it is both very powerful and very simple. It is not the
+most powerful build system possible, or the very simplest, but it
+certainly provides the most leverage.
+
+Build systems manage state in the file system. In Common Lisp, we have
+a bundle of state which, in many ways, resembles a file system: a set
+of persistent, mutable locations with first-class, hierarchical
+addresses. Symbols have value cells and function cells (mutable
+locations); they have property lists; they are used as keys in
+arbitrary namespaces (more locations); they can be persisted, in fasl
+files and in saved images; and they are each uniquely addressed with a
+path (package name, symbol name).
+
+Overlord generalizes the idea of a build system so that its dependency
+graph can include both files on disk and state in the Lisp system. It
+manages the state stored by Lisp itself, in symbols, and provides ways
+to manage other kinds of state. This generalized build system is
+modeled on Redo.
 
 The most obvious, but least important, difference between Overlord and
 Redo is that Redo uses shell scripts, while Overlord’s “scripts” are
@@ -411,6 +426,9 @@ You might want them again later. -->
 [Bawden]: https://people.csail.mit.edu/alan/mtt/
 [Frink]: https://frinklang.org
 [LoL]: http://www.letoverlambda.com/
+[djb-redo]: https://cr.yp.to/redo.html
+[djb]: https://cr.yp.to/djb.html
+
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
