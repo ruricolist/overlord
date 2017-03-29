@@ -184,6 +184,14 @@ the language is not an inherent part of the file, the same file can be
 loaded as a module in more than one language. And each language-file
 combination gets its own, completely independent module.
 
+Overlord is very liberal about what can be a module. In Overlord, any
+value can be a module – a string, a function, a hash table, anything –
+and any module can provide exports as long as it specializes certain
+generic functions, like `module-ref`.
+
+(Most of the time, however, what you want
+is [`simple-module`](#simple-modules).)
+
 ## Languages
 
 In Racket, languages are defined in two steps. In Racket, a language
@@ -275,13 +283,6 @@ function binding for `module-static-exports`, it is used,
 unsurprisingly, to statically determine the module’s exports.
 
 ## Imports and exports
-
-Overlord is very liberal about what can be a module. In Overlord, any
-value can be a module – a string, a function, a hash table, anything –
-and any module can provide exports as long as it specializes certain
-generic functions, like `module-ref`.
-
-(Most of the time, however, what you want is [`simple-module`](#simple-modules).)
 
 What Overlord imports and exports are not values, but bindings. Bindings
 are indirect (and immutable): they refer to the module, rather than to
