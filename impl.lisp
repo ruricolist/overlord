@@ -484,12 +484,7 @@ it."
   (etypecase-of (or string pathname) path
     (string (pathname-exists? (ensure-pathname path :want-pathname t)))
     (pathname
-     (or (and (handler-case
-                  (file-mtime path)
-                #+sbcl (sb-int:simple-file-error () nil))
-              (not (directory-pathname-p path)))
-         ;; TODO file-exists-p has (had?) a bug in CCL.
-         #+ () (file-exists-p path)
+     (or (file-exists-p path)
          (directory-exists-p path)))))
 
 (defun target-timestamp (target)
