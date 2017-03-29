@@ -76,7 +76,8 @@
    :lang :lang-name :hash-lang-name
    :load-module
    :expand-module
-   :depends-on
+   :depends-on :depends-on*
+   :depends-on-all :depends-on-all*
    :package-expander :package-reader :module-progn-in
    :with-meta-language
    :load-same-name-system
@@ -857,7 +858,7 @@ E.g. delete a file, unbind a variable."
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
-               (depends-on-all/unordered (list-all-targets))))))
+               (depends-on-all (list-all-targets))))))
     ((or bindable-symbol pathname)
      (gethash target *tasks*))
     (directory-ref
@@ -904,7 +905,7 @@ E.g. delete a file, unbind a variable."
                  ;; Depend on the source file.
                  (depends-on (.source target))
                  ;; The stashed recursive dependencies of the module.
-                 (depends-on-all/unordered (module-deps target))
+                 (depends-on-all (module-deps target))
                  ;; Let the language tell you what else to depend on.
                  (lang-deps (.lang target) (.source target)))))))))
 
@@ -1063,9 +1064,9 @@ Don't know how to build missing prerequisite ~s."
   "Build DEPS in no particular order.
 If any of DEPS is a list, its elements will also be added in no
 particular order."
-  (depends-on-all/unordered deps))
+  (depends-on-all deps))
 
-(defun depends-on-all/unordered (deps)
+(defun depends-on-all (deps)
   ;; NB This is where you would add parallelism.
   (assert (boundp '*base*))
   (~>> deps
@@ -1077,9 +1078,9 @@ particular order."
 (defun depends-on* (&rest deps)
   "Build DEPS in the order they are supplied.
 If any of DEPS is a list, it will be descended into."
-  (depends-on-all/ordered deps))
+  (depends-on-all* deps))
 
-(defun depends-on-all/ordered (deps)
+(defun depends-on-all* (deps)
   (assert (boundp '*base*))
   (~> deps
       (flatten-deps *base*)
@@ -1877,7 +1878,7 @@ The input defaults override PATH where they conflict."
                    :source *source*))
                 (save-module-deps lang *input*))
         :deps (lambda ()
-                (depends-on-all/unordered
+                (depends-on-all
                  (module-static-dependencies lang *input*)))))
 
 (defun fasl-lang-pattern-ref (lang source)
