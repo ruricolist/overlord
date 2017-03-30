@@ -209,6 +209,4 @@
   '(or atom
     function-alias
     macro-alias
-    (tuple symbol :as import-alias)
-    (tuple (tuple 'function symbol) :as import-alias)
-    (tuple (tuple 'macro-function symbol) :as import-alias)))
+    (tuple symbol :as import-alias)))

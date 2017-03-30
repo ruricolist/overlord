@@ -2443,9 +2443,7 @@ actually exported by the module specified by LANG and SOURCE."
            (list (make-keyword (second clause)) clause))
           (macro-alias
            (list (make-keyword (second clause)) clause))
-          ((or (tuple symbol :as import-alias)
-               (tuple (tuple 'function symbol) :as import-alias)
-               (tuple (tuple 'macro-function symbol) :as import-alias))
+          ((tuple symbol :as import-alias)
            (destructuring-bind (import &key ((:as alias))) clause
              (list (make-keyword import) alias)))))))
 
