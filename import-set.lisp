@@ -33,16 +33,9 @@
 (defun public-name= (x y)
   (equal x y))
 
-(defun rename-import (import new-name &optional old-name)
-  (flet ((verify-old-name (old-name public-name)
-           (unless (name= old-name public-name)
-             (error "Invalid renaming: the old name is ~a, not ~a"
-                    public-name old-name))))
-    (receive (public private) (public-name+private-name import)
-      (when old-name
-        (verify-old-name old-name public))
-      (assure binding-designator
-        (list private :as new-name)))))
+(defun rename-import (import new-name)
+  (assure binding-designator
+    (list (private-name import) :as new-name)))
 
 (defun expand-import-set (import-set get-exports
                           &optional (package *package*))
@@ -93,7 +86,7 @@
   (reduce (lambda (import-set renaming)
             (receive (old-name new-name) (old-name+new-name renaming)
               (if-let (import (find old-name import-set :test #'named?))
-                (cons (rename-import import new-name old-name)
+                (cons (rename-import import new-name)
                       (remove import import-set))
                 (missing-id old-name import-set))))
           renames
@@ -103,7 +96,7 @@
   (reduce (lambda (import-set renaming)
             (receive (old-name new-name) (old-name+new-name renaming)
               (if-let (import (find old-name import-set :test #'named?))
-                (cons (rename-import import new-name old-name)
+                (cons (rename-import import new-name)
                       import-set)
                 (missing-id old-name import-set))))
           renames
