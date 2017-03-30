@@ -461,3 +461,8 @@ You might want them again later. -->
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
+
+
+<!-- Local Variables: -->
+<!-- compile-command: "pandoc README.md -o README.html" -->
+<!-- End: -->
