@@ -200,7 +200,9 @@
 (deftype import-alias () '(or var-alias function-alias macro-alias))
 
 (deftype binding-spec ()
-  '(or (member :all :all-as-functions) list))
+  '(or (member :all :all-as-functions)
+    (tuple :import-set list)
+    list))
 
 (deftype canonical-binding ()
   '(tuple keyword import-alias))

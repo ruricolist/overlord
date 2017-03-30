@@ -386,7 +386,6 @@ system that is very likely to change.
 - Convenient logging protocol/syntax.
 - More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
-- More expressive syntax for imports. (Compare [R6RS][r6rs-imports].)
 - Better names for definition forms (e.g. `defconst/deps`).
 - Fewer dependencies.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el).)

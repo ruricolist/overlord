@@ -19,7 +19,9 @@
     ;; How to infer the base for the current package.
     :overlord/base
     ;; The #lang syntax.
-    :overlord/hash-lang)
+    :overlord/hash-lang
+    ;; Import sets.
+    :overlord/import-set)
   ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -2184,6 +2186,9 @@ the #lang declaration ends."
        (loop for export in (get-static-exports)
              for sym = (intern (string export))
              collect `(,export :as #',sym)))
+      ((tuple :import-set list)
+       (let ((import-set (second spec)))
+         (expand-import-set import-set #'get-static-exports)))
       (list spec))))
 
 (defun guess-source (lang alias)

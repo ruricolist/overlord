@@ -13,6 +13,7 @@
 
 (defsystem #:overlord-tests
   :depends-on (#:overlord
+               #:overlord/import-set
                #:overlord/simple-module
                #:core-lisp
                #:fiveam
