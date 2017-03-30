@@ -169,7 +169,7 @@
 
 ;;; Prefixes and renaming.
 
-(test party
+(test (party :compile-at :run-time)
   ;; Reproduces an example from the R6RS spec.
   (with-imports* (party :from "tests/party/party.lisp" :binding :all-as-functions)
     (let ((p (make-party)))
@@ -177,7 +177,7 @@
       (push! p (push* (make 5 5) 1))
       (is (equal (pop! p) "Boom! 24")))))
 
-(test grid
+(test (grid :compile-at :run-time)
   ;; Reproduces an example from the R7RS spec.
   (with-imports* (main :from "tests/grid/main.lisp" :binding ((run :as #'run*)))
     (let* ((sep #\Page)
