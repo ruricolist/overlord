@@ -1128,7 +1128,7 @@ safely, overwrite DEST with the contents of the temporary file."
 (defun build-constant (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
-  (let* ((*base* (if (boundp '*base*) *base* (base)))
+  (let* ((*base* (eif (boundp '*base*) *base* (base)))
          (old (symbol-value name)))
     (if (funcall test old new)
         old
