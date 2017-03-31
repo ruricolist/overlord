@@ -102,13 +102,13 @@ to manage other kinds of state. This generalized build system is
 modeled on Redo.
 
 The most obvious, but least important, difference between Overlord and
-Redo is that Redo uses shell scripts, while Overlord’s “scripts” are
-written in Lisp. (It is unimportant because, after all, you can run
-shell commands from Lisp, or somehow call Lisp from the shell.) On the
-one hand, embedding shell syntax in Lisp is clumsy; on the other hand,
-Lisp special variables are much superior to any shell-based means for
-passing information between parent and child scripts. (See §5.4.2
-in [Grosskurth 2007][Grosskurth].)
+Redo in practice is that Redo uses shell scripts, while Overlord’s
+“scripts” are written in Lisp. (It is unimportant because, after all,
+you can run shell commands from Lisp, or somehow call Lisp from the
+shell.) On the one hand, embedding shell syntax in Lisp is clumsy; on
+the other hand, Lisp special variables are much superior to any
+shell-based means for passing information between parent and child
+scripts. (See §5.4.2 in [Grosskurth 2007][Grosskurth].)
 
 The *important* difference is that Overlord uses *two* scripts per
 target: one for building the target, and another for computing its
@@ -125,7 +125,7 @@ the order in which targets are built.
 
 # Overlord and Lisp images
 
-During development, as targets are defined and re-defined, or rebuilt
+During development, as targets are defined and re-defined, and rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
 from the one specified by Overlord’s dependency graph. Before dumping
 an image such discrepancies must be resolved. It is obviously
@@ -136,28 +136,46 @@ file might be provided maliciously.)
 
 Thus, before an image is saved, Overlord needs to do two things:
 
-1. Assure the state of the image by making sure that all defined
+1. Finalize the state of the image by making sure that all defined
    targets have been built.
 
 2. Disable itself.
 
 If you use `uiop:dump-image` to save the image, you don’t need to do
-anything; Overlord will assure the state of the image, and disable
+anything; Overlord will finalize the state of the image, and disable
 itself, automatically.
 
 If you are using implementation-specific means to save an image,
 however, you will need to arrange to call `overlord:freeze` before the
 image is saved.
 
+The default policy is to allow the restored image to be unfrozen, and
+development to be resumed, by calling `overlord:unfreeze`. This is
+probably what you want when, say, saving an image on a server. In
+other scenarios, however — like delivering a binary – you may want to
+strip the build system from the image entirely. This is possible by
+changing Overlord’s “freeze policy”, using the `freeze-policy`
+accessor.
+
+    ;;; The default: can be reversed after
+    ;;; loading the image by calling
+    ;;; `overlord:unfreeze`.
+    (setf (overlord:freeze-policy) nil)
+
+    ;;; Irreversible: before saving the
+    ;;; image, Overlord should destroy its
+    ;;; internal state.
+    (setf (overlord:freeze-policy) :hard)
+
 # Overlord vs. Racket
 
 Racket is a language in the Lisp family, descended from Scheme. Its
 distinction is its focus on making languages. An impressive amount of
-thought and effort has gone into making the whole Racket environment
-act as a toolkit for making languages. Racket users are both encouraged
-and expected to solve their problems by making special-purpose
-languages; and Racket itself is implemented, from a simple,
-Scheme-like core, as a tower of languages.
+thought, effort, and research has gone into making the whole Racket
+environment act as a toolkit for making languages. Racket users are
+both encouraged and expected to solve their problems by making
+special-purpose languages; and Racket itself is implemented, from a
+simple, Scheme-like core, as a tower of languages.
 
 (If you want to investigate for yourself, you can find a gentle
 introduction to making languages with Racket in [Beautiful Racket][].)
@@ -172,8 +190,8 @@ relationship is a *language*; the Lisp object is a *module*.
 
 Overlord models its support for making languages on Racket. It is not
 a direct imitation of Racket, however. It also draws on subsequent and
-related work in Scheme module systems. And unlike Racket’s module
-system, Overlord’s module system is fundamentally dynamic.
+related work in Scheme module systems to create a module system that
+is fundamentally dynamic.
 
 ## Modules
 
