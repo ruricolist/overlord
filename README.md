@@ -169,7 +169,8 @@ accessor.
 
 # Overlord vs. Racket
 
-Racket is a language in the Lisp family, descended from Scheme. Its
+Overlord’s approach to making languages is inspired by Racket. Racket
+is a language in the Lisp family, descended from Scheme. Its
 distinction is its focus on making languages. An impressive amount of
 thought, effort, and research has gone into making the whole Racket
 environment act as a toolkit for making languages. Racket users are
@@ -406,7 +407,7 @@ system that is very likely to change.
 - Thread safety (and eventually parallelism).
 - Better names for definition forms (e.g. `defconst/deps`).
 - Fewer dependencies.
-- Improve the Emacs integration ([Prototype](elisp/overlord.el).)
+- Improve the Emacs integration ([Prototype](elisp/overlord.el)).
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
 - Interfaces for modules?
 
