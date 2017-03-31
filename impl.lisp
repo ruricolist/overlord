@@ -21,7 +21,9 @@
     ;; The #lang syntax.
     :overlord/hash-lang
     ;; Import sets.
-    :overlord/import-set)
+    :overlord/import-set
+    ;; Logging.
+    :overlord/message)
   ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -104,6 +106,8 @@
    ;; Emacs integration.
    :require-for-emacs
    :expand-module-for-emacs
+
+   ;; Freezing the state of the Lisp image.
    :freeze :freeze-policy
    :unfreeze
    :file))
@@ -772,7 +776,7 @@ E.g. delete a file, unbind a variable."
   *frozen*)
 
 (defun freeze ()
-  ;; You should be able to load an image and save it again.
+  ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
     (flet ((freeze ()
              (format t "~&Overlord: freezing image...~%")
@@ -788,6 +792,7 @@ E.g. delete a file, unbind a variable."
              (clrhash (symbol-value '*tasks*))
              (clrhash (symbol-value '*patterns*))
              (clrhash (symbol-value '*module-deps*))
+             ;; The table of module cells needs special handling.
              (clear-module-cells)
              (clrhash (symbol-value '*claimed-module-names*))
              (dolist (fn '(unfreeze build unbuild run dynamic-require-as))
@@ -950,13 +955,17 @@ Don't know how to build missing prerequisite ~s."
             (task.init task)
             (task.deps task))))
 
-(defun build (&optional (target nil target-supplied?) &key (errorp t) force)
+(defun build (&optional (target nil target-supplied?)
+              &key (errorp t)
+                   force
+                   (message-handler *message-handler*))
   (check-not-frozen)
-  (if target-supplied?
-      (receive (target thunk deps)
-          (target-task-values target errorp)
-        (build-task target thunk deps :force force))
-      (build root-target)))
+  (handler-bind ((overlord-message message-handler))
+    (if target-supplied?
+        (receive (target thunk deps)
+            (target-task-values target errorp)
+          (build-task target thunk deps :force force))
+        (build root-target))))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
@@ -1163,7 +1172,9 @@ value and NEW do not match under TEST."
               (:extension (ext)
                 `(extension ,ext))
               (:run (cmd &rest args)
-                `(run-cmd ,cmd ,@args)))
+                `(run-cmd ,cmd ,@args))
+              (:message (control-string &rest args)
+                `(message ,control-string ,@args)))
      ,@body))
 
 (defun run-cmd (cmd &rest args)
