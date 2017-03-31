@@ -1500,6 +1500,11 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *module-deps* (dict))
 
+(defcondition module-dependency ()
+  ((module-cell
+    :initarg :module-cell
+    :reader module-dependency.module-cell)))
+
 (defun module-deps (m)
   (check-type m module-cell)
   (gethash m *module-deps*))
@@ -1527,14 +1532,17 @@ Incrementing this should be sufficient to invalidate old fasls.")
   (if (boundp '*module-chain*)
       (funcall thunk)
       (let ((*module-chain* '()))
-        (funcall thunk))))
+        (handler-bind ((module-dependency
+                         (lambda (c)
+                           (let ((mc (module-dependency.module-cell c)))
+                             (when-let (prev (first *module-chain*))
+                               (pushnew mc (module-deps prev)))
+                             (push mc *module-chain*)))))
+          (funcall thunk)))))
 
 (defun save-module-dependency (mc)
   (check-type mc module-cell)
-  (when (boundp '*module-chain*)
-    (when-let (prev (first *module-chain*))
-      (pushnew mc (module-deps prev)))
-    (push mc *module-chain*)))
+  (signal 'module-dependency :module-cell mc))
 
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
