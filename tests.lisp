@@ -5,7 +5,12 @@
   (:import-from :overlord/impl :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :local-time :now)
-  (:import-from :uiop :absolute-pathname-p)
+  (:import-from :uiop
+    :native-namestring
+    :file-exists-p
+    :absolute-pathname-p
+    :os-windows-p
+    :run-program)
   ;; Languages.
   (:import-from :overlord/demo/js)
   (:import-from :overlord/lang/sweet-exp)
@@ -51,20 +56,19 @@
        ,@body)))
 
 (defun resolve-file (file)
-  (uiop:native-namestring
+  (native-namestring
    (if (absolute-pathname-p file)
        file
        (asdf:system-relative-pathname :overlord file))))
 
 (defun touch-file (file)
   (lret ((file-string (resolve-file file)))
-    (assert (uiop:file-exists-p file-string))
-    #+windows
-    (uiop:run-program
-     (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
-          (uiop:native-namestring file-string)))
-    #-windows
-    (uiop:run-program `("touch" ,file-string))))
+    (assert (file-exists-p file-string))
+    (if (os-windows-p)
+        (run-program
+         (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
+              (native-namestring file-string)))
+        (run-program `("touch" ,file-string)))))
 
 (defun touch (&rest targets)
   (flet ((touch (target)
