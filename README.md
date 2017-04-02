@@ -115,6 +115,21 @@ target: one for building the target, and another for computing its
 dependencies. This (mostly) replaces the need to maintain a database
 of dependencies.
 
+## Building with signals
+
+One other potentially interesting aspect of Overlord’s implementation
+of the Redo model is that walking the dependencies is done using
+signals and handlers, rather than by recursing directly. That is, when
+a script calls `depends-on`, all it does is *signal* that a dependency
+exists. It is the default handler which is responsible for actually
+building the dependency.
+
+While the dependency graph of Overlord remains fundamentally
+imperative, because of this separation, and because of the distinction
+between build and dependency scripts, it should be possible to write
+handlers that simply traverse the dependency graph (once it has been
+built at least once), without necessarily having to actually build it.
+
 ## A word of warning
 
 One thing that might not be obvious about Redo-style build systems is
