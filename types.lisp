@@ -35,7 +35,6 @@
    #:binding-spec
    #:export-spec
    #:definable-symbol
-   #:import-spec
    #:binding-designator
    #:canonical-binding
    #:non-keyword))
@@ -194,8 +193,15 @@
 
 ;;; Imports.
 
-(deftype import-spec ()
-  '(or (member :all :all-as-functions) list))
+(deftype var-alias () 'bindable-symbol)
+(deftype function-alias () '(tuple 'function bindable-symbol))
+(deftype macro-alias () '(tuple 'macro-function bindable-symbol))
+(deftype import-alias () '(or var-alias function-alias macro-alias))
+
+(deftype binding-spec ()
+  '(or (member :all :all-as-functions)
+    (tuple :import-set list)
+    list))
 
 (deftype canonical-binding ()
   '(tuple keyword binding-spec))
@@ -205,4 +211,4 @@
     var-spec
     function-spec
     macro-spec
-    (tuple symbol :as binding-spec)))
+    (tuple symbol :as import-alias)))

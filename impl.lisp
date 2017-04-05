@@ -19,7 +19,11 @@
     ;; How to infer the base for the current package.
     :overlord/base
     ;; The #lang syntax.
-    :overlord/hash-lang)
+    :overlord/hash-lang
+    ;; Import sets.
+    :overlord/import-set
+    ;; Logging.
+    :overlord/message)
   ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -47,13 +51,14 @@
    :if                                  ;Always ternary.
    :if-let                              ;Ditto.
    :cond                                ;Require exhaustive.
-   :set                                 ;Use `symbol-value'.
+   :set                                 ;Use symbol-value.
    :defclass                            ;Force checking slot types.
    :typecase                            ;Use typecase-of instead.
    :etypecase                           ;Use etypecase-of instead.
    :ctypecase                           ;Use ctypecase-of instead.
    :file-write-date                     ;Use file-mtime instead.
    :pathname                            ;Use ensure-pathname.
+   :multiple-value-bind                 ;Use receive.
    )
   (:export
    ;; Defining and building targets.
@@ -75,7 +80,8 @@
    :lang :lang-name :hash-lang-name
    :load-module
    :expand-module
-   :depends-on
+   :depends-on :depends-on*
+   :depends-on-all :depends-on-all*
    :package-expander :package-reader :module-progn-in
    :with-meta-language
    :load-same-name-system
@@ -100,6 +106,8 @@
    ;; Emacs integration.
    :require-for-emacs
    :expand-module-for-emacs
+
+   ;; Freezing the state of the Lisp image.
    :freeze :freeze-policy
    :unfreeze
    :file))
@@ -116,7 +124,7 @@
 ;;; time.
 
 (cl:defmacro defmacro (name args &body body)
-  (multiple-value-bind (body decls docstring)
+  (receive (body decls docstring)
       (parse-body body :documentation t)
     `(cl:defmacro ,name ,args
        ,@(unsplice docstring)
@@ -483,12 +491,7 @@ it."
   (etypecase-of (or string pathname) path
     (string (pathname-exists? (ensure-pathname path :want-pathname t)))
     (pathname
-     (or (and (handler-case
-                  (file-mtime path)
-                #+sbcl (sb-int:simple-file-error () nil))
-              (not (directory-pathname-p path)))
-         ;; TODO file-exists-p has (had?) a bug in CCL.
-         #+ () (file-exists-p path)
+     (or (file-exists-p path)
          (directory-exists-p path)))))
 
 (defun target-timestamp (target)
@@ -773,7 +776,7 @@ E.g. delete a file, unbind a variable."
   *frozen*)
 
 (defun freeze ()
-  ;; You should be able to load an image and save it again.
+  ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
     (flet ((freeze ()
              (format t "~&Overlord: freezing image...~%")
@@ -789,6 +792,7 @@ E.g. delete a file, unbind a variable."
              (clrhash (symbol-value '*tasks*))
              (clrhash (symbol-value '*patterns*))
              (clrhash (symbol-value '*module-deps*))
+             ;; The table of module cells needs special handling.
              (clear-module-cells)
              (clrhash (symbol-value '*claimed-module-names*))
              (dolist (fn '(unfreeze build unbuild run dynamic-require-as))
@@ -861,7 +865,7 @@ E.g. delete a file, unbind a variable."
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
-               (depends-on-all/unordered (list-all-targets))))))
+               (depends-on-all (list-all-targets))))))
     ((or bindable-symbol pathname)
      (gethash target *tasks*))
     (directory-ref
@@ -908,7 +912,7 @@ E.g. delete a file, unbind a variable."
                  ;; Depend on the source file.
                  (depends-on (.source target))
                  ;; The stashed recursive dependencies of the module.
-                 (depends-on-all/unordered (module-deps target))
+                 (depends-on-all (module-deps target))
                  ;; Let the language tell you what else to depend on.
                  (lang-deps (.lang target) (.source target)))))))))
 
@@ -951,13 +955,17 @@ Don't know how to build missing prerequisite ~s."
             (task.init task)
             (task.deps task))))
 
-(defun build (&optional (target nil target-supplied?) &key (errorp t) force)
+(defun build (&optional (target nil target-supplied?)
+              &key (errorp t)
+                   force
+                   (message-handler *message-handler*))
   (check-not-frozen)
-  (if target-supplied?
-      (multiple-value-bind (target thunk deps)
-          (target-task-values target errorp)
-        (build-task target thunk deps :force force))
-      (build root-target)))
+  (handler-bind ((overlord-message message-handler))
+    (if target-supplied?
+        (receive (target thunk deps)
+            (target-task-values target errorp)
+          (build-task target thunk deps :force force))
+        (build root-target))))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
@@ -1021,7 +1029,7 @@ Don't know how to build missing prerequisite ~s."
                (progn
                  (setf (target-table-member *already-built* target) t)
                  (let ((*target* target))
-                   (multiple-value-bind (target thunk deps)
+                   (receive (target thunk deps)
                        (target-task-values target)
                      (when (needs-building? target deps)
                        (funcall thunk))
@@ -1042,11 +1050,6 @@ Don't know how to build missing prerequisite ~s."
     (let ((*target* symbol))
       (setf (symbol-value symbol)     (funcall thunk)
             (target-timestamp symbol) (now)))))
-
-(defun build-symbol (symbol thunk deps)
-  (build-task symbol
-              (rebuild-symbol symbol thunk)
-              deps))
 
 (defcondition dependency ()
   ((target :initarg :target
@@ -1072,36 +1075,23 @@ Don't know how to build missing prerequisite ~s."
   "Build DEPS in no particular order.
 If any of DEPS is a list, its elements will also be added in no
 particular order."
-  (depends-on-all/unordered deps))
+  (depends-on-all deps))
 
-(defun depends-on-all/unordered (deps)
+(defun depends-on-all (deps)
   ;; NB This is where you would add parallelism.
   (assert (boundp '*base*))
-  (~>> deps
-       (flatten-deps *base*)
-       shuffle*
-       (map nil #'depends-on/1))
+  (map nil #'depends-on/1 (shuffle* deps))
   (values))
 
 (defun depends-on* (&rest deps)
   "Build DEPS in the order they are supplied.
 If any of DEPS is a list, it will be descended into."
-  (depends-on-all/ordered deps))
+  (depends-on-all* deps))
 
-(defun depends-on-all/ordered (deps)
+(defun depends-on-all* (deps)
   (assert (boundp '*base*))
-  (~> deps
-      (flatten-deps *base*)
-      (mapc #'depends-on/1 _))
+  (mapc #'depends-on/1 deps)
   (values))
-
-(defun flatten-deps (base deps)
-  ;; We want lists of dependencies to be flattened.
-  (let ((deps (mappend #'ensure-list deps)))
-    ;; A single target may resolve into multiple dependencies (e.g.
-    ;; patterns), but only to one level.
-    (assure (list-of atom)
-      (mappend (op (ensure-list (resolve-target _ base))) deps))))
 
 (defun call/temp-file (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
@@ -1138,7 +1128,7 @@ safely, overwrite DEST with the contents of the temporary file."
 (defun build-constant (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
-  (let* ((*base* (if (boundp '*base*) *base* (base)))
+  (let* ((*base* (eif (boundp '*base*) *base* (base)))
          (old (symbol-value name)))
     (if (funcall test old new)
         old
@@ -1162,6 +1152,10 @@ value and NEW do not match under TEST."
                 `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(depends-on* ,x ,@xs))
+              (:depends-on-all (xs)
+                `(depends-on-all ,xs))
+              (:depends-on-all* (xs)
+                `(depends-on-all* ,xs))
               (:path (path)
                 (assure pathname
                   (path path)))
@@ -1178,7 +1172,9 @@ value and NEW do not match under TEST."
               (:extension (ext)
                 `(extension ,ext))
               (:run (cmd &rest args)
-                `(run-cmd ,cmd ,@args)))
+                `(run-cmd ,cmd ,@args))
+              (:message (control-string &rest args)
+                `(message ,control-string ,@args)))
      ,@body))
 
 (defun run-cmd (cmd &rest args)
@@ -1264,9 +1260,10 @@ rebuilt."
   (with-script-dependency (name expr deps)
     `(progn
        (defvar ,name)
-       (build-symbol ',name
-                     (init-thunk ,expr)
-                     (deps-thunk ,@deps))
+       (build-task ',name
+                   (rebuild-symbol ',name
+                                   (init-thunk ,expr))
+                   (deps-thunk ,@deps))
        ',name)))
 
 (defmacro defconst/deps (name expr &body deps)
@@ -1293,8 +1290,8 @@ rebuilt."
               (if (boundp name)
                   (build name)
                   (let ((deps-thunk (eval* `(deps-thunk ,@deps)))
-                        (init-thunk (eval* `(init-thunk ,expr))))
-                    (build-symbol name init-thunk deps-thunk)))
+                        (init-thunk (rebuild-symbol name (eval* `(init-thunk ,expr)))))
+                    (build-task name init-thunk deps-thunk)))
               (values (symbol-value name)
                       (target-timestamp name)))))
     `(progn
@@ -1303,9 +1300,9 @@ rebuilt."
              (prog1 ',init
                (setf (target-timestamp ',name) ,timestamp))))
        (eval-always
-         (build-symbol ',name
-                       (init-thunk ,expr)
-                       (deps-thunk ,@deps)))
+         (build-task ',name
+                     (rebuild-symbol ',name (init-thunk ,expr))
+                     (deps-thunk ,@deps)))
        ',name)))
 
 (defmacro file-target (name pathname (tmp) &body (init . deps))
@@ -1414,7 +1411,7 @@ specify the dependencies you want on build."
     (etypecase-of (or symbol pattern) pattern
       (pattern pattern)
       (symbol
-       (multiple-value-bind (pat pat?)
+       (receive (pat pat?)
            (gethash pattern *patterns*)
          (cond (pat? pat)
                (errorp (error* "No such pattern: ~s" pattern))
@@ -1503,6 +1500,11 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *module-deps* (dict))
 
+(defcondition module-dependency ()
+  ((module-cell
+    :initarg :module-cell
+    :reader module-dependency.module-cell)))
+
 (defun module-deps (m)
   (check-type m module-cell)
   (gethash m *module-deps*))
@@ -1530,14 +1532,17 @@ Incrementing this should be sufficient to invalidate old fasls.")
   (if (boundp '*module-chain*)
       (funcall thunk)
       (let ((*module-chain* '()))
-        (funcall thunk))))
+        (handler-bind ((module-dependency
+                         (lambda (c)
+                           (let ((mc (module-dependency.module-cell c)))
+                             (when-let (prev (first *module-chain*))
+                               (pushnew mc (module-deps prev)))
+                             (push mc *module-chain*)))))
+          (funcall thunk)))))
 
 (defun save-module-dependency (mc)
   (check-type mc module-cell)
-  (when (boundp '*module-chain*)
-    (when-let (prev (first *module-chain*))
-      (pushnew mc (module-deps prev)))
-    (push mc *module-chain*)))
+  (signal 'module-dependency :module-cell mc))
 
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
@@ -1885,7 +1890,7 @@ The input defaults override PATH where they conflict."
                    :source *source*))
                 (save-module-deps lang *input*))
         :deps (lambda ()
-                (depends-on-all/unordered
+                (depends-on-all
                  (module-static-dependencies lang *input*)))))
 
 (defun fasl-lang-pattern-ref (lang source)
@@ -1945,19 +1950,29 @@ If PACKAGE does not export an expander, `progn' is used instead."
          (form `(,module-progn ,@body)))
     (expand-in-package form package env)))
 
-(defun user-package (package)
+(defun suffix-package (package suffix)
   "Like `resolve-package' but, if a package exists with the same name,
-but ending in -USER, and inheriting from that package, return that
+but ending in SUFFIX, and inheriting from that package, return that
 instead."
+  (assert (string^= "-" suffix))
   (assure package
     (with-absolute-package-names ()
       (when-let (base-package (resolve-package package))
-        (let* ((user-package-name (fmt "~a-USER" (package-name base-package)))
+        (let* ((user-package-name
+                 (concatenate 'string
+                              (package-name base-package)
+                              suffix))
                (user-package (find-package user-package-name)))
           (or (and user-package
                    (find base-package (package-use-list user-package))
                    user-package)
               base-package))))))
+
+(defun user-package (package)
+  "Like `resolve-package' but, if a package exists with the same name,
+but ending in `-user', and inheriting from that package, return that
+instead."
+  (suffix-package package "-USER"))
 
 ;;; TODO Is this useful?
 (defun expand-in-package (form package env)
@@ -1987,7 +2002,7 @@ instead."
       (let ((p (resolve-package package)))
         (if (eql p (find-package :cl))
             'cl-read-module
-            (multiple-value-bind (sym status) (find-symbol reader-string p)
+            (receive (sym status) (find-symbol reader-string p)
               (cond ((no sym)
                      ;; There is no symbol.
                      (error* "No reader defined in package ~a" p))
@@ -2022,7 +2037,7 @@ instead."
                (return-from package-expander nil))))
     (assure (or symbol null)
       (let ((p (resolve-package package)))
-        (multiple-value-bind (sym status) (find-symbol module-string p)
+        (receive (sym status) (find-symbol module-string p)
           (cond ((no sym)
                  (error* "No expander defined in package ~a" p))
                 ((not (eql status :external))
@@ -2110,7 +2125,7 @@ This should be a superset of the variables bound by CL during calls to
 (defun guess-lang+pos (file)
   "If FILE has a #lang line, return the lang and the position at which
 the #lang declaration ends."
-  (multiple-value-bind (lang pos)
+  (receive (lang pos)
       (file-hash-lang file)
     (if (stringp lang)
         (values (lookup-hash-lang lang) pos)
@@ -2197,6 +2212,9 @@ the #lang declaration ends."
        (loop for export in (get-static-exports)
              for sym = (intern (string export))
              collect `(,export :as #',sym)))
+      ((tuple :import-set list)
+       (let ((import-set (second spec)))
+         (expand-import-set import-set #'get-static-exports)))
       (list spec))))
 
 (defun guess-source (lang alias)
@@ -2286,7 +2304,7 @@ Binding imports (~a) from a module imported as a function (~a) is not currently 
 
 Note you can do (import #'foo ...), and the module will be bound as a function."
   ;; Ensure we have both the lang and the source.
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang lang
                            :source source
                            :module module
@@ -2425,7 +2443,7 @@ actually exported by the module specified by LANG and SOURCE."
   `(progn
      ,@(collecting
          (dolist (clause values)
-           (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+           (receive (import alias ref) (import+alias+ref clause module)
              (declare (ignore import))
              (collect
                  (etypecase-of binding-spec alias
@@ -2456,7 +2474,7 @@ actually exported by the module specified by LANG and SOURCE."
            (list (make-keyword (second clause)) clause))
           (macro-spec
            (list (make-keyword (second clause)) clause))
-          ((tuple symbol :as binding-spec)
+          ((tuple symbol :as import-alias)
            (destructuring-bind (import &key ((:as alias))) clause
              (list (make-keyword import) alias)))))))
 
@@ -2474,7 +2492,7 @@ actually exported by the module specified by LANG and SOURCE."
                               (macro-spec `(macro-function ,(prefix (second alias))))))))))
 
 (defun import-binding (clause module &optional env)
-  (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+  (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of binding-spec alias
       (var-spec
@@ -2504,7 +2522,7 @@ actually exported by the module specified by LANG and SOURCE."
               (funcall ,ref ,whole ,env))))))))
 
 (defun import-value (clause module)
-  (multiple-value-bind (import alias ref) (import+alias+ref clause module)
+  (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of binding-spec alias
       (var-spec
@@ -2529,7 +2547,7 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import/local (mod &body (&key from as binding values prefix)
                         &environment env)
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang as
                            :source from
                            :prefix prefix
@@ -2569,7 +2587,7 @@ actually exported by the module specified by LANG and SOURCE."
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
-  (multiple-value-bind (lang source bindings values)
+  (receive (lang source bindings values)
       (resolve-import-spec :lang lang
                            :source source
                            :bindings bindings

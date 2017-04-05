@@ -9,11 +9,11 @@
 ;;         (grid-make make-grid))
 
 (:import grid :from "grid.lisp"
-  :binding :all-as-functions
-  :prefix grid-)
-
-(defun make-grid (n m)
-  (grid-make n m))
+  :binding
+  (:import-set
+   (:rename
+    (:prefix :all-as-functions grid-)
+    (#'grid-make #'make-grid))))
 
 ;;; Initialize a grid with a glider.
 (def grid (make-grid 24 24))

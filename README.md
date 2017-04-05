@@ -27,8 +27,9 @@ Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
 Note that, to run the test suite, you will need to
-download [Core Lisp][], and you must have the `touch` program in your
-search path.
+download [Core Lisp][], and, if not on Windows, you must have the
+`touch` program in your search path. (If on Windows, Powershell is
+used instead).
 
 When I say “experimental”, I mean it. Anything may change at any time.
 This code is not ready for use. It may not even be ready for release.
@@ -77,22 +78,37 @@ unfortunately, unlikely to change.)
 
 # Overlord vs. Redo
 
-A phrase like “inspired by Redo and Racket” needs unpacking. Overlord has
-a stratified design. The bottom layer is a build system, inspired by
-Redo. What makes Overlord different is that its dependency graph allows
-both files and Lisp bindings as targets. The top layer is a module
-system, inspired by Racket, for embedding languages into Lisp. You can
-use the module system without knowing about the build system; you
-can use the build system without knowing about the module system.
+[Redo][] is a build system. Actually, Redo is a family of build
+systems, sharing [a design][djb-redo] due
+to [Daniel J. Bernstein][djb] (although he has never released an
+implementation). In the space of build systems, Redo is a remarkable
+local optimum: it is both very powerful and very simple. It is not the
+most powerful build system possible, or the very simplest, but it
+certainly provides the most leverage.
+
+Build systems manage state in the file system. In Common Lisp, we have
+a bundle of state which, in many ways, resembles a file system: a set
+of persistent, mutable locations with first-class, hierarchical
+addresses. Symbols have value cells and function cells (mutable
+locations); they have property lists; they are used as keys in
+arbitrary namespaces (more locations); they can be persisted, in fasl
+files and in saved images; and they are each uniquely addressed with a
+path (package name, symbol name).
+
+Overlord generalizes the idea of a build system so that its dependency
+graph can include both files on disk and state in the Lisp system. It
+manages the state stored by Lisp itself, in symbols, and provides ways
+to manage other kinds of state. This generalized build system is
+modeled on Redo.
 
 The most obvious, but least important, difference between Overlord and
-Redo is that Redo uses shell scripts, while Overlord’s “scripts” are
-written in Lisp. (It is unimportant because, after all, you can run
-shell commands from Lisp, or somehow call Lisp from the shell.) On the
-one hand, embedding shell syntax in Lisp is clumsy; on the other hand,
-Lisp special variables are much superior to any shell-based means for
-passing information between parent and child scripts. (See §5.4.2
-in [Grosskurth 2007][Grosskurth].)
+Redo in practice is that Redo uses shell scripts, while Overlord’s
+“scripts” are written in Lisp. (It is unimportant because, after all,
+you can run shell commands from Lisp, or somehow call Lisp from the
+shell.) On the one hand, embedding shell syntax in Lisp is clumsy; on
+the other hand, Lisp special variables are much superior to any
+shell-based means for passing information between parent and child
+scripts. (See §5.4.2 in [Grosskurth 2007][Grosskurth].)
 
 The *important* difference is that Overlord uses *two* scripts per
 target: one for building the target, and another for computing its
@@ -109,7 +125,7 @@ the order in which targets are built.
 
 # Overlord and Lisp images
 
-During development, as targets are defined and re-defined, or rebuilt
+During development, as targets are defined and re-defined, and rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
 from the one specified by Overlord’s dependency graph. Before dumping
 an image such discrepancies must be resolved. It is obviously
@@ -120,24 +136,64 @@ file might be provided maliciously.)
 
 Thus, before an image is saved, Overlord needs to do two things:
 
-1. Assure the state of the image by making sure that all defined
+1. Finalize the state of the image by making sure that all defined
    targets have been built.
 
 2. Disable itself.
 
 If you use `uiop:dump-image` to save the image, you don’t need to do
-anything; Overlord will assure the state of the image, and disable
+anything; Overlord will finalize the state of the image, and disable
 itself, automatically.
 
 If you are using implementation-specific means to save an image,
 however, you will need to arrange to call `overlord:freeze` before the
 image is saved.
 
+The default policy is to allow the restored image to be unfrozen, and
+development to be resumed, by calling `overlord:unfreeze`. This is
+probably what you want when, say, saving an image on a server. In
+other scenarios, however — like delivering a binary – you may want to
+strip the build system from the image entirely. This is possible by
+changing Overlord’s “freeze policy”, using the `freeze-policy`
+accessor.
+
+    ;;; The default: can be reversed after
+    ;;; loading the image by calling
+    ;;; `overlord:unfreeze`.
+    (setf (overlord:freeze-policy) nil)
+
+    ;;; Irreversible: before saving the
+    ;;; image, Overlord should destroy its
+    ;;; internal state.
+    (setf (overlord:freeze-policy) :hard)
+
 # Overlord vs. Racket
 
-The following assumes some familiarity
-with [Racket][Racket Manifesto], and with subsequent work in Scheme
-module systems.
+Racket is a language in the Lisp family, descended from Scheme. Its
+distinction is its focus on making languages. An impressive amount of
+thought, effort, and research has gone into making the whole Racket
+environment act as a toolkit for making languages. Racket users are
+both encouraged and expected to solve their problems by making
+special-purpose languages; and Racket itself is implemented, from a
+simple, Scheme-like core, as a tower of languages.
+
+(If you want to investigate for yourself, you can find a gentle
+introduction to making languages with Racket in [Beautiful Racket][].)
+
+You might be wondering what making languages has to do with a build
+system. The answer is that, once we have a build system that allows
+Lisp bindings as targets, the idea of a language falls out naturally.
+The most abstraction a file-to-file build system can support is a
+*pattern* – an abstract relationship between two files. But what is an
+abstract relationship between a file and a Lisp binding? The
+relationship is a *language*; the Lisp object is a *module*.
+
+Overlord models its support for making languages on Racket. It is not
+a direct imitation of Racket, however. It also draws on subsequent and
+related work in Scheme module systems to create a module system that
+is fundamentally dynamic.
+
+## Modules
 
 A Overlord module is a *file* in a *language*. Overlord supports a
 Racket-like hash-lang (`#lang`) syntax, but in Overlord the language
@@ -145,6 +201,14 @@ of a module can also be specified as part of the import syntax. Since
 the language is not an inherent part of the file, the same file can be
 loaded as a module in more than one language. And each language-file
 combination gets its own, completely independent module.
+
+Overlord is very liberal about what can be a module. In Overlord, any
+value can be a module – a string, a function, a hash table, anything –
+and any module can provide exports as long as it specializes certain
+generic functions, like `module-ref`.
+
+(Most of the time, however, what you want
+is [`simple-module`](#simple-modules).)
 
 ## Languages
 
@@ -238,13 +302,6 @@ unsurprisingly, to statically determine the module’s exports.
 
 ## Imports and exports
 
-Overlord is very liberal about what can be a module. In Overlord, any
-value can be a module – a string, a function, a hash table, anything –
-and any module can provide exports as long as it specializes certain
-generic functions, like `module-ref`.
-
-(Most of the time, however, what you want is [`simple-module`](#simple-modules).)
-
 What Overlord imports and exports are not values, but bindings. Bindings
 are indirect (and immutable): they refer to the module, rather than to
 the value of the export. This allows for modules to be reloaded at any
@@ -267,10 +324,17 @@ always loaded lazily. A module is never actually loaded until a
 function imported from it is called, or a variable imported from it is
 looked up.
 
-Finally, Overlord allows local imports. The combination of lazy loading
-and local imports means that needless imports are minimized. For
-example, a module that is only used inside of a macro will only be
-loaded when the macro is expanded at compile time.
+Finally, Overlord allows local imports: imports that only take effect
+within the body of a `with-imports` form.
+
+The combination of lazy loading and local imports may mean that, in
+some cases, needless imports are minimized. For example, a module that
+is only used inside of a macro might only be loaded when the macro is
+expanded at compile time. However, this does not apply when saving
+images: all known modules are loaded before the image is saved. The
+real effect of pervasive lazy loading is that, since you do not know
+when, or in what order, modules will be loaded, you must not rely on
+load-time side effects.
 
 ## Simple modules
 
@@ -335,11 +399,11 @@ system that is very likely to change.
 - Lots of tests.
 - More portability testing.
 - Leverage UIOP more.
+- Stop relying on timestamps.
 - Source locations for functions in embedded languages.
 - Convenient logging protocol/syntax.
 - More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
-- More expressive syntax for imports. (Compare [R6RS][r6rs-imports].)
 - Better names for definition forms (e.g. `defconst/deps`).
 - Fewer dependencies.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el).)
@@ -403,6 +467,19 @@ You might want them again later. -->
 [Bawden]: https://people.csail.mit.edu/alan/mtt/
 [Frink]: https://frinklang.org
 [LoL]: http://www.letoverlambda.com/
+[djb-redo]: https://cr.yp.to/redo.html
+[djb]: https://cr.yp.to/djb.html
+[Beautiful Racket]: http://beautifulracket.com
+[Maxima]: https://sourceforge.net/projects/maxima/
+[ACL2]: https://www.cs.utexas.edu/users/moore/acl2/
+[hopeless]: https://gist.github.com/samth/3083053
+[REPL scripting]:
+
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
+
+
+<!-- Local Variables: -->
+<!-- compile-command: "pandoc README.md -o README.html" -->
+<!-- End: -->

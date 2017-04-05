@@ -23,7 +23,8 @@
    #:dx-sxhash
    #:ensure-pathnamef
    #:read-file-form
-   #:write-form-as-file))
+   #:write-form-as-file
+   #:write-file-if-changed))
 (cl:in-package #:overlord/util)
 
 (defun package-exports (p)
@@ -142,3 +143,18 @@ then we set its value inside a critical section."
                          :if-exists :rename-and-delete)
       (write form :stream out
                   :readably t))))
+
+(defun write-file-if-changed (data file)
+  (receive (read1 element-type)
+      (etypecase data
+        (string (values #'read-char 'character))
+        (octet-vector (values #'read-byte 'octet)))
+    (fbind read1
+      (or (and (file-exists-p file)
+               (with-input-from-file (in file :element-type element-type)
+                 (and (= (length data)
+                         (file-length file))
+                      (loop for char across data
+                            always (eql char (read1 in))))))
+          (with-output-to-file (out file :if-exists :rename-and-delete)
+            (write-sequence data out))))))

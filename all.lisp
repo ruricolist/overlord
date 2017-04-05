@@ -12,14 +12,20 @@
   (:import-from :overlord/file-package
     :ensure-file-package
     :reset-file-package)
+  (:import-from :overlord/message
+    :message
+    :*message-handler*
+    :*message-stream*)
   (:export
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
-   :ensure-file-package :reset-file-package)
+   :ensure-file-package :reset-file-package
+   :message :*message-handler*)
   (:use-reexport
    :overlord/base
    :overlord/impl
-   :overlord/parsers))
+   :overlord/parsers
+   :overlord/message))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord/impl)
