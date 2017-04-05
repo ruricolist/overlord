@@ -27,6 +27,7 @@
    #:physical-pathname
    #:temporary-file
    ;; Imports and exports.
+   #:import-alias
    #:bindable-symbol
    #:export-alias
    #:var-spec
@@ -34,6 +35,9 @@
    #:macro-spec
    #:binding-spec
    #:export-spec
+   #:var-alias
+   #:function-alias
+   #:macro-alias
    #:definable-symbol
    #:binding-designator
    #:canonical-binding
@@ -174,9 +178,6 @@
 
 (deftype macro-spec ()
   '(tuple 'macro-function bindable-symbol))
-
-(deftype binding-spec ()
-  '(or var-spec function-spec macro-spec))
 
 ;;; Exports.
 
