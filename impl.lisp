@@ -2193,10 +2193,17 @@ the #lang declaration ends."
 (defun expand-binding-spec (spec lang source)
   (setf source (merge-pathnames source (base))
         lang (lang-name lang))
-  ;; Avoid calculating the static exports if we don't need them.
   (flet ((get-static-exports ()
+           ;; This doesn't save any work. The static bindings are
+           ;; always computed every time we import from a module. But
+           ;; we still only want to compute them here if we absolutely
+           ;; have to. Why? For friendlier debugging. Doing the check
+           ;; here would prevent us from macroexpanding `import' at
+           ;; all if there was a problem with the imports, which is
+           ;; frustrating. Instead, we push the check down into the
+           ;; `check-static-bindings-now' macro.
            (module-static-exports/cache lang source)))
-    (etypecase-of binding-spec spec
+    (etypecase-of import-spec spec
       ((eql :all)
        (loop for export in (get-static-exports)
              for sym = (intern (string export))
@@ -2211,9 +2218,9 @@ the #lang declaration ends."
       (list spec))))
 
 (defun guess-source (lang alias)
-  (~>> (etypecase-of import-alias alias
-         (var-alias alias)
-         ((or function-alias macro-alias)
+  (~>> (etypecase-of binding-spec alias
+         (var-spec alias)
+         ((or function-spec macro-spec)
           (second alias)))
        string-downcase
        (make-pathname :name)
@@ -2267,7 +2274,7 @@ the #lang declaration ends."
           (required-argument :from))))))
 
 (defun imports-with-module-as-function-not-supported (mod bindings values)
-  (when (and (typep mod 'function-alias)
+  (when (and (typep mod 'function-spec)
              (or bindings values))
     (error* "~
 Binding imports (~a) from a module imported as a function (~a) is not currently supported."
@@ -2392,35 +2399,35 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import-module (module &key as from)
   (let ((req-form `(require-as ',as ,from)))
-    (etypecase-of import-alias module
-      (var-alias
+    (etypecase-of binding-spec module
+      (var-spec
        `(overlord/shadows:def ,module ,req-form))
-      (function-alias
+      (function-spec
        `(overlord/shadows:defalias ,(second module) ,req-form))
-      (macro-alias
+      (macro-spec
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
   (save-module-dependency (module-cell as from))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
-    (etypecase-of import-alias module
-      (var-alias
+    (etypecase-of binding-spec module
+      (var-spec
        `(overlord/shadows:define-symbol-macro ,module ,lazy-load))
-      (function-alias
+      (function-spec
        (let ((fn (second module)))
          `(progn
             (declaim (notinline ,fn))
             (overlord/shadows:defun ,fn (&rest args)
               (apply ,lazy-load args)))))
-      (macro-alias
+      (macro-spec
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-task (module &key as from values lazy)
   (declare (ignorable lazy))
   (let ((task-name
-          (etypecase-of import-alias module
-            (var-alias module)
-            ((or function-alias macro-alias)
+          (etypecase-of binding-spec module
+            (var-spec module)
+            ((or function-spec macro-spec)
              (second module)))))
     `(deftask ,task-name
        (progn
@@ -2439,11 +2446,11 @@ actually exported by the module specified by LANG and SOURCE."
            (receive (import alias ref) (import+alias+ref clause module)
              (declare (ignore import))
              (collect
-                 (etypecase-of import-alias alias
-                   (var-alias `(setf ,alias ,ref))
-                   (function-alias
+                 (etypecase-of binding-spec alias
+                   (var-spec `(setf ,alias ,ref))
+                   (function-spec
                     `(setf (symbol-function ',(second alias)) ,ref))
-                   (macro-alias
+                   (macro-spec
                     ;; TODO Why not? It's just setf of macro-function.
                     (error 'macro-as-value :name (second alias))))))))))
 
@@ -2461,11 +2468,11 @@ actually exported by the module specified by LANG and SOURCE."
     (if (typep clause 'canonical-binding)
         clause
         (etypecase-of binding-designator clause
-          (atom
+          (var-spec
            (list (make-keyword clause) clause))
-          (function-alias
+          (function-spec
            (list (make-keyword (second clause)) clause))
-          (macro-alias
+          (macro-spec
            (list (make-keyword (second clause)) clause))
           ((tuple symbol :as import-alias)
            (destructuring-bind (import &key ((:as alias))) clause
@@ -2479,18 +2486,18 @@ actually exported by the module specified by LANG and SOURCE."
       (flet ((prefix (suffix) (symbolicate prefix suffix)))
         (loop for (import alias) in clauses
               collect (list import
-                            (etypecase-of import-alias alias
-                              (var-alias (prefix alias))
-                              (function-alias `(function ,(prefix (second alias))))
-                              (macro-alias `(macro-function ,(prefix (second alias))))))))))
+                            (etypecase-of binding-spec alias
+                              (var-spec (prefix alias))
+                              (function-spec `(function ,(prefix (second alias))))
+                              (macro-spec `(macro-function ,(prefix (second alias))))))))))
 
 (defun import-binding (clause module &optional env)
   (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
-    (etypecase-of import-alias alias
-      (var-alias
+    (etypecase-of binding-spec alias
+      (var-spec
        `(overlord/shadows:define-symbol-macro ,alias ,ref))
-      (function-alias
+      (function-spec
        (let ((alias (second alias))
              (exp (macroexpand-1 `(function-wrapper ,ref) env)))
          ;; We used to use dynamic-extent declarations here, but Core
@@ -2507,7 +2514,7 @@ actually exported by the module specified by LANG and SOURCE."
                   (function-wrapper
                    (lambda (&rest args)
                     (apply ,ref args))))))))
-      (macro-alias
+      (macro-spec
        (let ((alias (second alias)))
          (with-gensyms (whole body env)
            `(overlord/shadows:defmacro ,alias (&whole ,whole &body ,body &environment ,env)
@@ -2517,14 +2524,14 @@ actually exported by the module specified by LANG and SOURCE."
 (defun import-value (clause module)
   (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
-    (etypecase-of import-alias alias
-      (var-alias
+    (etypecase-of binding-spec alias
+      (var-spec
        `(overlord/shadows:def ,alias ,ref))
-      (function-alias
+      (function-spec
        (let ((alias (second alias)))
          `(overlord/shadows:defalias ,alias
             (function-wrapper ,ref))))
-      (macro-alias
+      (macro-spec
        (error 'macro-as-value :name (second alias))))))
 
 (defun import+alias+ref (clause module)
@@ -2553,6 +2560,7 @@ actually exported by the module specified by LANG and SOURCE."
     ;; every time.
     `(progn
        (import-module/lazy ,mod :as ,lang :from ,source)
+       (check-static-bindings-now ,lang ,source ,(append bindings values))
        (import-bindings ,mod ,@bindings)
        (import-values ,mod ,@values))))
 
@@ -2602,33 +2610,33 @@ the symbols bound in the body of the import form."
                                      &key
                                        ((:binding bindings))
                                        values
-                                       &allow-other-keys))
+                                     &allow-other-keys))
   (declare (ignore body))
   `(defpackage ,package-name
      (:use)
      (:export ,@(nub (loop for (nil alias) in (append bindings values)
                            collect (make-keyword
-                                    (etypecase-of import-alias alias
-                                      (var-alias alias)
-                                      (function-alias (second alias))
-                                      (macro-alias (second alias)))))))))
+                                    (etypecase-of binding-spec alias
+                                      (var-spec alias)
+                                      (function-spec (second alias))
+                                      (macro-spec (second alias)))))))))
 
 (defmacro import-as-package-aux (package-name &body
                                                 (&rest body
                                                  &key ((:binding bindings))
                                                       values
-                                                      &allow-other-keys))
+                                                 &allow-other-keys))
   (let ((p (assure package (find-package package-name))))
     (labels ((intern* (sym)
                (intern (string sym) p))
              (intern-spec (spec)
                (loop for (key alias) in spec
-                     collect `(,key :as ,(etypecase-of import-alias alias
-                                           (var-alias (intern* alias))
-                                           (function-alias
+                     collect `(,key :as ,(etypecase-of binding-spec alias
+                                           (var-spec (intern* alias))
+                                           (function-spec
                                             (let ((alias (second alias)))
                                               `(function ,(intern* alias))))
-                                           (macro-alias
+                                           (macro-spec
                                             (let ((alias (second alias)))
                                               `(macro-function ,(intern* alias)))))))))
       (let ((module-binding (symbolicate '%module-for-package- (package-name p))))
