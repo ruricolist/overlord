@@ -15,7 +15,7 @@
 (defun public-name+private-name (import)
   (receive (public private)
       (etypecase-of binding-designator import
-        (atom (values import import))
+        (var-spec (values import import))
         (function-alias (values import (second import)))
         (macro-alias (values import (second import)))
         ((tuple symbol :as import-alias)
