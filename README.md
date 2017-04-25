@@ -1,13 +1,30 @@
 Overlord is an experimental build/module system for Common Lisp,
 inspired by [Redo][] and [Racket][].
 
-Overlord enables *languages as libraries*. All Lisps handle language
+Overlord enables *languages as libraries*. Overlord languages have
+several important properties:
+
+1. Embedded languages are first-class. Modules live in their own
+   files, just like Lisp code, and are compiled into [fasls][], just
+   like Lisp code.
+
+2. Languages can use any syntax. Unlike emedded DSLs, which are
+   limited by what can be done with reader macros, full languages can
+   use any parser they like.
+
+3. Languages are interoperable. Lisp code can import modules written
+   in embedded languages; embedded languages can import other modules
+   written in the same language, or in other languages.
+
+All Lisps handle language
 extension through macros. Common Lisp even allows extension at the
 syntactic level, with reader macros. But projects that go beyond
 internal DSLs, into full language implementations, end up in their own
 silos. With Overlord, modules written in hosted languages can be used
 in ordinary Lisp programs, and even (for languages implemented in
 Lisp) from modules written in other languages.
+
+
 
 Besides a module system, Overlord also offers a general-purpose build
 system. This is a case of what is good for the implementer being good
@@ -28,7 +45,7 @@ running the latest version of [ASDF][].
 
 Note that, to run the test suite, you will need to
 download [Core Lisp][], and, if not on Windows, you must have the
-`touch` program in your search path. (If on Windows, Powershell is
+`touch` program in your search path. (On Windows, Powershell is
 used instead).
 
 When I say “experimental”, I mean it. Anything may change at any time.
@@ -489,8 +506,6 @@ You might want them again later. -->
 [Maxima]: https://sourceforge.net/projects/maxima/
 [ACL2]: https://www.cs.utexas.edu/users/moore/acl2/
 [hopeless]: https://gist.github.com/samth/3083053
-[REPL scripting]:
-
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
