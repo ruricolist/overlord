@@ -438,7 +438,6 @@ system that is very likely to change.
 - Convenient logging protocol/syntax.
 - More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
-- Better names for definition forms (e.g. `defconst/deps`).
 - Fewer dependencies.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el)).
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)

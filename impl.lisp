@@ -44,7 +44,7 @@
   (:import-from :cl-custom-hash-table
     :define-custom-hash-table-constructor
     :with-custom-hash-table)
-  (:shadow :define-constant :import)
+  (:shadow :defconfig :import)
   ;; Shadow for style.
   (:shadow
    :defmacro                            ;Hygienic pathnames.
@@ -62,8 +62,8 @@
    )
   (:export
    ;; Defining and building targets.
-   :define-constant
-   :defconst/deps
+   :defconfig
+   :defconfig/deps
    :var-target
    :defvar/deps
    :deftask
@@ -532,7 +532,7 @@ it."
   (etypecase-of target target
     (root-target (setf (root-target-timestamp root-target) timestamp))
     (bindable-symbol
-     ;; "Constants" need to set the timestamp while unbound.
+     ;; Configurations need to set the timestamp while unbound.
      #+ () (unless (boundp target)
              (error* "Trying to set timestamp for unbound symbol ~s"
                      target))
@@ -1139,7 +1139,7 @@ safely, overwrite DEST with the contents of the temporary file."
              (rebuild-file file thunk (base))
              deps))
 
-(defun build-constant (name new test)
+(defun build-conf (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
   (let* ((*base* (eif (boundp '*base*) *base* (base)))
@@ -1147,7 +1147,7 @@ value and NEW do not match under TEST."
     (if (funcall test old new)
         old
         (progn
-          (simple-style-warning "Redefining constant ~s" name)
+          (simple-style-warning "Redefining configuration ~s" name)
           (funcall (rebuild-symbol name (lambda () new)))))))
 
 ;
@@ -1202,8 +1202,8 @@ value and NEW do not match under TEST."
 
 ;;; Bindings.
 
-(defmacro define-constant (name init &key (test '#'equal)
-                                          documentation)
+(defmacro defconfig (name init &key (test '#'equal)
+                                    documentation)
   (let ((init
           `(let ((*base* ,(base)))
              (with-defaults-from-base
@@ -1222,7 +1222,7 @@ value and NEW do not match under TEST."
        (eval-always
          (save-task ',name (constantly ,init) (constantly nil)))
        (eval-always
-         (build-constant ',name ,init ,test))
+         (build-conf ',name ,init ,test))
        ',name)))
 
 (defmacro deps-thunk (&body body)
@@ -1240,8 +1240,8 @@ value and NEW do not match under TEST."
            ,@body)))))
 
 (defmacro define-script (name expr)
-  `(define-constant ,name ',expr
-     :test #'source=))
+  `(defconfig ',expr
+     :test #'source=)))
 
 (defmacro with-script-dependency ((name expr deps) &body body)
   (with-gensyms (sn)
@@ -1287,8 +1287,8 @@ rebuilt."
      (build ',name)
      ',name))
 
-(defmacro defconst/deps (name expr &body deps)
-  "Define a constant with dependencies.
+(defmacro defconfig/deps (name expr &body deps)
+  "Define a conf with dependencies.
 A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
@@ -1297,10 +1297,10 @@ rebuilt."
      ;; The script must be available at compile time to be depended
      ;; on.
      (define-script ,(script-name name) ,expr)
-     (defconst/deps-aux ,name ,expr
+     (defconfig/deps-aux ,name ,expr
        ,@deps)))
 
-(defmacro defconst/deps-aux (name expr &body deps)
+(defmacro defconfig/deps-aux (name expr &body deps)
   (mvlet* ((base (base))
            (*base* base)
            (deps

@@ -91,10 +91,10 @@
 
 ;;; Definition form tests.
 
-(overlord:define-constant
+(overlord:defconfig
     +literal-string-file+ #p"tests/literal.txt")
 
-(overlord:defconst/deps +literal-string+
+(overlord:defconfig/deps +literal-string+
     (read-file-into-string +literal-string-file+)
   (:depends-on '+literal-string-file+)
   (:depends-on +literal-string-file+))
