@@ -205,7 +205,7 @@
     list))
 
 (deftype canonical-binding ()
-  '(tuple keyword binding-spec))
+  '(tuple keyword import-alias))
 
 (deftype binding-designator ()
   '(or
