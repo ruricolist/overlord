@@ -1241,7 +1241,7 @@ value and NEW do not match under TEST."
 
 (defmacro define-script (name expr)
   `(defconfig ',expr
-     :test #'source=)))
+     :test #'source=))
 
 (defmacro with-script-dependency ((name expr deps) &body body)
   (with-gensyms (sn)
