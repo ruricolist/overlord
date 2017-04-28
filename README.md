@@ -193,7 +193,7 @@ accessor.
     ;;; The default: can be reversed after
     ;;; loading the image by calling
     ;;; `overlord:unfreeze`.
-    (setf (overlord:freeze-policy) nil)
+    (setf (overlord:freeze-policy) t)
 
     ;;; Irreversible: before saving the
     ;;; image, Overlord should destroy its
