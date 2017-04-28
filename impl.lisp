@@ -764,6 +764,19 @@ E.g. delete a file, unbind a variable."
 (declaim (type freeze-policy *freeze-policy*))
 
 (defun freeze-policy ()
+  "Get or set the current freeze policy.
+
+The freeze policy determines what Overlord does when saving an image.
+
+A freeze policy of `t' (the default) disables module loading, but can
+be reversed with `overlord:unfreeze'.
+
+A freeze policy of `nil` does nothing. This should only be used for
+local development.
+
+A freeze policy of `:hard' does the same thing as `t', but cannot be
+reversed. This should be used when the image is intended to be
+distributed."
   *freeze-policy*)
 
 (defun (setf freeze-policy) (value)
