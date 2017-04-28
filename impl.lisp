@@ -64,6 +64,7 @@
    ;; Defining and building targets.
    :define-constant
    :defconst/deps
+   :var-target
    :defvar/deps
    :deftask
    :file-target :directory-target
@@ -1264,20 +1265,27 @@ value and NEW do not match under TEST."
   (declare (ignore body))
   `(forget-target ',name))
 
+(defmacro var-target (name expr &body deps)
+  (with-script-dependency (name expr deps)
+    `(progn
+       (defvar ,name)
+       (save-task ',name
+                  (rebuild-symbol ',name
+                                  (init-thunk ,expr))
+                  (deps-thunk ,@deps))
+       ',name)))
+
 (defmacro defvar/deps (name expr &body deps)
   "Define a variable with dependencies.
 A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  (with-script-dependency (name expr deps)
-    `(progn
-       (defvar ,name)
-       (build-task ',name
-                   (rebuild-symbol ',name
-                                   (init-thunk ,expr))
-                   (deps-thunk ,@deps))
-       ',name)))
+  `(progn
+     (var-target ,name ,expr
+       ,@deps)
+     (build ',name)
+     ',name))
 
 (defmacro defconst/deps (name expr &body deps)
   "Define a constant with dependencies.
