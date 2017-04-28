@@ -1,62 +1,35 @@
+# Overlord
+
 Overlord is an experimental build/module system for Common Lisp,
 inspired by [Redo][] and [Racket][].
+
+## A programming language programming language
 
 Overlord enables *languages as libraries*. Overlord languages have
 several important properties:
 
-1. Embedded languages are first-class. Modules live in their own
-   files, just like Lisp code, and are compiled into [fasls][], just
-   like Lisp code.
+1. Languages are *first-class*. Modules live in their own files, just
+   like Lisp code, and are compiled into [fasls][], just like Lisp
+   code.
 
-2. Languages can use any syntax. Unlike emedded DSLs, which are
+2. Languages can use *any syntax*. Unlike emedded DSLs, which are
    limited by what can be done with reader macros, full languages can
    use any parser they like.
 
-3. Languages are interoperable. Lisp code can import modules written
-   in embedded languages; embedded languages can import other modules
-   written in the same language, or in other languages.
+3. Languages are *interoperable*. Lisp code can import modules written
+   in embedded languages, and modules written in embedded languages
+   can import other modules – even modules written in other languages.
 
-All Lisps handle language
-extension through macros. Common Lisp even allows extension at the
-syntactic level, with reader macros. But projects that go beyond
-internal DSLs, into full language implementations, end up in their own
-silos. With Overlord, modules written in hosted languages can be used
-in ordinary Lisp programs, and even (for languages implemented in
-Lisp) from modules written in other languages.
+4. Languages are *reusable*. Support for meta-languages allows
+   different languages to share the same parser or for the same
+   language to be written in more than one syntax.
 
-
-
-Besides a module system, Overlord also offers a general-purpose build
-system. This is a case of what is good for the implementer being good
-for the user. Supporting a flexible module system requires an
-expressive build system. This build system is also made available to
-users of Overlord.
-
-*Overlord is experimental*. Trying to document the API at this stage
-would be futile. Instead, this README discusses the concepts behind
-Overlord. If you’re looking for the current syntax, consult
-the [test suite](tests.lisp) and the [files it uses](tests/).
-
-(If you are interested in reading the code, the substance is
-in [impl.lisp](impl.lisp); the rest is support.)
-
-Before loading Overlord, it would be a good idea to make sure you are
-running the latest version of [ASDF][].
-
-Note that, to run the test suite, you will need to
-download [Core Lisp][], and, if not on Windows, you must have the
-`touch` program in your search path. (On Windows, Powershell is
-used instead).
-
-When I say “experimental”, I mean it. Anything may change at any time.
-This code is not ready for use. It may not even be ready for release.
-
-# Language examples
+## Language examples
 
 Here are some example language embeddings:
 
 1. [overlord/demo/js](demo/js.lisp). A simple demo language built
-   on [CL-JavaScript][]. Shows how to convert an existing CL language
+   on [CL-JavaScript][]. Shows how to convert a pre-existing CL language
    implementation to work with Overlord.
 
 2. [Bosom Serpent][]. Shows how to wrap a foreign runtime (Python,
@@ -73,6 +46,34 @@ Here are some example language embeddings:
 5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
    dialect [ISLISP][] (itself a conceptual subset of Common Lisp).
    Shows how to use Overlord to build “language towers.”
+
+## Overlord as a build system
+
+Besides a module system, Overlord also offers a general-purpose build
+system. This is a case of what is good for the implementer being good
+for the user. A flexible module system requires an expressive build
+system. This build system is also made available to users of Overlord.
+
+## Advice for users
+
+*Overlord is experimental*. For the most part, trying to document the
+API at this stage would be futile. Instead, this README discusses the
+concepts behind Overlord. If you’re looking for the current syntax,
+consult the [test suite](tests.lisp) and the [files it uses](tests/).
+
+(If you are interested in reading the code, the substance is
+in [impl.lisp](impl.lisp); the rest is support.)
+
+Before loading Overlord, it would be a good idea to make sure you are
+running the latest version of [ASDF][].
+
+Note that, to run the test suite, you will need to
+download [Core Lisp][], and, if not on Windows, you must have the
+`touch` program in your search path. (On Windows, Powershell is
+used instead).
+
+When I say “experimental”, I mean it. Anything may change at any time.
+This code is not ready for use. It may not even be ready for release.
 
 # Overlord vs. ASDF
 
@@ -506,6 +507,7 @@ You might want them again later. -->
 [Maxima]: https://sourceforge.net/projects/maxima/
 [ACL2]: https://www.cs.utexas.edu/users/moore/acl2/
 [hopeless]: https://gist.github.com/samth/3083053
+[parser generator]: http://cliki.net/parser%20generator
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
