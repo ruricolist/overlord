@@ -2064,9 +2064,9 @@ instead."
                 ((not (eql status :external))
                  (error* "Package ~a does not export an expander" p))
                 ((not (fboundp sym))
-                 (error* "Expander in package ~a is missing its binding" p))
+                 (error* "Expander in package ~a is exported but unbound" p))
                 ((not (macro-function sym))
-                 (error* "Package ~a exports a non-macro expander" p))
+                 (error* "Package ~a exports an expander that is not a macro" p))
                 (t
                  (unless (eql (symbol-package sym) p)
                    (simple-style-warning "Package expander ~a in ~a is inherited from ~a."
