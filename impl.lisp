@@ -1240,7 +1240,7 @@ value and NEW do not match under TEST."
            ,@body)))))
 
 (defmacro define-script (name expr)
-  `(defconfig ',expr
+  `(defconfig ,name ',expr
      :test #'source=))
 
 (defmacro with-script-dependency ((name expr deps) &body body)
