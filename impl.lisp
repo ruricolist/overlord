@@ -23,7 +23,9 @@
     ;; Import sets.
     :overlord/import-set
     ;; Logging.
-    :overlord/message)
+    :overlord/message
+    ;; Time tuples.
+    :overlord/time-tuple)
   ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -44,7 +46,7 @@
   (:import-from :cl-custom-hash-table
     :define-custom-hash-table-constructor
     :with-custom-hash-table)
-  (:shadow :defconfig :import)
+  (:shadow :defconfig :import :now)
   ;; Shadow for style.
   (:shadow
    :defmacro                            ;Hygienic pathnames.
@@ -200,12 +202,33 @@ Lisp/OS/filesystem combinations that support it."
 ;;; times, the singleton `never` (which means the target
 ;;; unconditionally needs building) and the singleton `far-future`
 ;;; (which means the target unconditionally does not need building).
+;;; Alternatively, a timestamp can be a "time tuple", which consists
+;;; of a universal time and a count of internal time units; this does
+;;; not establish a specific time but does establish an ordering, and
+;;; is used instead of a local-time timestamp on
+;;; implementation/platform combinations (e.g. Clozure on Windows)
+;;; where local-time timestamps are too fuzzy to be useful.
 
 (define-singleton-type never)
 (define-singleton-type far-future)
 
+(declaim (type function *now-function*))
+(defvar *now-function*
+  (let ((local-time-resolution-bad
+          (loop repeat 1000
+                for timestamp = (local-time:now)
+                always (zerop (local-time:timestamp-microsecond
+                               timestamp)))))
+    (if local-time-resolution-bad
+        #'time-tuple
+        #'local-time:now)))
+
+(defun now ()
+  (funcall *now-function*))
+
 (deftype target-timestamp ()
   '(or timestamp
+    time-tuple
     universal-time
     never
     far-future))
@@ -527,7 +550,7 @@ it."
          (.timestamp target)))))
 
 (defun (setf target-timestamp) (timestamp target)
-  (check-type timestamp timestamp)
+  (check-type timestamp (or timestamp time-tuple))
   (check-not-frozen)
   (etypecase-of target target
     (root-target (setf (root-target-timestamp root-target) timestamp))
@@ -637,15 +660,38 @@ E.g. delete a file, unbind a variable."
         (if precise
             (timestamp> ts1 (universal-to-timestamp ts2))
             (> (timestamp-to-universal ts1) ts2)))
+       (time-tuple
+        ;; TODO Should we consider precision here?
+        (timestamp> ts1 (time-tuple->timestamp ts2)))
        (never t)
        (far-future nil)))
     (universal-time
      (etypecase-of target-timestamp ts2
-       (universal-time (> ts1 ts2))
+       (universal-time
+        (> ts1
+           ts2))
+       (time-tuple
+        (> ts1
+           (time-tuple-universal-time ts2)))
        (timestamp
         (if precise
-            (timestamp> (universal-to-timestamp ts1) ts2)
-            (> ts1 (timestamp-to-universal ts2))))
+            (timestamp> (universal-to-timestamp ts1)
+                        ts2)
+            (> ts1
+               (timestamp-to-universal ts2))))
+       (never t)
+       (far-future nil)))
+    (time-tuple
+     (etypecase-of target-timestamp ts2
+       (universal-time
+        (> ts2
+           (time-tuple-universal-time ts1)))
+       (time-tuple
+        (> (time-tuple-universal-time ts1)
+           (time-tuple-universal-time ts2)))
+       (timestamp
+        (timestamp> (time-tuple->timestamp ts1)
+                    ts2))
        (never t)
        (far-future nil)))
     (never nil)
