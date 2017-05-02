@@ -48,18 +48,21 @@ Inlinable, and skips generic dispatch for some common types."
   of static exports.")
 (declaim (type hash-table *static-exports-cache*))
 
+(def static-exports-lock (bt:make-lock "Static exports lock"))
+
 (defun module-static-exports/cache (lang source)
   (check-type lang symbol)
   (if (boundp '*static-exports-cache*)
       (let ((c *static-exports-cache*))
         (assert (hash-table-p c))
         (assert (eql (hash-table-test c) 'equal))
-        (synchronized ()
-          (mvlet* ((key (cons lang source))
-                   (cached cached?
-                    (gethash key c)))
-            (if cached? cached
-                (let ((exports (module-static-exports lang source)))
+        (mvlet* ((key (cons lang source))
+                 (cached cached?
+                  (synchronized (static-exports-lock)
+                    (gethash key c))))
+          (if cached? cached
+              (let ((exports (module-static-exports lang source)))
+                (synchronized (static-exports-lock)
                   (setf (gethash key c) exports))))))
       (module-static-exports lang source)))
 
