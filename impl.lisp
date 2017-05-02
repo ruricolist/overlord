@@ -387,7 +387,6 @@ the module is reloaded.")
     :initform nil
     :accessor .module)
    (lock
-    :initform (bt:make-lock)
     :reader monitor))
   (:documentation "Storage for a module.
 
@@ -437,6 +436,10 @@ resolved at load time."
   `(setf (module-cell-meta (module-cell ,lang ,path) ,key) ,value))
 
 (defmethods module-cell (self)
+  (:method initialize-instance :after (self &key)
+    (setf (slot-value self 'lock)
+          (bt:make-lock (fmt "Lock for module ~a" self))))
+
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
       (format stream "~a (~a) (~:[not loaded~;loaded~])"
@@ -2301,9 +2304,11 @@ the #lang declaration ends."
   "Table to track claimed modules, so we can warn if they are
   redefined.")
 
+(def module-name-lock (bt:make-lock "Module name lock"))
+
 (defun claim-module-name (module lang source)
   "Warn if MODULE is already in use with a different LANG and SOURCE."
-  (synchronized ()
+  (synchronized (module-name-lock)
     (let* ((table *claimed-module-names*)
            (old-value (gethash module table))
            (new-value (list lang source)))

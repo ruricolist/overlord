@@ -74,7 +74,7 @@ then we set its value inside a critical section."
       `(let* ((,cell (load-time-value (box ,empty)))
               (,value (unbox ,cell)))
          (if (eq ,value ,empty)         ;Identity.
-             (synchronized ()
+             (synchronized () "Lock for once"
                ;; "Double-checked locking."
                (let ((,value (unbox ,cell)))
                  (if (eq ,value ,empty)
