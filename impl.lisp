@@ -1436,22 +1436,27 @@ specify the dependencies you want on build."
   ((name
     :initarg :name
     :accessor .name
+    :accessor pattern-name
     :type symbol)
    (input-defaults
     :initarg :input-defaults
     :type pathname
+    :reader pattern-input-defaults
     :reader .input-defaults)
    (output-defaults
     :initarg :output-defaults
     :type pathname
+    :reader pattern-output-defaults
     :reader .output-defaults)
    (init-fn
     :initarg :init
     :type function
+    :reader pattern-init-fn
     :reader .init)
    (deps-fn
     :initarg :deps
     :type function
+    :reader pattern-deps-fn
     :reader .deps))
   (:default-initargs
    :input-defaults *nil-pathname*
