@@ -315,6 +315,23 @@ Lisp/OS/filesystem combinations that support it."
     :type pathname
     :accessor .output)))
 
+(defgeneric merge-pattern-defaults (pattern input)
+  (:method (pattern input)
+    (values (merge-input-defaults pattern input)
+            (merge-output-defaults pattern input))))
+
+(defgeneric merge-input-defaults (pattern input)
+  (:method (pattern input)
+    ;; Note that we're merging the *provided* inputs and
+    ;; outputs into the defaults, rather than vice-versa.
+    (merge-pathnames* (input-defaults pattern)
+                      input)))
+
+(defgeneric merge-output-defaults (pattern input)
+  (:method (pattern input)
+    (merge-pathnames (output-defaults pattern)
+                     input)))
+
 (defmethods pattern-ref (self)
   (:method initialize-instance :after (self &key)
     ;; Merge in the defaults for inputs and outputs.
@@ -841,7 +858,6 @@ distributed."
                (clear-target-table (symbol-value '*all-targets*))
                (clrhash (symbol-value '*symbol-timestamps*))
                (clrhash (symbol-value '*tasks*))
-               (clrhash (symbol-value '*patterns*))
                (clrhash (symbol-value '*module-deps*))
                ;; The table of module cells needs special handling.
                (clear-module-cells)
@@ -937,20 +953,18 @@ distributed."
     (pattern-ref
      (let* ((input (.input target))
             (output (.output target))
-            (pattern (find-pattern (.pattern target)))
-            (init (.init pattern))
-            (deps (.deps pattern)))
+            (pattern (find-pattern (.pattern target))))
        (task output
              (lambda ()
                (let ((*input* input)
                      (*output* output))
-                 (funcall init)))
+                 (pattern-init pattern)))
              (lambda ()
                (let ((*input* input)
                      (*output* output))
                  (let ((*base* input))
                    (depends-on input))
-                 (funcall deps))))))
+                 (pattern-depend pattern))))))
     (module-cell
      (task target
            (lambda ()
@@ -1426,56 +1440,37 @@ specify the dependencies you want on build."
 ;;; A pattern is an abstract relationship between two files.
 
 (defclass pattern ()
-  ((name
-    :initarg :name
-    :accessor .name
-    :accessor pattern-name
-    :type symbol)
-   (input-defaults
+  ((input-defaults
     :initarg :input-defaults
     :type pathname
     :reader pattern-input-defaults
-    :reader .input-defaults)
+    :reader input-defaults)
    (output-defaults
     :initarg :output-defaults
     :type pathname
-    :reader pattern-output-defaults
-    :reader .output-defaults)
+    :reader output-defaults
+    :reader pattern-output-defaults)
    (init-fn
     :initarg :init
     :type function
-    :reader pattern-init-fn
-    :reader .init)
+    :reader pattern-init-fn)
    (deps-fn
     :initarg :deps
     :type function
-    :reader pattern-deps-fn
-    :reader .deps))
+    :reader pattern-deps-fn))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
    :deps (constantly nil)
    :init (constantly nil)))
 
+(defgeneric pattern-init (pattern)
+  (:method (pattern)
+    (funcall (slot-value pattern 'init-fn))))
 
-(defmethods pattern (self)
-  (:method print-object (self stream)
-    (print-unreadable-object (self stream :type t)
-      (format stream "~s" (.name self))))
-
-  (:method merge-pattern-input-defaults (self input)
-    ;; Note that we're merging the *provided* inputs and
-    ;; outputs into the defaults, rather than vice-versa.
-    (merge-pathnames* (.input-defaults self)
-                      input))
-
-  (:method merge-pattern-output-defaults (self input)
-    (merge-pathnames (.output-defaults self)
-                     input))
-
-  (:method merge-pattern-defaults (self input)
-    (values (merge-pattern-input-defaults self input)
-            (merge-pattern-output-defaults self input))))
+(defgeneric pattern-depend (pattern)
+  (:method (pattern)
+    (funcall (slot-value pattern 'deps-fn))))
 
 (defun extension (ext)
   (assure pathname
@@ -1483,20 +1478,17 @@ specify the dependencies you want on build."
       (null *nil-pathname*)
       (string (make-pathname :type ext)))))
 
-(defvar *patterns* (make-hash-table :size 1024))
-
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
     (etypecase-of (or symbol pattern) pattern
       (pattern pattern)
       (symbol
-       (receive (pat pat?)
-           (gethash pattern *patterns*)
-         (cond (pat? pat)
-               (errorp (error* "No such pattern: ~s" pattern))
-               (t nil)))))))
+       (cond ((subtypep pattern 'pattern)
+              (make pattern))
+             (errorp (error* "No such pattern: ~s" pattern))
+             (t nil))))))
 
-(defmacro defpattern (name (in out)
+(defmacro defpattern (class-name (in out)
                       (&rest options &key &allow-other-keys)
                       &body (init . deps))
   "Define a file pattern named NAME.
@@ -1515,37 +1507,28 @@ extension to the file.
 
 Based on the pattern, the output file is calculated, and the result
 depends on that."
-  (let ((script-name (script-name name)))
+  (let ((script-name (script-name class-name)))
     `(progn
        (define-script ,script-name ,(list* in out init))
        (eval-always
          (with-keyword-macros
-           (save-pattern
-            ',name
-            (lambda ()
-              (let ((,in *input*)
-                    (,out *output*))
-                (declare (ignorable ,in ,out))
-                ,init))
-            (lambda ()
-              (let ((,in *input*)
-                    (,out *output*))
-                (declare (ignorable ,out))
-                (funcall
-                 (deps-thunk
-                   (:depends-on ',script-name)
-                   (:depends-on ,in)
-                   ,@deps))))
-            ,@options))))))
-
-(defun save-pattern (name init deps &rest options)
-  (let ((pattern
-          (apply #'make 'pattern
-                 :name name
-                 :init init
-                 :deps deps
-                 options)))
-    (setf (gethash name *patterns*) pattern)))
+           (defclass ,class-name (pattern)
+             ()
+             (:default-initargs ,@options))))
+       (defmethod pattern-init ((self ,class-name))
+         (let ((,in *input*)
+               (,out *output*))
+           (declare (ignorable ,in ,out))
+           ,init))
+       (defmethod pattern-depends ((self ,class-name))
+         (let ((,in *input*)
+               (,out *output*))
+           (declare (ignorable ,out))
+           (funcall
+            (deps-thunk
+              (:depends-on ',script-name)
+              (:depends-on ,in)
+              ,@deps)))))))
 
 
 ;;; Languages
@@ -1727,23 +1710,26 @@ interoperation with Emacs."
       (funcall sym source)
       (module-exports (dynamic-require-as lang source)))))
 
-(defpattern static-exports-pattern (in out)
-  ()
-  )
+(defclass static-exports-pattern (pattern)
+  ((lang :initarg :lang)
+   (source :initarg :source)))
+
+(defmethods static-exports-pattern (self lang source)
+  (:method output-defaults (self)
+    ;; Bear in mind *input* may have been resolved.
+    (let ((fasl (faslize lang source))
+          (ext (extension "static-exports")))
+      (merge-pathnames* ext fasl)))
+
+  (:method pattern-init (self)
+    (save-static-exports lang source))
+
+  (:method pattern-depend (self)
+    (depends-on (fasl-lang-pattern-ref lang source))))
 
 (defun static-exports-pattern (lang source)
   ;; The static export file depends on the fasl.
-  (let* ((ref (fasl-lang-pattern-ref lang source))
-         (fasl (faslize lang source))
-         (ext (extension "static-exports"))
-         (output (merge-pathnames* ext fasl)))
-    (make 'pattern
-          :name (symbolicate (lang-name lang) '| (static exports)|)
-          :output-defaults output
-          :init (lambda ()
-                  (save-static-exports lang source))
-          :deps (lambda ()
-                  (depends-on ref)))))
+  (make 'static-exports-pattern :lang lang :source source))
 
 (defun snarf-static-exports (lang source)
   (let ((file (static-exports-file lang source)))
@@ -1817,13 +1803,6 @@ if it does not exist."
 (define-compiler-macro find-module (lang source)
   `(.module (module-cell ,lang ,source)))
 
-(defun merge-input-defaults (lang path)
-  "Merge PATH with the input defaults of LANG.
-The input defaults override PATH where they conflict."
-  ;; TODO Which should win? Inputs or defaults? Providing an explicit
-  ;; extension vs. providing an implicit module path.
-  (merge-pathnames* (.input-defaults lang) path))
-
 ;;; Hack to stop recursion. We can't use %ensure-module-cell directly,
 ;;; because it doesn't apply the defaults for the language.
 (declaim (notinline %module-cell))
@@ -1876,11 +1855,11 @@ The input defaults override PATH where they conflict."
   (:method ((lang symbol) (source t))
     (unbuild-lang-deps (resolve-lang lang) source)))
 
-(defmethod .input-defaults ((lang symbol))
+(defmethod input-defaults ((lang symbol))
   (let ((p (resolve-package lang)))
-    (if p (.input-defaults p) *nil-pathname*)))
+    (if p (input-defaults p) *nil-pathname*)))
 
-(defmethod .input-defaults ((p package))
+(defmethod input-defaults ((p package))
   (let ((sym (find-symbol #.(string 'extension) p)))
     (or (and sym (symbol-value sym))
         *nil-pathname*)))
@@ -1949,16 +1928,17 @@ The input defaults override PATH where they conflict."
       (lang-name (make-keyword lang))
       (package (package-name-keyword lang)))))
 
-;;; Why not (here and for static-exports-pattern) use defpattern?
-;;; Because defpattern takes defaults specified as a pathname, and
-;;; uses merge-pathnames* to combine said defaults with the input.
+(defclass fasl-lang-pattern (pattern)
+  ((lang :initarg :lang)
+   (source :initarg :source)))
 
-(defpattern fasl-lang-pattern (in out)
-  (:input-defaults
-   :output-defaults)
-  ;; TODO Should we reset the deps first?
-  (progn
-    (let* ((*source* in)
+(defmethods fasl-lang-pattern (self lang source)
+  (:method output-defaults (self)
+    (faslize lang source))
+
+  (:method pattern-init (self)
+    ;; TODO Should we reset the deps first?
+    (let* ((*source* *input*)
            (lang (lang-name lang))
            (*language* lang)
            ;; Must be bound here for macros that intern
@@ -1966,39 +1946,19 @@ The input defaults override PATH where they conflict."
            (*package* (user-package (resolve-package lang))))
       (compile-to-file
        (wrap-current-module
-        (expand-module lang in)
-        lang in)
-       (ensure-directories-exist out)
+        (expand-module lang *input*)
+        lang *input*)
+       (ensure-directories-exist *output*)
        :top-level (package-compile-top-level? lang)
        :source *source*))
-    (save-module-deps lang in))
-  (depends-on-all
-   (module-static-dependencies lang in)))
+    (save-module-deps lang *input*))
+
+  (:method pattern-depend (self)
+    (depends-on-all
+     (module-static-dependencies lang *input*))))
 
 (defun fasl-lang-pattern (lang source)
-  (make 'pattern
-        :name (lang-name lang)
-        :output-defaults (faslize lang source)
-        ;; Bear in mind *input* may have been resolved.
-        :init (lambda ()
-                ;; TODO Should we reset the deps first?
-                (let* ((*source* *input*)
-                       (lang (lang-name lang))
-                       (*language* lang)
-                       ;; Must be bound here for macros that intern
-                       ;; symbols.
-                       (*package* (user-package (resolve-package lang))))
-                  (compile-to-file
-                   (wrap-current-module
-                    (expand-module lang *input*)
-                    lang *input*)
-                   (ensure-directories-exist *output*)
-                   :top-level (package-compile-top-level? lang)
-                   :source *source*))
-                (save-module-deps lang *input*))
-        :deps (lambda ()
-                (depends-on-all
-                 (module-static-dependencies lang *input*)))))
+  (make 'fasl-lang-pattern :lang lang :source source))
 
 (defun fasl-lang-pattern-ref (lang source)
   (pattern-ref (fasl-lang-pattern lang source) source))
