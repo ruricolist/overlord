@@ -1148,7 +1148,7 @@ If any of DEPS is a list, it will be descended into."
 
 (defun depends-on-all* (deps)
   (assert (boundp '*base*))
-  (mapc #'depends-on/1 deps)
+  (map nil #'depends-on/1 deps)
   (values))
 
 (defun call/temp-file (dest fn)
