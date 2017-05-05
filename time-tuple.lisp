@@ -12,6 +12,12 @@
   internal real time."))
 (in-package :overlord/time-tuple)
 
+;;; Let's be clear about our assumptions: the following is only useful
+;;; is we can expect that a tuple of (universal time, internal real
+;;; time) is likely to be unique. Or, to put it another way, if we can
+;;; expect that the internal real time clock is reset less often than
+;;; once per second.
+
 (defstruct-read-only
     (time-tuple
      (:constructor %time-tuple (universal-time real-time)))
