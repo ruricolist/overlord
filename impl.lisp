@@ -318,16 +318,9 @@ Lisp/OS/filesystem combinations that support it."
 (defmethods pattern-ref (self)
   (:method initialize-instance :after (self &key)
     ;; Merge in the defaults for inputs and outputs.
-    (let* ((pattern (find-pattern (.pattern self)))
-           ;; Note that we're merging the *provided* inputs and
-           ;; outputs into the defaults, rather than vice-versa.
-           (input
-             (merge-pathnames* (.input-defaults pattern)
-                               (.input self)))
-           (output                      ;Careful about the order.
-             (merge-pathnames* (.output-defaults pattern)
-                               ;; .input, not .output.
-                               (.input self))))
+    (mvlet* ((pattern (find-pattern (.pattern self)))
+             (input output
+              (merge-pattern-defaults pattern (.input self))))
       (setf (.input self)  input
             (.output self) output)))
 
@@ -1464,9 +1457,25 @@ specify the dependencies you want on build."
    :deps (constantly nil)
    :init (constantly nil)))
 
-(defmethod print-object ((self pattern) stream)
-  (print-unreadable-object (self stream :type t)
-    (format stream "~s" (.name self))))
+
+(defmethods pattern (self)
+  (:method print-object (self stream)
+    (print-unreadable-object (self stream :type t)
+      (format stream "~s" (.name self))))
+
+  (:method merge-pattern-input-defaults (self input)
+    ;; Note that we're merging the *provided* inputs and
+    ;; outputs into the defaults, rather than vice-versa.
+    (merge-pathnames* (.input-defaults self)
+                      input))
+
+  (:method merge-pattern-output-defaults (self input)
+    (merge-pathnames (.output-defaults self)
+                     input))
+
+  (:method merge-pattern-defaults (self input)
+    (values (merge-pattern-input-defaults self input)
+            (merge-pattern-output-defaults self input))))
 
 (defun extension (ext)
   (assure pathname
@@ -1487,7 +1496,9 @@ specify the dependencies you want on build."
                (errorp (error* "No such pattern: ~s" pattern))
                (t nil)))))))
 
-(defmacro defpattern (name (in out) options &body (init . deps))
+(defmacro defpattern (name (in out)
+                      (&rest options &key &allow-other-keys)
+                      &body (init . deps))
   "Define a file pattern named NAME.
 
 Some build systems let you define file patterns based on extensions or
@@ -1716,6 +1727,10 @@ interoperation with Emacs."
       (funcall sym source)
       (module-exports (dynamic-require-as lang source)))))
 
+(defpattern static-exports-pattern (in out)
+  ()
+  )
+
 (defun static-exports-pattern (lang source)
   ;; The static export file depends on the fasl.
   (let* ((ref (fasl-lang-pattern-ref lang source))
@@ -1937,6 +1952,28 @@ The input defaults override PATH where they conflict."
 ;;; Why not (here and for static-exports-pattern) use defpattern?
 ;;; Because defpattern takes defaults specified as a pathname, and
 ;;; uses merge-pathnames* to combine said defaults with the input.
+
+(defpattern fasl-lang-pattern (in out)
+  (:input-defaults
+   :output-defaults)
+  ;; TODO Should we reset the deps first?
+  (progn
+    (let* ((*source* in)
+           (lang (lang-name lang))
+           (*language* lang)
+           ;; Must be bound here for macros that intern
+           ;; symbols.
+           (*package* (user-package (resolve-package lang))))
+      (compile-to-file
+       (wrap-current-module
+        (expand-module lang in)
+        lang in)
+       (ensure-directories-exist out)
+       :top-level (package-compile-top-level? lang)
+       :source *source*))
+    (save-module-deps lang in))
+  (depends-on-all
+   (module-static-dependencies lang in)))
 
 (defun fasl-lang-pattern (lang source)
   (make 'pattern
