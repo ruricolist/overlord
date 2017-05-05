@@ -181,11 +181,6 @@ This is provided in case we want to offer more precise timestamps on
 Lisp/OS/filesystem combinations that support it."
   (cl:file-write-date pathname))
 
-(defun shuffle* (seq)
-  "Like `alexandria:shuffle', but non-destructive and returns a
-  vector."
-  (shuffle (copy-sequence 'vector seq)))
-
 
 ;;; Types.
 
@@ -1143,7 +1138,7 @@ particular order."
 (defun depends-on-all (deps)
   ;; NB This is where you would add parallelism.
   (assert (boundp '*base*))
-  (map nil #'depends-on/1 (shuffle* deps))
+  (map nil #'depends-on/1 (reshuffle deps))
   (values))
 
 (defun depends-on* (&rest deps)
