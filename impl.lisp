@@ -1540,7 +1540,7 @@ depends on that."
 
 (deftype fasl-version () '(integer 1 *))
 
-(defparameter *fasl-version* 2
+(defparameter *fasl-version* 4
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type fasl-version *fasl-version*))
