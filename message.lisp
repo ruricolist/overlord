@@ -1,5 +1,6 @@
 (defpackage :overlord/message
-  (:use :cl :alexandria :serapeum)
+  (:use :cl :alexandria :serapeum
+    :overlord/global-state)
   (:import-from :overlord/types :overlord-condition)
   (:export
    :overlord-message
@@ -8,8 +9,8 @@
    :*message-stream*))
 (in-package :overlord/message)
 
-(defvar *message-stream*
-  (make-synonym-stream '*standard-output*)
+(define-global-state *message-stream*
+    (make-synonym-stream '*standard-output*)
   "The stream printed to by the default message handler.")
 
 (defun default-message-handler (msg)
@@ -20,7 +21,7 @@
       ;; Messages the user doesn't see in time aren't very useful.
       (force-output stream))))
 
-(defvar *message-handler* #'default-message-handler
+(define-global-state *message-handler* #'default-message-handler
   "The current handler for message conditions.")
 (declaim (type (or function symbol) *message-handler*))
 

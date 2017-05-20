@@ -2,7 +2,8 @@
 
 (defpackage :overlord/base
   (:use :cl :alexandria :serapeum
-    :overlord/types)
+    :overlord/types
+    :overlord/global-state)
   (:import-from :overlord/specials
     :*base*
     :ensure-absolute)
@@ -29,7 +30,7 @@
             *base*)))
      ,@body))
 
-(defvar *package-bases* (make-hash-table))
+(define-global-state *package-bases* (make-hash-table))
 
 (defun set-package-base* (base &optional (system nil system-supplied?))
   "Set the base for the current package.
@@ -45,7 +46,7 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
      (set-package-base* ,base
                         ,@(if system-supplied? (list system) nil))))
 
-(defvar *supplied-package-systems* (make-hash-table))
+(define-global-state *supplied-package-systems* (make-hash-table))
 
 (defun base-relative-pathname (pathname)
   (merge-pathnames pathname (base)))

@@ -1,6 +1,8 @@
 ;;; http.lisp -- update a downloaded file
 (defpackage #:overlord/http
-  (:use #:cl #:alexandria #:serapeum #:overlord/types)
+  (:use #:cl #:alexandria #:serapeum
+    #:overlord/types
+    #:overlord/global-state)
   (:import-from #:cl-strftime #:format-time)
   (:import-from #:drakma #:http-request)
   (:import-from #:overlord/specials #:*base* #:ensure-absolute)
@@ -19,7 +21,7 @@
 
 (in-package #:overlord/http)
 
-(defvar *offline* nil
+(define-global-state *offline* nil
   "Are we offline?")
 (declaim (type boolean *offline*))
 

@@ -8,6 +8,8 @@
     :uiop/filesystem
     :uiop/pathname
 
+    ;; Resettable global state.
+    :overlord/global-state
     ;; Types common to the project.
     :overlord/types
     ;; Special variables.
@@ -516,7 +518,9 @@ it."
 
 ;;; Targets.
 
-(defvar *symbol-timestamps* (make-hash-table :size 1024))
+(defconst reset-key 'reset)
+
+(define-global-state *symbol-timestamps* (make-hash-table :size 1024))
 (declaim (type hash-table *symbol-timestamps*))
 
 (defun pathname-exists? (path)
@@ -882,10 +886,10 @@ distributed."
         :report "Unfreeze the build system."
         (setf *frozen* nil)))))
 
-(defvar *tasks* (dict))
+(define-global-state *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(defvar *all-targets* (make-target-table :size 8192))
+(define-global-state *all-targets* (make-target-table :size 8192))
 (declaim (type target-table *all-targets*))
 
 (defun list-all-targets ()
@@ -1540,7 +1544,7 @@ depends on that."
 
 (deftype fasl-version () '(integer 1 *))
 
-(defparameter *fasl-version* 6
+(defparameter *fasl-version* 7
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type fasl-version *fasl-version*))
@@ -1562,7 +1566,7 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defvar-unbound *module-chain*
   "The chain of modules being loaded.")
 
-(defvar *module-deps* (dict))
+(define-global-state *module-deps* (dict))
 
 (defcondition module-dependency ()
   ((module-cell
@@ -1756,7 +1760,7 @@ interoperation with Emacs."
 ;;; The idea here is to avoid runtime lookups of modules by interning
 ;;; mutable cells instead.
 
-(defvar *module-cells* (dict))
+(define-global-state *module-cells* (dict))
 
 (defun list-module-cells ()
   (hash-table-values *module-cells*))
@@ -2297,7 +2301,7 @@ the #lang declaration ends."
   "Global definition for possible shadowing."
   fn)
 
-(defvar *claimed-module-names* (make-hash-table :size 1024)
+(define-global-state *claimed-module-names* (make-hash-table :size 1024)
   "Table to track claimed modules, so we can warn if they are
   redefined.")
 
