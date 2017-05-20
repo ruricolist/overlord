@@ -36,7 +36,14 @@
         (fiveam:*on-error* :debug)
         (overlord/impl::*fasl-version* most-positive-fixnum))
     (unwind-protect
-         (run! 'overlord)
+         (progn
+           (format t "~&First run (1/2)~%")
+           (run! 'overlord)
+           (format t "~&Resetting global state for second run...~%")
+           (sleep 2)
+           (format t "~&Second run (2/2)~%")
+           (overlord/global-state:reset-global-state)
+           (run! 'overlord))
       (overlord/impl::delete-versioned-fasls))))
 
 ;;; Internal use.
