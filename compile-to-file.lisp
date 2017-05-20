@@ -1,6 +1,7 @@
 (defpackage #:overlord/compile-to-file
   (:use #:cl #:alexandria #:serapeum #:overlord/specials)
   (:import-from #:overlord/types #:absolute-pathname)
+  (:import-from #:overlord/file-package #:ensure-file-package)
   (:export #:compile-to-file #:load-as-module :fasl-ext :module))
 (in-package #:overlord/compile-to-file)
 
@@ -21,29 +22,48 @@
 ;;; http://kpreid.livejournal.com/14713.html
 (def universal-file (asdf:system-relative-pathname :overlord "universal.lisp"))
 
+(defmacro define-file-package (source)
+  (let* ((lang *language*)
+         (package (ensure-file-package source :lang lang))
+         (name (package-name package))
+         (use-list (mapcar #'package-name (package-use-list package))))
+    `(eval-always
+       (unless (find-package ,name)
+         (defpackage ,name
+           ;; Pass the use list of the existing package into the
+           ;; macroexpansion.
+           (:use ,@use-list))))))
+
 (defun compile-to-file (program output-file
                         &key top-level source
                         &aux (namestring (namestring source)))
   "Compile PROGRAM to a fasl."
   (check-type source absolute-pathname)
-  (let ((*program*
-          (if top-level
-              program
+  (let ((package *package*)
+        (*program-preamble*
+          ;; Ensure that a file package exists whenever compiling at
+          ;; the top level.
+          (and top-level
+               source
+               `(define-file-package ,source)))
+        (*program*
+          (if top-level program
               `(setq *module* ,program))))
     ;; TODO The following is cribbed from the sources of Slime and Sly.
     (with-compilation-unit (:allow-other-keys t
                             ;; SBCL
                             :source-namestring namestring)
-      (compile-file universal-file
-                    :allow-other-keys t
-                    :output-file output-file
-                    :external-format :utf-8
-                    ;; CCL.
-                    :compile-file-original-truename source
-                    ;; ECL.
-                    :source-truename source
-                    ;; Clasp.
-                    :source-debug-namestring namestring))))
+      (let ((*package* package))
+        (compile-file universal-file
+                      :allow-other-keys t
+                      :output-file output-file
+                      :external-format :utf-8
+                      ;; CCL.
+                      :compile-file-original-truename source
+                      ;; ECL.
+                      :source-truename source
+                      ;; Clasp.
+                      :source-debug-namestring namestring)))))
 
 (defun load-as-module (file)
   "Load FILE and return whatever it assigns to `*module*'."

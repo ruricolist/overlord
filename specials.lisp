@@ -10,6 +10,7 @@
            #:*output*
            #:*module*
            #:*program*
+           #:*program-preamble*
            #:*deps*
            #:*language*
            #:*phase*
@@ -37,6 +38,12 @@
 
 (defvar-unbound *module* "The module being returned.")
 (defvar-unbound *program* "The program to be compiled.")
+
+(defvar-unbound *program-preamble*
+  "A preamble to the program to be compiled.
+
+This would be something like a package declaration, that the reader
+has to see before the other forms.")
 
 (defvar-unbound *language* "The name (symbol) of the current language.")
 (declaim (type symbol *language*))
