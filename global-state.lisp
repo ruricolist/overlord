@@ -18,6 +18,10 @@
        ,@(unsplice docstring))))
 
 (defun reset-global-state ()
-  (loop for (var . fn) in *global-state*
+  "Restore Overlord's global state to its value when first loaded.
+
+This is intended to be the practical equivalent of quitting Lisp and
+reloading: it completely resets Overlord's internal state."
+  (loop for (var . init) in *global-state*
         collect var
-        do (setf (symbol-value var) (funcall fn))))
+        do (setf (symbol-value var) (funcall init))))
