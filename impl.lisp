@@ -1024,17 +1024,24 @@ Don't know how to build missing prerequisite ~s."
             (task.init task)
             (task.deps task))))
 
+(define-global-state *always-rebuild* nil
+  "Flag to always rebuild.
+When this flag is set, targets are always rebuilt.
+
+Possibly useful for testing.")
+
 (defun build (&optional (target nil target-supplied?)
               &key (errorp t)
-                   force
+                   (force *always-rebuild*)
                    (message-handler *message-handler*))
   (check-not-frozen)
-  (handler-bind ((overlord-message message-handler))
-    (if target-supplied?
-        (receive (target thunk deps)
-            (target-task-values target errorp)
-          (build-task target thunk deps :force force))
-        (build root-target))))
+  (let ((*always-rebuild* force))
+    (handler-bind ((overlord-message message-handler))
+      (if target-supplied?
+          (receive (target thunk deps)
+              (target-task-values target errorp)
+            (build-task target thunk deps))
+          (build root-target)))))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
@@ -1055,12 +1062,12 @@ Don't know how to build missing prerequisite ~s."
       (build (intern target package))
       (values target system-name package))))
 
-(defun build-task (target thunk deps &key force)
+(defun build-task (target thunk deps)
   (check-type thunk function)
   (check-type deps function)
   (check-not-frozen)
   (save-task target thunk deps)
-  (build-recursively target :force force))
+  (build-recursively target))
 
 (defvar-unbound *already-built*
   "List of targets that have already been built.")
@@ -1069,7 +1076,7 @@ Don't know how to build missing prerequisite ~s."
 (defun already-built? (target)
   (target-table-member *already-built* target))
 
-(defun build-recursively (target &key force)
+(defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
   (labels
       ((build-deps (deps)
