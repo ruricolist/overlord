@@ -2222,7 +2222,7 @@ the #lang declaration ends."
          (*package* user-package)
          (forms (funcall fn path stream)))
     `(module-progn-in ,(package-name-keyword package)
-       ,@forms)))
+                      ,@forms)))
 
 
 ;;; Imports.
@@ -2239,6 +2239,14 @@ the #lang declaration ends."
 
 ;;; Hopefully most, if not all, of this code will be replaced once we
 ;;; have a full implementation of import sets.
+
+(define-global-state *always-import-values* nil
+  "Flag to control importing behavior.
+When this is T, imports should always be values, never bindings.
+
+This is intended to be used when saving an image, where you don't care
+about ease of development or debugging, only speed.")
+(declaim (type boolean *always-import-values*))
 
 (defcondition bad-macro-import (overlord-error)
   ((name :initarg :name :type symbol
@@ -2423,8 +2431,11 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
              (~> (expand-binding-spec spec lang source)
                  canonicalize-bindings
                  (apply-prefix prefix))))
-      (values (expand bindings)
-              (expand values)))))
+      (let ((bindings (expand bindings))
+            (values (expand values)))
+        (if *always-import-values*
+            (values nil (append bindings values))
+            (values bindings values))))))
 
 (defmacro check-static-bindings-now (lang source bindings)
   "Wrapper around check-static-bindings to force evaluation at compile time.
