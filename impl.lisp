@@ -1429,7 +1429,8 @@ rebuilt."
                                   ;; Write to a temp file and rename.
                                   `(call/temp-file ,pathname
                                                    (lambda (,tmp)
-                                                     ,init))))
+                                                     ,init)))
+                             (assert (file-exists-p ,pathname)))
                            (deps-thunk ,@deps))))
        ',pathname)))
 
