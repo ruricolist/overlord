@@ -435,7 +435,6 @@ system that is very likely to change.
 - Leverage UIOP more.
 - Stop relying on timestamps.
 - Source locations for functions in embedded languages.
-- Convenient logging protocol/syntax.
 - More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
 - Fewer dependencies.
@@ -507,6 +506,7 @@ You might want them again later. -->
 [ACL2]: https://www.cs.utexas.edu/users/moore/acl2/
 [hopeless]: https://gist.github.com/samth/3083053
 [parser generator]: http://cliki.net/parser%20generator
+[Boot]: http://boot-clj.com
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
