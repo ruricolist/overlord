@@ -8,6 +8,7 @@
   (:import-from #:overlord/specials #:*base* #:ensure-absolute)
   (:import-from #:serapeum #:make-octet-vector)
   (:export #:update-file-from-url
+           #:ensure-file-from-url
            #:go-offline
            #:go-online
            #:*connection-timeout*
@@ -47,30 +48,47 @@
   (with-thunk (body)
     `(call/online ,body :error ,error)))
 
-;;; TODO Encodings?
+(defun http-request/binary (url &rest args)
+  (apply #'http-request url
+         :force-binary t
+         :connection-timeout *connection-timeout*
+         args))
+
 (defun update-file-from-url (file url)
-  (when (boundp '*base*)
-    (setf file (ensure-absolute file)))
-  (flet ((http-request (url &rest args)
-           (apply #'http-request url
-                  :force-binary t
-                  :connection-timeout *connection-timeout*
-                  args)))
+  (lret ((file
+          (if (boundp '*base*)
+              (ensure-absolute file)
+              file)))
     (if (not (uiop:file-exists-p file))
         (if *offline*
             (error* "Offline: cannot retrieve ~a" file)
-            (multiple-value-bind (body status) (http-request url)
+            (multiple-value-bind (body status) (http-request/binary url)
               (when (= status 200)
                 (write-byte-vector-into-file body file))))
         (online-only ()
           (let ((fwd (file-write-date file)))
             (multiple-value-bind (body status)
-                (http-request url
-                              :additional-headers
-                              `((:if-modified-since . ,(format-mtime fwd))))
+                (http-request/binary
+                 url
+                 :additional-headers
+                 `((:if-modified-since . ,(format-mtime fwd))))
               (when (= status 200)
                 (unless (vector= body (read-file-into-byte-vector file))
                   (write-byte-vector-into-file body file :if-exists :supersede)))))))))
+
+(defun ensure-file-from-url (file url)
+  "Unlike `update-file-from-url' this does not preserve URL's
+timestamp."
+  (lret ((file
+          (if (boundp '*base*)
+              (ensure-absolute file)
+              file)))
+    (unless (uiop:file-exists-p file)
+      (online-only ()
+        (multiple-value-bind (body status) (http-request/binary url)
+          (if (= status 200)
+              (write-byte-vector-into-file body file)
+              (error* "Could not fetch ~a: code ~a" url status)))))))
 
 (defun go-offline ()
   (setf *offline* t))
