@@ -28,6 +28,8 @@
     :overlord/message
     ;; Time tuples.
     :overlord/time-tuple)
+  (:import-from :trivia
+    :match :ematch)
   ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -1056,17 +1058,30 @@ Possibly useful for testing.")
          (asdf:component-loaded-p system)
          system)))
 
-(defun run (target system-name &optional (package-name system-name))
+(defun run (target &optional system-name)
   "Entry point for scripts."
-  (let ((system-name (string-downcase system-name)) ;What ASDF wants.
-        (target (coerce-case target))
-        (package-name (coerce-case package-name)))
+  (mvlet* ((target package-name
+            (ematch target
+              ((and target (type symbol)) target)
+              ((list (and package-name (type string-designator))
+                     (and symbol-name (type string-designator)))
+               (values symbol-name package-name))))
+           (system-name
+            (string-downcase            ;What ASDF wants.
+             (or system-name package-name))))
     (unless (system-loaded? system-name)
-      (asdf:load-system system-name))
-    (let ((package (find-package package-name)))
-      (unless package
-        (error* "No such package: ~s" package))
-      (build (intern target package))
+      (restart-case
+          (asdf:load-system system-name)
+        (quickload ()
+          :test (lambda () (find-package :ql))
+          :report (lambda (s)
+                    (format s "Load ~a with Quicklisp instead."
+                            system-name))
+          (uiop:symbol-call :ql :quickload system-name))))
+    (let ((package
+            (or (find-package package-name)
+                (error* "No such package: ~s" package-name))))
+      (build (intern (string target) package))
       (values target system-name package))))
 
 (defun build-task (target thunk deps)

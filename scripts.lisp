@@ -51,6 +51,14 @@
                                     help version
                                     ((:system system-name) nil)
                                     ((:package package-name) nil))
+  (check-type target string)
+  (setf target (string-invert-case target))
+  (when (find #\: target)
+    ;; dsetq?
+    (setf (values package-name target)
+          (values-list
+           (assure (tuple string string)
+             (split-sequence #\: target :count 2)))))
   (setf package-name (or package-name system-name))
   (handler-bind ((warning #'maybe-muffle-warning))
     (cond (help
@@ -65,7 +73,7 @@
              (out "Built ~a.~%" target)))
           ((equal cmd "run")
            (multiple-value-bind (target system-name package)
-               (run target system-name package-name)
+               (run (list package-name target) system-name)
              (out "Built target ~s in system ~s (package ~s).~%"
                   target system-name package)))
           (t (die "Invalid cmd: ~a~%" cmd)))))
