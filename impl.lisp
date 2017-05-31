@@ -1389,6 +1389,7 @@ rebuilt."
        ',name)))
 
 (defmacro file-target (name pathname (tmp) &body (init . deps))
+  "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (setf pathname (resolve-target pathname (base)))
@@ -1400,10 +1401,13 @@ rebuilt."
          (with-defaults-from-base
            (save-file-task ,pathname
                            (init-thunk
-                             ;; Write to a temp file and rename.
-                             (call/temp-file ,pathname
-                                             (lambda (,tmp)
-                                               ,init)))
+                             ,(if (null tmp)
+                                  ;; No temp file needed.
+                                  init
+                                  ;; Write to a temp file and rename.
+                                  `(call/temp-file ,pathname
+                                                   (lambda (,tmp)
+                                                     ,init))))
                            (deps-thunk ,@deps))))
        ',pathname)))
 
