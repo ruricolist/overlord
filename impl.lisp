@@ -660,6 +660,7 @@ E.g. delete a file, unbind a variable."
   parameter will be removed.")
 
 (defun timestamp-newer? (ts1 ts2 &key (precise *preserve-fractional-seconds*))
+  "Is TS1 greater than TS2?"
   ;; NB Note that conversion from timestamp to universal rounds down
   ;; (loses nsecs), so when comparing one of each, whether you convert
   ;; the universal time to a timestamp, or the timestamp to a
@@ -696,11 +697,17 @@ E.g. delete a file, unbind a variable."
     (time-tuple
      (etypecase-of target-timestamp ts2
        (universal-time
-        (> ts2
-           (time-tuple-universal-time ts1)))
+        (let ((u1 (time-tuple-universal-time ts1)))
+          (or (> u1 ts2)
+              (and (= u1 ts2)
+                   (> (time-tuple-real-time 0))))))
        (time-tuple
-        (> (time-tuple-universal-time ts1)
-           (time-tuple-universal-time ts2)))
+        (let ((u1 (time-tuple-universal-time ts1))
+              (u2 (time-tuple-universal-time ts2)))
+          (or (> u1 u2)
+              (and (= u1 u2)
+                   (> (time-tuple-real-time ts1)
+                      (time-tuple-real-time ts2))))))
        (timestamp
         (timestamp> (time-tuple->timestamp ts1)
                     ts2))

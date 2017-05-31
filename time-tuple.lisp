@@ -3,7 +3,7 @@
   (:export
    :time-tuple
    :time-tuple-universal-time
-   :time-tuple-internal-time
+   :time-tuple-real-time
    :time-tuple=
    :time-tuple>
    :time-tuple<
