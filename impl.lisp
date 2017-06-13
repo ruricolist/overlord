@@ -1419,24 +1419,29 @@ rebuilt."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (setf pathname (resolve-target pathname (base)))
-  (with-script-dependency (name init deps)
-    `(progn
-       ;; Make the task accessible by name.
-       (def ,name ,pathname)
-       (let ((*base* ,(base)))
-         (with-defaults-from-base
-           (save-file-task ,pathname
-                           (init-thunk
-                             ,(if (null tmp)
-                                  ;; No temp file needed.
-                                  init
-                                  ;; Write to a temp file and rename.
-                                  `(call/temp-file ,pathname
-                                                   (lambda (,tmp)
-                                                     ,init)))
-                             (assert (file-exists-p ,pathname)))
-                           (deps-thunk ,@deps))))
-       ',pathname)))
+  (let* ((base (base))
+         (init
+           `(progn
+              (uiop:chdir ,base)
+              ,init)))
+    (with-script-dependency (name init deps)
+      `(progn
+         ;; Make the task accessible by name.
+         (def ,name ,pathname)
+         (let ((*base* ,base))
+           (with-defaults-from-base
+             (save-file-task ,pathname
+                             (init-thunk
+                               ,(if (null tmp)
+                                    ;; No temp file needed.
+                                    init
+                                    ;; Write to a temp file and rename.
+                                    `(call/temp-file ,pathname
+                                                     (lambda (,tmp)
+                                                       ,init)))
+                               (assert (file-exists-p ,pathname)))
+                             (deps-thunk ,@deps))))
+         ',pathname))))
 
 
 ;;;; Phony targets.
