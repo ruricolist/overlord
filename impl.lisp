@@ -73,7 +73,7 @@
    :var-target
    :defvar/deps
    :deftask
-   :file-target :directory-target
+   :file-target
    :undefine-target
    :build :unbuild :forget-target
    :run
@@ -1453,28 +1453,6 @@ rebuilt."
                                                      ,init)))
                              (assert (file-exists-p ,pathname)))
                            (deps-thunk ,@deps))))
-       ',pathname)))
-
-(defmacro directory-target (name pathname &body (init . deps))
-  (ensure-pathnamef pathname)
-  (check-type pathname tame-pathname)
-  (setf pathname (resolve-target pathname (base)))
-  (check-type pathname directory-pathname)
-  (with-script-dependency (name init deps)
-    `(progn
-       ;; Make the task accessible by name, even in the init and deps.
-       (def ,name ,pathname)
-       (let ((*base* ,(base)))
-         (with-defaults-from-base
-           ;; Note the task is being saved as a file task, rather than
-           ;; a directory ref -- that's strictly for making sure
-           ;; directories exist.
-           (save-file-task ,pathname
-                           (init-thunk
-                             ,init
-                             (assert (directory-exists-p ,pathname)))
-                           (deps-thunk
-                             ,@deps))))
        ',pathname)))
 
 
