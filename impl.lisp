@@ -27,7 +27,9 @@
     ;; Logging.
     :overlord/message
     ;; Time tuples.
-    :overlord/time-tuple)
+    :overlord/time-tuple
+    ;; Running shell commands.
+    :overlord/cmd)
   (:import-from :trivia
     :match :ematch)
   ;; Portability shim for "global" or "static" vars. They have global
@@ -1284,27 +1286,6 @@ value and NEW do not match under TEST."
     cmd
     (values-list args)
     :directory *base*))
-
-(defun parse-cmd-args (args)
-  (loop for arg in args
-        if (stringp arg)
-          nconc (tokens arg) into tokens
-        else if (pathnamep arg)
-               collect (uiop:native-namestring arg) into tokens
-        else if (typep arg '(list-of string))
-               append arg into tokens
-        else if (typep arg 'plist)
-               append arg into plist
-        finally (return (values tokens plist))))
-
-(defun cmd (&rest args)
-  (receive (tokens plist) (parse-cmd-args args)
-    (multiple-value-call #'uiop:run-program
-      tokens
-      (values-list plist)
-      :output t
-      :error-output t
-      :directory *base*)))
 
 
 ;;; Bindings.
