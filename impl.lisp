@@ -1414,7 +1414,7 @@ rebuilt."
                      (deps-thunk ,@deps)))
        ',name)))
 
-(defmacro file-target (name pathname (tmp) &body (init . deps))
+(defmacro file-target (name pathname (&optional tmp) &body (init . deps))
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
