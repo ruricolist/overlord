@@ -85,12 +85,15 @@
   ;; XXX Not, of course, recursive, but still catches most mistakes.
   `(or null (cons ,a list)))
 
-(defun check-list-of (list item-type)
+(defun check-list-of* (list item-type)
   (unless (and (listp list)
                (every (of-type item-type) list))
     (error 'type-error
            :datum list
            :expected-type `(list-of ,item-type))))
+
+(defmacro check-list-of (list item-type)
+  `(check-list-of* ,list ',item-type))
 
 (deftype plist ()
   ;; Would it be worth it to check for even length?
