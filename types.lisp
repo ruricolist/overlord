@@ -11,6 +11,7 @@
    #:cerror*
    ;; General types.
    #:list-of
+   #:check-list-of
    #:plist
    #:universal-time
    #:pathname-designator
@@ -83,6 +84,13 @@
 (deftype list-of (a)
   ;; XXX Not, of course, recursive, but still catches most mistakes.
   `(or null (cons ,a list)))
+
+(defun check-list-of (list item-type)
+  (unless (and (listp list)
+               (every (of-type item-type) list))
+    (error 'type-error
+           :datum list
+           :expected-type `(list-of ,item-type))))
 
 (deftype plist ()
   ;; Would it be worth it to check for even length?
