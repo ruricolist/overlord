@@ -1271,6 +1271,8 @@ value and NEW do not match under TEST."
                 `(extension ,ext))
               (:run (cmd &rest args)
                 `(run-cmd ,cmd ,@args))
+              (:cmd (&rest args)
+                `(cmd ,@args))
               (:message (control-string &rest args)
                 `(message ,control-string ,@args)))
      ,@body))
@@ -1282,6 +1284,22 @@ value and NEW do not match under TEST."
     cmd
     (values-list args)
     :directory *base*))
+
+(defun cmd (&rest args)
+  (receive (tokens args)
+      (with-collectors (token-list arg-list)
+        (dolist (arg args)
+          (etypecase-of (or string (list-of string) plist)
+              arg
+            (string (token-list (tokens arg)))
+            ((list-of string)
+             (check-list-of arg 'string)
+             (token-list arg))
+            (plist (arg-list arg)))))
+    (multiple-value-call #'uiop:run-program
+      tokens
+      (values-list args)
+      :directory *base*)))
 
 
 ;;; Bindings.
