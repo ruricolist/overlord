@@ -1302,6 +1302,8 @@ value and NEW do not match under TEST."
     (multiple-value-call #'uiop:run-program
       tokens
       (values-list plist)
+      :output t
+      :error-output t
       :directory *base*)))
 
 
