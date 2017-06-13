@@ -1285,20 +1285,23 @@ value and NEW do not match under TEST."
     (values-list args)
     :directory *base*))
 
+(defun parse-cmd-args (args)
+  (loop for arg in args
+        if (stringp arg)
+          nconc (tokens arg) into tokens
+        else if (pathnamep arg)
+               collect (uiop:native-namestring arg) into tokens
+        else if (typep arg '(list-of string))
+               append arg into tokens
+        else if (typep arg 'plist)
+               append arg into plist
+        finally (return (values tokens plist))))
+
 (defun cmd (&rest args)
-  (receive (tokens args)
-      (with-collectors (token-list arg-list)
-        (dolist (arg args)
-          (etypecase-of (or string (list-of string) plist)
-              arg
-            (string (token-list (tokens arg)))
-            ((list-of string)
-             (check-list-of arg 'string)
-             (token-list arg))
-            (plist (arg-list arg)))))
+  (receive (tokens plist) (parse-cmd-args args)
     (multiple-value-call #'uiop:run-program
       tokens
-      (values-list args)
+      (values-list plist)
       :directory *base*)))
 
 
