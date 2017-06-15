@@ -3,6 +3,8 @@
   (:import-from :uiop/stream :default-temporary-directory)
   (:import-from :trivia :match)
   (:export
+   ;; Singletons.
+   #:define-singleton-type
    ;; Conditions.
    #:overlord-condition
    #:overlord-error
@@ -46,6 +48,18 @@
    #:non-keyword))
 
 (in-package :overlord/types)
+
+
+;;; Singletons.
+
+;;; A "singleton" type has exactly one instance, bound to a global
+;;; lexical of the same name.
+
+(defmacro define-singleton-type (name)
+  `(progn
+     (deftype ,name ()
+       '(eql ,name))
+     (def ,name ',name)))
 
 
 ;;; Conditions.

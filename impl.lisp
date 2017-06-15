@@ -190,15 +190,6 @@ on Lisp/OS/filesystem combinations that support it."
 
 ;;; Types.
 
-;;; A "singleton" type has exactly one instance, bound to a global
-;;; lexical of the same name.
-
-(defmacro define-singleton-type (name)
-  `(progn
-     (deftype ,name ()
-       '(eql ,name))
-     (def ,name ',name)))
-
 ;;; Timestamps can be exact timestamps (from local-time), universal
 ;;; times, the singleton `never` (which means the target
 ;;; unconditionally needs building) and the singleton `far-future`
