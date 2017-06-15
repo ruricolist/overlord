@@ -1,6 +1,7 @@
 (defpackage :overlord/types
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
+  (:import-from :trivia :match :_)
   (:export
    ;; Conditions.
    #:overlord-condition
@@ -96,8 +97,15 @@
   `(check-list-of* ,list ',item-type))
 
 (deftype plist ()
-  ;; Would it be worth it to check for even length?
-  '(or null (cons symbol (cons t list))))
+  '(and list (satisfies plist?)))
+
+(defun plist? (list)
+  (nlet plist? (list)
+    (match list
+      (() t)
+      ((list* (and _ (type symbol)) _ list)
+       (plist? list))
+      (otherwise nil))))
 
 (deftype case-mode ()
   "Possible values for a readtable's case mode."
