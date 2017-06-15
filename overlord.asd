@@ -1,6 +1,8 @@
 ;;;; overlord.asd
 (in-package :asdf)
 
+(assert (uiop:version< "3.1" (asdf:asdf-version)))
+
 (defsystem #:overlord
   :description "Experimental build/module system."
   :author "Paul M. Rodriguez <pmr@ruricolist.com>"
