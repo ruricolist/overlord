@@ -42,7 +42,7 @@ Overlord enables *languages as libraries*. Overlord languages have
 several important properties:
 
 1. Languages are *first-class*. Modules live in their own files, just
-   like Lisp code, and are compiled into [fasls][], just like Lisp
+   like Lisp code, and are compiled into FASLs, just like Lisp
    code.
 
 2. Languages can use *any syntax*. Unlike emedded DSLs, which are
