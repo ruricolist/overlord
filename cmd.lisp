@@ -18,7 +18,7 @@
         finally (return (values tokens plist))))
 
 (defun cmd (&rest args)
-  (receive (tokens plist) (parse-cmd-args args)
+  (multiple-value-bind (tokens plist) (parse-cmd-args args)
     (multiple-value-call #'uiop:run-program
       tokens
       (values-list plist)
