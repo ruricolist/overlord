@@ -57,6 +57,13 @@ several important properties:
    different languages to share the same parser or for the same
    language to be written in more than one syntax.
 
+One goal of the language implementation is to provide a reasonable
+level of integration with Emacs. A prototype Emacs minor mode is
+included in <elisp/overlord.el>. Using `overlord-minor-mode` lets you
+recompile a module using `C-c C-k`, and lets you view the Lisp code
+that the file expands into using `C-c RET` – just like an ordinary
+macroexpansion.
+
 ## Language examples
 
 Here are some example language embeddings:
@@ -137,6 +144,15 @@ The *important* difference is that Overlord uses *two* scripts per
 target: one for building the target, and another for computing its
 dependencies. This (mostly) replaces the need to maintain a database
 of dependencies.
+
+## CLI
+
+Overlord has basic integration with the command line.
+
+It is possible to run Overlord using either [cl-launch][]
+or [Roswell][]. The cl-launch script is in `cl-launch/overlord`. The
+Roswell script is in `roswell/overlord.ros`. They each use the same
+syntax.
 
 ## Building with signals
 
@@ -515,6 +531,8 @@ You might want them again later. -->
 [parser generator]: http://cliki.net/parser%20generator
 [Boot]: http://boot-clj.com
 [Make]: https://www.gnu.org/software/make/
+[Roswell]: https://github.com/roswell/roswell
+[cl-launch]: http://cliki.net/cl-launch
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
