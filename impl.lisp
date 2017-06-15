@@ -191,13 +191,14 @@ on Lisp/OS/filesystem combinations that support it."
 ;;; Types.
 
 ;;; Timestamps can be exact timestamps (from local-time), universal
-;;; times, the singleton `never` (which means the target
-;;; unconditionally needs building) and the singleton `far-future`
+;;; times, the singleton `never' (which means the target
+;;; unconditionally needs building) and the singleton `far-future'
 ;;; (which means the target unconditionally does not need building).
-;;; Alternatively, a timestamp can be a "time tuple", which consists
-;;; of a universal time and a count of internal time units; this does
-;;; not establish a specific time but does establish an ordering, and
-;;; is used instead of a local-time timestamp on
+
+;;; Alternatively, a timestamp can be a `time-tuple', which consists
+;;; of a universal time and a count of internal time units. A time
+;;; tuple does not establish a specific time but does establish an
+;;; ordering, and is used instead of a local-time timestamp on
 ;;; implementation/platform combinations (e.g. Clozure on Windows)
 ;;; where local-time timestamps are too fuzzy to be useful.
 
