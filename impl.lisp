@@ -207,12 +207,12 @@ on Lisp/OS/filesystem combinations that support it."
 
 (declaim (type function *now-function*))
 (defvar *now-function*
-  (let ((local-time-resolution-bad
+  (let ((local-time-resolution-bad?
           (loop repeat 1000
                 for timestamp = (local-time:now)
                 always (zerop (local-time:timestamp-microsecond
                                timestamp)))))
-    (if local-time-resolution-bad
+    (if local-time-resolution-bad?
         #'time-tuple
         #'local-time:now)))
 
