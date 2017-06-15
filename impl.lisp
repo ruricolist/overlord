@@ -183,8 +183,8 @@ nicknames."
 
 (defun file-mtime (pathname)
   "Same as `file-write-date'.
-This is provided in case we want to offer more precise timestamps on
-Lisp/OS/filesystem combinations that support it."
+This is provided in case we ever want to offer more precise timestamps
+on Lisp/OS/filesystem combinations that support it."
   (cl:file-write-date pathname))
 
 
