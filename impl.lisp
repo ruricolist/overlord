@@ -132,15 +132,11 @@
 ;;; Resolve literal relative pathnames in macro bodies at compile
 ;;; time.
 
+;;; Not shadowed at the moment, but it has been in the past, and might
+;;; be again in the future.
 (cl:defmacro defmacro (name args &body body)
-  (receive (body decls docstring)
-      (parse-body body :documentation t)
-    `(cl:defmacro ,name ,args
-       ,@(unsplice docstring)
-       ,@decls
-       ;; Expand all literal relative pathnames.
-       (hygienic-pathnames
-        (local ,@body)))))
+  `(cl:defmacro ,name ,args
+     ,@body))
 
 ;;; Conditionals should always be exhaustive.
 
