@@ -3,7 +3,8 @@
 Overlord is an experimental build/module system for Common Lisp,
 inspired by [Redo][] and [Racket][].
 
-Overlord addresses three problems which might seem unrelated, but which, on closer examination, turn out to the same problem:
+Overlord addresses three problems which might seem unrelated, but
+which, on closer examination, turn out to the same problem:
 
 1. It provides a module system for implementing *languages as
    libraries* (similar to [Racket][]).
@@ -446,6 +447,7 @@ system that is very likely to change.
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
 - Interfaces for modules?
 - Isolate file-system side effects (cf. [Boot][]).
+- Using build directories (cf. [ASDF][]).
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
