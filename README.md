@@ -101,10 +101,12 @@ system’s files is what ASDF was designed for.
 it still depends on ASDF the project, because it builds on the UIOP
 portability layer.)
 
-(Note also that relying on ASDF means there is a discrepancy between
-path names in Overlord modules, which are relative to the file, and
-path names in Lisp files, which are relative to the system. This is,
-unfortunately, unlikely to change.)
+(Note also that relying on ASDF means there is a discrepancy in the
+handling of relative pathnames in Overlord modules vs. Lisp files.
+Relative pathnames in Overlord modules are relative to the file that
+contains the module, but relative pathnames in Lisp files are relative
+to the base of the system they are loaded in. This is, unfortunately,
+unlikely to change.)
 
 # Overlord vs. Redo
 
