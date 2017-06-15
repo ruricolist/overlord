@@ -1,7 +1,7 @@
 (defpackage :overlord/types
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
-  (:import-from :trivia :match :_)
+  (:import-from :trivia :match)
   (:export
    ;; Conditions.
    #:overlord-condition
@@ -82,9 +82,27 @@
 (deftype package-designator ()
   '(or string-designator package))
 
+(deftype list-without-nil ()
+  `(and list (satisfies list-without-nil?)))
+
+(defun list-without-nil? (list)
+  (declare (optimize speed (debug 0)))
+  (nlet list-without-nil? ((list list))
+    (match list
+      (() t)
+      ((list* nil _) nil)
+      (otherwise (list-without-nil? (cdr list))))))
+
 (deftype list-of (a)
-  ;; XXX Not, of course, recursive, but still catches most mistakes.
-  `(or null (cons ,a list)))
+  ;; We don't check that every element is of type A (that could be
+  ;; expensive) but, if `null' is not a subtype of A, then we do check
+  ;; that `nil' is not present in the list. It is not sound, but it is
+  ;; useful.
+  (if (subtypep 'null a)
+      ;; XXX Not, of course, recursive, but still catches many
+      ;; mistakes.
+      `(or null (cons ,a list))
+      `(and list (satisfies list-without-nil?))))
 
 (defun check-list-of* (list item-type)
   (unless (and (listp list)
@@ -100,7 +118,8 @@
   '(and list (satisfies plist?)))
 
 (defun plist? (list)
-  (nlet plist? (list)
+  (declare (optimize speed (debug 0)))
+  (nlet plist? ((list list))
     (match list
       (() t)
       ((list* (and _ (type symbol)) _ list)
