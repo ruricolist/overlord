@@ -159,7 +159,8 @@
 
 (deftype tame-pathname ()
   "A pathname without wild components."
-  '(and pathname (not (satisfies wild-pathname-p))))
+  '(or directory-pathname
+    (and pathname (not (satisfies wild-pathname-p)))))
 
 (deftype absolute-pathname ()
   '(and pathname (satisfies absolute-pathname-p)))
