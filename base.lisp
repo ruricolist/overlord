@@ -46,6 +46,13 @@
   (setf (current-dir!) dir)
   (funcall thunk))
 
+(defun ensure-absolute (pathname)
+  (assure absolute-pathname
+    (etypecase pathname
+      (absolute-pathname pathname)
+      (relative-pathname
+       (merge-pathnames* pathname (current-dir!))))))
+
 (deftype build-env ()
   '(member :cli :repl :compile-file :load-file))
 

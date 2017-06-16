@@ -5,7 +5,8 @@
     #:overlord/global-state)
   (:import-from #:cl-strftime #:format-time)
   (:import-from #:drakma #:http-request)
-  (:import-from #:overlord/specials #:*base* #:ensure-absolute)
+  (:import-from #:overlord/specials #:*base*)
+  (:import-from #:overlord/base #:ensure-absolute)
   (:import-from #:serapeum #:make-octet-vector)
   (:export #:update-file-from-url
            #:ensure-file-from-url

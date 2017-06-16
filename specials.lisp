@@ -6,7 +6,6 @@
   (:export #:*base*
            #:*cli*
            #:*target*
-           #:ensure-absolute
            #:*input*
            #:*output*
            #:*module*
@@ -25,18 +24,6 @@
 (defvar-unbound *source* "Source file being compiled.")
 
 (declaim (type absolute-pathname *base* *input* *output* *source*))
-
-(defun ensure-absolute (path)
-  "If PATH is relative, merge it with *BASE*."
-  (assure absolute-pathname
-    (etypecase path
-      (absolute-pathname path)
-      (relative-pathname
-       (if (boundp '*base*)
-           (let ((base (uiop:pathname-directory-pathname *base*)))
-             (merge-pathnames path base))
-           (error* "Can't make absolute: ~a" path))))))
-
 
 (defvar *cli* nil)
 (declaim (type boolean *cli*))
