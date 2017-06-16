@@ -242,13 +242,12 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defclass ref ()
   ((name
-    :reader ref-name
-    :reader .name
+    :reader ref.name
     :type t
     :initarg :name))
   (:documentation "Base class for different kinds of by-name references."))
 
-(defmethods ref (self)
+(defmethods ref (self name)
   (:method initialize-instance :after (self &key &allow-other-keys)
     (unless (slot-boundp self 'name)
       (error* "No name")))
@@ -256,7 +255,7 @@ on Lisp/OS/filesystem combinations that support it."
   (:method make-load-form (self &optional env)
     (declare (ignore env))
     `(make-instance ,(class-of self)
-                    :name ,(.name self))))
+                    :name ,name)))
 
 (defclass directory-ref (ref)
   ((name
@@ -275,11 +274,11 @@ on Lisp/OS/filesystem combinations that support it."
    (nicknames
     :type list
     :initarg :nicknames
-    :reader .nicknames)
+    :reader package-ref.nicknames)
    (use-list
     :type list
     :initarg :use
-    :reader .use-list))
+    :reader package-ref.use-list))
   (:documentation "A reference to a package.")
   (:default-initargs
    :nicknames nil
@@ -304,14 +303,14 @@ on Lisp/OS/filesystem combinations that support it."
   ((pattern
     :initarg :pattern
     :type (or symbol standard-object)
-    :accessor .pattern)
+    :accessor pattern-ref.pattern)
    (name
     :type pathname
     :initarg :input
-    :accessor .input)
+    :accessor pattern-ref.input)
    (output
     :type pathname
-    :accessor .output)))
+    :accessor pattern-ref.output)))
 
 (defgeneric merge-pattern-defaults (pattern input)
   (:method (pattern input)
@@ -322,28 +321,24 @@ on Lisp/OS/filesystem combinations that support it."
   (:method (pattern input)
     ;; Note that we're merging the *provided* inputs and
     ;; outputs into the defaults, rather than vice-versa.
-    (merge-pathnames* (input-defaults pattern)
+    (merge-pathnames* (pattern.input-defaults pattern)
                       input)))
 
 (defgeneric merge-output-defaults (pattern input)
   (:method (pattern input)
-    (merge-pathnames (output-defaults pattern)
+    (merge-pathnames (pattern.output-defaults pattern)
                      input)))
 
-(defmethods pattern-ref (self)
+(defmethods pattern-ref (self (input name) output pattern)
   (:method initialize-instance :after (self &key)
     ;; Merge in the defaults for inputs and outputs.
-    (mvlet* ((pattern (find-pattern (.pattern self)))
-             (input output
-              (merge-pattern-defaults pattern (.input self))))
-      (setf (.input self)  input
-            (.output self) output)))
+    (let ((pattern (find-pattern pattern)))
+      (setf (values input output)
+            (merge-pattern-defaults pattern input))))
 
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
-      (format stream "~a -> ~a"
-              (.input self)
-              (.output self))))
+      (format stream "~a -> ~a" input output)))
 
   (:method make-load-form (self &optional env)
     (make-load-form-saving-slots self
@@ -367,28 +362,24 @@ on Lisp/OS/filesystem combinations that support it."
   ((timestamp
     :type target-timestamp
     :initform never
-    :accessor .timestamp)
+    :accessor module-cell.timestamp)
    (lang
     :initarg :lang
     :type lang-name
-    :reader .lang
-    :reader module-cell-lang
-    :reader module-lang)
+    :reader module-cell.lang)
    (source
     :initarg :source
     :type (and file-pathname tame-pathname)
-    :reader .source
-    :accessor module-cell-source
-    :reader module-source)
+    :accessor module-cell.source)
    (meta
     :initform nil
     :type plist
-    :accessor .meta
+    :accessor module-cell.meta
     :documentation "Metadata about the module. This persists even when
 the module is reloaded.")
    (module
     :initform nil
-    :accessor .module)
+    :accessor module-cell.module)
    (lock
     :reader monitor))
   (:documentation "Storage for a module.
@@ -420,11 +411,11 @@ forever."))
 
 (defun module-cell-meta (cell key)
   (synchronized (cell)
-    (getf (.meta cell) key)))
+    (getf (module-cell.meta cell) key)))
 
 (defun (setf module-cell-meta) (value cell key)
   (synchronized (cell)
-    (setf (getf (.meta cell) key)
+    (setf (getf (module-cell.meta cell) key)
           value)))
 
 (defplace module-meta (lang path key)
@@ -438,38 +429,38 @@ resolved at load time."
 (define-compiler-macro (setf module-meta) (value lang path key)
   `(setf (module-cell-meta (module-cell ,lang ,path) ,key) ,value))
 
-(defmethods module-cell (self)
+(defmethods module-cell (self lock source lang module)
   (:method initialize-instance :after (self &key)
-    (setf (slot-value self 'lock)
-          (bt:make-lock (fmt "Lock for module ~a" self))))
+    ;; Give the lock a name.
+    (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
 
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
       (format stream "~a (~a) (~:[not loaded~;loaded~])"
-              (.source self)
-              (.lang self)
-              (.module self))))
+              source
+              lang
+              module)))
 
   (:method module-ref (self name)
-    (module-ref* (.module self) name))
+    (module-ref* module name))
 
   (:method module-exports (self)
-    (module-exports (.module self)))
+    (module-exports module))
 
   (:method make-load-form (self &optional env)
     (declare (ignore env))
-    `(module-cell ,(.lang self)
+    `(module-cell ,lang
                   ,(assure absolute-pathname
-                     (.source self)))))
+                     source))))
 
 (defun load-module-into-cell (cell)
   (lret ((module
           (assure (not null)
-            (load-module (.lang cell)
-                         (.source cell)))))
+            (load-module (module-cell.lang cell)
+                         (module-cell.source cell)))))
     (setf
-     (.module cell) module
-     (.timestamp cell) (now))))
+     (module-cell.module cell) module
+     (module-cell.timestamp cell) (now))))
 
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
@@ -540,22 +531,22 @@ it."
          (file-mtime target)
          never))
     (package-ref
-     (let* ((name (ref-name target))
+     (let* ((name (ref.name target))
             (package (find-package (string name))))
        (if package far-future never)))
     (directory-ref
-     (let ((dir (resolve-target (ref-name target) *base*)))
+     (let ((dir (resolve-target (ref.name target) *base*)))
        (if (directory-exists-p dir)
            far-future
            never)))
     (pattern-ref
-     (if (pathname-exists? (.output target))
-         (file-mtime (.output target))
-         never))
+     (with-accessors ((output pattern-ref.output)) target
+       (if (pathname-exists? output)
+           (file-mtime output)
+           never)))
     (module-cell
-     (if (null (.module target))
-         never
-         (.timestamp target)))))
+     (with-slots (module timestamp) target
+       (if (null module) never timestamp)))))
 
 (defun (setf target-timestamp) (timestamp target)
   (check-type timestamp (or timestamp time-tuple))
@@ -574,7 +565,7 @@ it."
          (error* "Cannot set pathname timestamps (yet).")
          (open target :direction :probe :if-does-not-exist :create)))
     (directory-ref
-     (let ((dir (.name target)))
+     (let ((dir (ref.name target)))
        (if (directory-exists-p dir)
            ;; TODO Ditto.
            (error* "Cannot set directory timestamps (yet).")
@@ -583,7 +574,7 @@ it."
      ;; TODO Or does it?
      (error* "Setting the timestamp of ~s does not make sense."))
     (module-cell
-     (setf (.timestamp target) timestamp))))
+     (setf (module-cell.timestamp target) timestamp))))
 
 (defun touch-target (target &optional (date (now)))
   (setf (target-timestamp target) date))
@@ -597,13 +588,13 @@ E.g. delete a file, unbind a variable."
     (bindable-symbol
      (makunbound target))
     (package-ref
-     (delete-package (.name target)))
+     (delete-package (ref.name target)))
     (pathname
-     (delete-file-or-directory (.name target)))
+     (delete-file-or-directory (ref.name target)))
     (pattern-ref
-     (delete-file-or-directory (.output target)))
+     (delete-file-or-directory (pattern-ref.output target)))
     (directory-ref
-     (delete-directory-tree (.name target)))
+     (delete-directory-tree (ref.name target)))
     (module-cell
      (with-slots (lang source) target
        (clear-module-cell lang source)
@@ -626,18 +617,18 @@ E.g. delete a file, unbind a variable."
            (directory* path)
            path)))
     (pattern-ref
-     (pattern-ref (.pattern target)
-                  (merge-pathnames* (.input target) base)))
+     (pattern-ref (pattern-ref.pattern target)
+                  (merge-pathnames* (pattern-ref.input target) base)))
     (directory-ref
      (directory-ref
       ;; Could this be wild?
       (assure tame-pathname
-        (merge-pathnames* (.name target) base))))
+        (merge-pathnames* (ref.name target) base))))
     (module-cell
-     (locally
-         (module-cell (.lang target)
-                      (assure tame-pathname
-                        (merge-pathnames* (.source target) base)))))))
+     (with-slots (lang source) target
+       (module-cell lang
+                    (assure tame-pathname
+                      (merge-pathnames* source base)))))))
 
 (defparameter *preserve-fractional-seconds* nil
   "When comparing precise timestamps (local-time timestamps) and
@@ -738,20 +729,20 @@ E.g. delete a file, unbind a variable."
 (defun target= (x y)
   "Are two targets the same?"
   (or (eql x y)
-      (and (type= (target-type-of x) (target-type-of y))
+      (and (compare #'type= #'target-type-of x y)
            (etypecase-of target x
              (root-target t)            ;There's only one.
              (bindable-symbol (eql x y))
              (pathname (pathname-equal x y))
              (module-cell (eql x y))
              (package-ref
-              (string= (.name x) (.name y)))
+              (compare #'string= #'ref.name x y))
              (directory-ref
-              (pathname-equal (.name x) (.name y)))
+              (compare #'pathname-equal #'ref.name x y))
              (pattern-ref
-              (and (equal (.input   x) (.input   y))
-                   (eql   (.pattern x) (.pattern y))
-                   (equal (.output  x) (.output  y))))))))
+              (and (compare #'equal #'pattern-ref.input    x y)
+                   (compare #'eql   #'pattern-ref.pattern  x y)
+                   (compare #'equal #'pattern-ref.output   x y)))))))
 
 (defun hash-target (target)
   (declare (optimize (speed 3)
@@ -764,20 +755,20 @@ E.g. delete a file, unbind a variable."
     (module-cell
      (dx-sxhash
       (list 'module-cell
-            (module-cell-lang target)
-            (module-cell-source target))))
+            (module-cell.lang target)
+            (module-cell.source target))))
     (directory-ref
      (dx-sxhash
       (list 'directory-ref
-            (.name target))))
+            (ref.name target))))
     (package-ref
      (dx-sxhash
       (list 'package-ref
-            (.name target))))
+            (ref.name target))))
     (pattern-ref
      (dx-sxhash
       (list 'package-ref
-            (.name target))))))
+            (ref.name target))))))
 
 (define-custom-hash-table-constructor %make-target-table
   :test target=
@@ -943,24 +934,25 @@ distributed."
     ((or bindable-symbol pathname)
      (gethash target *tasks*))
     (directory-ref
-     (let ((dir (ref-name target)))
+     (let ((dir (ref.name target)))
        (task target
              (lambda ()
                (let ((dir (resolve-target dir *base*)))
                  (ensure-directories-exist dir)))
              (constantly nil))))
     (package-ref
-     (task target
-           (lambda ()
-             (or (find-package (.name target))
-                 (make-package (.name target)
-                               :use (.use-list target)
-                               :nicknames (.nicknames target))))
-           (constantly nil)))
+     (with-slots (name use-list nicknames) target
+       (task target
+             (lambda ()
+               (or (find-package name)
+                   (make-package name
+                                 :use use-list
+                                 :nicknames nicknames)))
+             (constantly nil))))
     (pattern-ref
-     (let* ((input (.input target))
-            (output (.output target))
-            (pattern (find-pattern (.pattern target))))
+     (let* ((input (pattern-ref.input target))
+            (output (pattern-ref.output target))
+            (pattern (find-pattern (pattern-ref.pattern target))))
        (task output
              (lambda ()
                (let ((*input* input)
@@ -973,26 +965,27 @@ distributed."
                    (depends-on input))
                  (pattern-depend pattern))))))
     (module-cell
-     (task target
-           (lambda ()
-             (let ((*language* (.lang target)))
-               (load-module-into-cell target)))
-           (lambda ()
-             (let ((*base* (.source target))
-                   (*language* (.lang target)))
-               (with-defaults-from-base
-                 ;; Depend on the source file.
-                 (depends-on (.source target))
-                 ;; The stashed recursive dependencies of the module.
-                 (depends-on-all (module-deps target))
-                 ;; Let the language tell you what else to depend on.
-                 (lang-deps (.lang target) (.source target)))))))))
+     (with-slots (lang source) target
+       (task target
+             (lambda ()
+               (let ((*language* lang))
+                 (load-module-into-cell target)))
+             (lambda ()
+               (let ((*base* source)
+                     (*language* lang))
+                 (with-defaults-from-base
+                   ;; Depend on the source file.
+                   (depends-on source)
+                   ;; The stashed recursive dependencies of the module.
+                   (depends-on-all (module-deps target))
+                   ;; Let the language tell you what else to depend on.
+                   (lang-deps lang source)))))))))
 
 (defcondition no-such-task (overlord-error)
-  ((target :type target :initarg :target :reader .target))
+  ((target :type target :initarg :target :reader overlord-error-target))
   (:report (lambda (c s)
              (format s "No such task: ~a"
-                     (.target c)))))
+                     (overlord-error-target c)))))
 
 (defun no-such-task (target)
   (error 'no-such-task :target target))
@@ -1002,7 +995,7 @@ distributed."
   (:report (lambda (c s)
              (format s "~
 Don't know how to build missing prerequisite ~s."
-                     (.target c)))))
+                     (overlord-error-target c)))))
 
 (defun missing-file (target)
   (error 'missing-file :target target))
@@ -1147,7 +1140,7 @@ Possibly useful for testing.")
   ((target :initarg :target
            ;; Nothing can depend on the root target.
            :type (and target (not root-target))
-           :reader .target)))
+           :reader overlord-error-target)))
 
 (defun depends-on/1 (target)
   (let ((target (resolve-target target *base*)))
@@ -1460,34 +1453,30 @@ specify the dependencies you want on build."
   ((input-defaults
     :initarg :input-defaults
     :type pathname
-    :reader pattern-input-defaults
-    :reader input-defaults)
+    :reader pattern.input-defaults)
    (output-defaults
     :initarg :output-defaults
     :type pathname
-    :reader output-defaults
-    :reader pattern-output-defaults)
+    :reader pattern.output-defaults)
    (init-fn
     :initarg :init
     :type function
-    :reader pattern-init-fn)
+    :reader pattern.init-fn)
    (deps-fn
     :initarg :deps
     :type function
-    :reader pattern-deps-fn))
+    :reader pattern.deps-fn))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
    :deps (constantly nil)
    :init (constantly nil)))
 
-(defgeneric pattern-init (pattern)
-  (:method (pattern)
-    (funcall (slot-value pattern 'init-fn))))
-
-(defgeneric pattern-depend (pattern)
-  (:method (pattern)
-    (funcall (slot-value pattern 'deps-fn))))
+(defmethods pattern (self init-fn deps-fn)
+  (:method pattern-init (self)
+    (funcall init-fn))
+  (:method pattern-depend (self)
+    (funcall deps-fn)))
 
 (defun extension (ext)
   (assure pathname
@@ -1610,16 +1599,17 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defun call/module-dependency-tracking (thunk)
   "Ensure that `*module-chain*' is bound around THUNK."
-  (if (boundp '*module-chain*)
-      (funcall thunk)
-      (let ((*module-chain* '()))
-        (handler-bind ((module-dependency
-                         (lambda (c)
-                           (let ((mc (module-dependency.module-cell c)))
-                             (when-let (prev (first *module-chain*))
-                               (pushnew mc (module-deps prev)))
-                             (push mc *module-chain*)))))
-          (funcall thunk)))))
+  (fbind (thunk)
+    (if (boundp '*module-chain*)
+        (thunk)
+        (let ((*module-chain* '()))
+          (handler-bind ((module-dependency
+                           (lambda (c)
+                             (let ((mc (module-dependency.module-cell c)))
+                               (when-let (prev (first *module-chain*))
+                                 (pushnew mc (module-deps prev)))
+                               (push mc *module-chain*)))))
+            (thunk))))))
 
 (defun save-module-dependency (mc)
   (check-type mc module-cell)
@@ -1642,7 +1632,7 @@ Incrementing this should be sufficient to invalidate old fasls.")
     (let ((mc (module-cell lang source)))
       (save-module-dependency mc)
       (build mc)
-      (.module mc))))
+      (module-cell.module mc))))
 
 (defun %unrequire-as (lang source *base*)
   (with-defaults-from-base
@@ -1732,7 +1722,7 @@ interoperation with Emacs."
    (source :initarg :source)))
 
 (defmethods static-exports-pattern (self lang source)
-  (:method output-defaults (self)
+  (:method pattern.output-defaults (self)
     ;; Bear in mind *input* may have been resolved.
     (let ((fasl (faslize lang source))
           (ext (extension "static-exports")))
@@ -1785,8 +1775,9 @@ interoperation with Emacs."
   ;; optimization settings and there is no reference to the module
   ;; cell.
   (maphash (lambda (k mc) (declare (ignore k))
-             (setf (module-cell-source mc) *nil-pathname*
-                   (.timestamp mc) never))
+             (with-slots (source timestamp) mc
+               (setf source *nil-pathname*
+                     timestamp never)))
            *module-cells*))
 
 (defun %ensure-module-cell (lang path)
@@ -1815,10 +1806,10 @@ if it does not exist."
     (%ensure-module-cell lang path)))
 
 (defun find-module (lang source)
-  (.module (module-cell lang source)))
+  (module-cell.module (module-cell lang source)))
 
 (define-compiler-macro find-module (lang source)
-  `(.module (module-cell ,lang ,source)))
+  `(module-cell.module (module-cell ,lang ,source)))
 
 ;;; Hack to stop recursion. We can't use %ensure-module-cell directly,
 ;;; because it doesn't apply the defaults for the language.
@@ -1830,8 +1821,9 @@ if it does not exist."
 (defun clear-module-cell (lang source)
   (declare (notinline module-cell))
   (lret ((m (module-cell lang source)))
-    (setf (.timestamp m) never)
-    (nix (.module m))))
+    (with-slots (timestamp module) m
+      (setf timestamp never)
+      (nix module))))
 
 ;;; Lazy-loading modules.
 
@@ -1872,11 +1864,11 @@ if it does not exist."
   (:method ((lang symbol) (source t))
     (unbuild-lang-deps (resolve-lang lang) source)))
 
-(defmethod input-defaults ((lang symbol))
+(defmethod pattern.input-defaults ((lang symbol))
   (let ((p (resolve-package lang)))
-    (if p (input-defaults p) *nil-pathname*)))
+    (if p (pattern.input-defaults p) *nil-pathname*)))
 
-(defmethod input-defaults ((p package))
+(defmethod pattern.input-defaults ((p package))
   (let ((sym (find-symbol #.(string 'extension) p)))
     (or (and sym (symbol-value sym))
         *nil-pathname*)))
@@ -1950,7 +1942,7 @@ if it does not exist."
    (source :initarg :source)))
 
 (defmethods fasl-lang-pattern (self lang source)
-  (:method output-defaults (self)
+  (:method pattern.output-defaults (self)
     (faslize lang source))
 
   (:method pattern-init (self)
@@ -1985,7 +1977,7 @@ if it does not exist."
   (let* ((mc (module-cell lang source))
          (deps (module-deps mc))
          (file (deps-file lang source))
-         (deps-table (mapcar (juxt #'.lang #'.source) deps)))
+         (deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
     (write-form-as-file deps-table file)))
 
 (defun snarf-module-deps (lang source)

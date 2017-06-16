@@ -10,6 +10,7 @@
     :native-namestring
     :ensure-pathname)
   (:export
+   #:compare
    #:package-exports
    #:locate-dominating-file
    #:quoted-symbol?
@@ -26,6 +27,16 @@
    #:write-form-as-file
    #:write-file-if-changed))
 (cl:in-package #:overlord/util)
+
+;;; TODO This cries out for a compiler macro.
+(-> compare (function function t &rest t) t)
+(defun compare (test accessor &rest xs)
+  (cond ((null xs) t)
+        ((single xs) t)
+        (t (let* ((accessor (ensure-function accessor))
+                  (test (ensure-function test))
+                  (xs (mapcar accessor xs)))
+             (every test xs (rest xs))))))
 
 (defun package-exports (p)
   (collecting

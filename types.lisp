@@ -9,6 +9,7 @@
    #:overlord-condition
    #:overlord-error
    #:overlord-warning
+   #:overlord-error-target
    #:error*
    #:warning*
    #:cerror*
@@ -67,6 +68,8 @@
 (define-condition overlord-condition (condition) ())
 (define-condition overlord-error (overlord-condition simple-error) ())
 (define-condition overlord-warning (overlord-condition simple-warning) ())
+
+(defgeneric overlord-error-target (error))
 
 (defun error* (message &rest args)
   (error 'overlord-error
