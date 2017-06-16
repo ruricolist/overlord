@@ -5,7 +5,7 @@
     :overlord/types
     :overlord/global-state)
   (:import-from :overlord/specials
-    :*base*
+    :*base* :*cli*
     :ensure-absolute)
   (:import-from :uiop
     :pathname-directory-pathname
@@ -16,6 +16,7 @@
     :locate-dominating-file)
   (:export
    :current-dir!
+   :build-env :build-env-case
    :*base* :base
    :set-package-base
    :base-relative-pathname
@@ -44,6 +45,20 @@
 (defun call/current-dir! (thunk dir)
   (setf (current-dir!) dir)
   (funcall thunk))
+
+(deftype build-env ()
+  '(member :cli :repl :compile-file :load-file))
+
+(defun build-env ()
+  (assure build-env
+    (cond (*cli* :cli)
+          (*compile-file-truename* :compile-file)
+          (*load-truename* :load-file)
+          (t :repl))))
+
+(defmacro build-env-case (&body clauses)
+  `(ecase-of build-env (build-env)
+     ,@clauses))
 
 (defmacro with-defaults-from-base (&body body)
   "Wrapper for `call-with-defaults-from-base'."

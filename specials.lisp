@@ -4,6 +4,7 @@
   (:use #:cl :overlord/types)
   (:import-from :serapeum :defvar-unbound :assure)
   (:export #:*base*
+           #:*cli*
            #:*target*
            #:ensure-absolute
            #:*input*
@@ -35,6 +36,10 @@
            (let ((base (uiop:pathname-directory-pathname *base*)))
              (merge-pathnames path base))
            (error* "Can't make absolute: ~a" path))))))
+
+
+(defvar *cli* nil)
+(declaim (type boolean *cli*))
 
 (defvar-unbound *module* "The module being returned.")
 (defvar-unbound *program* "The program to be compiled.")
