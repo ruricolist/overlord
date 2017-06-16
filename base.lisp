@@ -10,10 +10,12 @@
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
-    :merge-pathnames*)
+    :merge-pathnames*
+    :chdir :getcwd :pathname-equal)
   (:import-from :overlord/util
     :locate-dominating-file)
   (:export
+   :current-dir!
    :*base* :base
    :set-package-base
    :base-relative-pathname
@@ -22,6 +24,26 @@
    :infer-system))
 
 (in-package :overlord/base)
+
+(defun current-dir! ()
+  (assure (and absolute-pathname directory-pathname)
+    (let ((cwd (getcwd))
+          (dpd *default-pathname-defaults*))
+      (unless (pathname-equal cwd dpd)
+        (setf *default-pathname-defaults* cwd))
+      cwd)))
+
+(defun (setf current-dir!) (dir)
+  (check-type dir (and absolute-pathname directory-pathname))
+  (unless (pathname-equal dir (getcwd))
+    (chdir dir))
+  (unless (pathname-equal dir *default-pathname-defaults*)
+    (setf *default-pathname-defaults* dir))
+  dir)
+
+(defun call/current-dir! (thunk dir)
+  (setf (current-dir!) dir)
+  (funcall thunk))
 
 (defmacro with-defaults-from-base (&body body)
   "Wrapper for `call-with-defaults-from-base'."
