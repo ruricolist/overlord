@@ -46,26 +46,26 @@
   (setf (current-dir!) dir)
   (funcall thunk))
 
-(defun ensure-absolute (pathname)
-  (assure absolute-pathname
-    (etypecase pathname
-      (absolute-pathname pathname)
-      (relative-pathname
-       (merge-pathnames* pathname (current-dir!))))))
-
 (deftype build-env ()
-  '(member :cli :repl :compile-file :load-file))
+  '(member :cli :repl :compile :load))
 
 (defun build-env ()
   (assure build-env
     (cond (*cli* :cli)
-          (*compile-file-truename* :compile-file)
-          (*load-truename* :load-file)
+          (*compile-file-truename* :compile)
+          (*load-truename* :load)
           (t :repl))))
 
 (defmacro build-env-case (&body clauses)
   `(ecase-of build-env (build-env)
      ,@clauses))
+
+(defun ensure-absolute (pathname)
+  (assure absolute-pathname
+    (etypecase pathname
+      (absolute-pathname pathname)
+      (relative-pathname
+       (merge-pathnames* pathname (base))))))
 
 (defmacro with-defaults-from-base (&body body)
   "Wrapper for `call-with-defaults-from-base'."
@@ -99,13 +99,15 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
   #+ () (or *compile-file-truename*
             *load-truename*)
   (if (boundp '*base*) *base*
-      (infer-base)))
+      (build-env-case
+        ((:cli :repl) (current-dir!))
+        ((:compile :load) (infer-base-from-package)))))
 
 (defun infer-base-1 (&key (errorp t))
   (or (gethash *package* *package-bases*)
       (system-base (infer-system :errorp errorp))))
 
-(defun infer-base (&key (errorp t))
+(defun infer-base-from-package (&key (errorp t))
   (let ((base (infer-base-1 :errorp errorp)))
     (if (absolute-pathname-p base)
         base
