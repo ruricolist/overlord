@@ -98,10 +98,11 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 (defun base ()
   #+ () (or *compile-file-truename*
             *load-truename*)
-  (if (boundp '*base*) *base*
-      (build-env-case
-        ((:cli :repl) (current-dir!))
-        ((:compile :load) (infer-base-from-package)))))
+  (assure directory-pathname
+    (if (boundp '*base*) *base*
+        (build-env-case
+          ((:cli :repl) (current-dir!))
+          ((:compile :load) (infer-base-from-package))))))
 
 (defun infer-base-1 (&key (errorp t))
   (or (gethash *package* *package-bases*)
