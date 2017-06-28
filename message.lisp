@@ -17,7 +17,7 @@
   (let ((stream *message-stream*)
         (control (simple-condition-format-control msg))
         (args    (simple-condition-format-arguments msg)))
-    (prog1 (format stream "~&~?~%" control args)
+    (prog1 (format stream "~&[Overlord] ~?~%" control args)
       ;; Messages the user doesn't see in time aren't very useful.
       (force-output stream))))
 
