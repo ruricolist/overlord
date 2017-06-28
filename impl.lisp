@@ -1076,7 +1076,11 @@ Possibly useful for testing.")
   (check-type deps function)
   (check-not-frozen)
   (save-task target thunk deps)
-  (build-recursively target))
+  (let ((*depth* (1+ *depth*)))
+    (message "~a(build ~a)"
+             (make-string (1- *depth*) :initial-element #\Space)
+             target)
+    (build-recursively target)))
 
 (defvar-unbound *already-built*
   "List of targets that have already been built.")

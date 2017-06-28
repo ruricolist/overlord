@@ -14,7 +14,8 @@
            #:*deps*
            #:*language*
            #:*phase*
-           #:*source*))
+           #:*source*
+           #:*depth*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -41,3 +42,6 @@ has to see before the other forms.")
 
 (defvar-unbound *language* "The name (symbol) of the current language.")
 (declaim (type symbol *language*))
+
+(defvar *depth* 0)
+(declaim (type (integer 0 #.most-positive-fixnum) *depth*))
