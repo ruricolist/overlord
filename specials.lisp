@@ -23,7 +23,9 @@
 (defvar-unbound *deps* "Dependencies being collected.")
 (defvar-unbound *source* "Source file being compiled.")
 
-(declaim (type absolute-pathname *base* *input* *output* *source*))
+(declaim (type (and directory-pathname absolute-pathname) *base*))
+
+(declaim (type absolute-pathname *input* *output* *source*))
 
 (defvar *cli* nil "Are we running on a CLI?")
 (declaim (type boolean *cli*))
