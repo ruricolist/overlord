@@ -22,7 +22,8 @@
    :with-defaults-from-base
    :hygienic-pathnames
    :infer-system
-   :ensure-absolute))
+   :ensure-absolute
+   :cd))
 
 (in-package :overlord/base)
 
@@ -41,6 +42,9 @@
   (unless (pathname-equal dir *default-pathname-defaults*)
     (setf *default-pathname-defaults* dir))
   dir)
+
+(defun cd (dir)
+  (setf (current-dir!) dir))
 
 (defun call/current-dir! (thunk dir)
   (setf (current-dir!) dir)
