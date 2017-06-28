@@ -3,6 +3,7 @@
   (:import-from #:overlord #:build #:run)
   (:import-from #:overlord/safer-read
     #:safer-read-from-string)
+  (:import-from #:overlord/specials #:*cli*)
   (:import-from :alexandria :read-file-into-string)
   (:import-from :uiop :quit)
   (:export #:main))
@@ -50,7 +51,8 @@
 (defun handle-args (cmd target &key ((:verbose *verbose*) nil)
                                     help version
                                     ((:system system-name) nil)
-                                    ((:package package-name) nil))
+                                    ((:package package-name) nil)
+                    &aux (*cli* t))
   (check-type target string)
   (setf target (string-invert-case target))
   (when (find #\: target)

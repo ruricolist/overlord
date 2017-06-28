@@ -25,7 +25,7 @@
 
 (declaim (type absolute-pathname *base* *input* *output* *source*))
 
-(defvar *cli* nil)
+(defvar *cli* nil "Are we running on a CLI?")
 (declaim (type boolean *cli*))
 
 (defvar-unbound *module* "The module being returned.")
