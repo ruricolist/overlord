@@ -21,7 +21,7 @@
       ;; Messages the user doesn't see in time aren't very useful.
       (force-output stream))))
 
-(define-global-state *message-handler* #'default-message-handler
+(define-global-state *message-handler* 'default-message-handler
   "The current handler for message conditions.")
 (declaim (type (or function symbol) *message-handler*))
 
