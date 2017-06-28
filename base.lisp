@@ -69,10 +69,12 @@
 
 (defmacro with-defaults-from-base (&body body)
   "Wrapper for `call-with-defaults-from-base'."
-  `(let ((*default-pathname-defaults*
-           (pathname-directory-pathname
-            *base*)))
-     ,@body))
+  `(progn ,@body)
+  ;; `(let ((*default-pathname-defaults*
+  ;;          (pathname-directory-pathname
+  ;;           *base*)))
+  ;;    ,@body)
+  )
 
 (define-global-state *package-bases* (make-hash-table))
 
