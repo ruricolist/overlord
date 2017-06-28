@@ -5,8 +5,7 @@
     :overlord/types
     :overlord/global-state)
   (:import-from :overlord/specials
-    :*base* :*cli*
-    :ensure-absolute)
+    :*base* :*cli*)
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
@@ -22,7 +21,8 @@
    :base-relative-pathname
    :with-defaults-from-base
    :hygienic-pathnames
-   :infer-system))
+   :infer-system
+   :ensure-absolute))
 
 (in-package :overlord/base)
 
