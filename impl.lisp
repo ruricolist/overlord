@@ -1076,11 +1076,7 @@ Possibly useful for testing.")
   (check-type deps function)
   (check-not-frozen)
   (save-task target thunk deps)
-  (let ((*depth* (1+ *depth*)))
-    (message "~a(build ~a)"
-             (make-string (1- *depth*) :initial-element #\Space)
-             target)
-    (build-recursively target)))
+  (build-recursively target))
 
 (defvar-unbound *already-built*
   "List of targets that have already been built.")
@@ -1088,6 +1084,11 @@ Possibly useful for testing.")
 
 (defun already-built? (target)
   (target-table-member *already-built* target))
+
+(defun print-target-being-built (target)
+  (message "~a(build ~a)"
+           (make-string (1- *depth*) :initial-element #\Space)
+           target))
 
 (defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
@@ -1121,7 +1122,9 @@ Possibly useful for testing.")
                    (receive (target thunk deps)
                        (target-task-values target)
                      (when (needs-building? target deps)
-                       (funcall thunk))
+                       (let ((*depth* (1+ *depth*)))
+                         (print-target-being-built target)
+                         (funcall thunk)))
                      (target-timestamp target))))))))
 
     (handler-bind ((dependency #'redo))
