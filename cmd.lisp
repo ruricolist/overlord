@@ -1,6 +1,6 @@
 (cl:defpackage :overlord/cmd
   (:use :cl :alexandria :serapeum)
-  (:import-from :overlord/specials :*base*)
+  (:import-from :overlord/base :base)
   (:import-from :overlord/types :list-of :plist)
   (:export :cmd))
 (cl:in-package :overlord/cmd)
@@ -24,4 +24,4 @@
       (values-list plist)
       :output t
       :error-output t
-      :directory *base*)))
+      :directory (base))))

@@ -5,7 +5,6 @@
     #:overlord/global-state)
   (:import-from #:cl-strftime #:format-time)
   (:import-from #:drakma #:http-request)
-  (:import-from #:overlord/specials #:*base*)
   (:import-from #:overlord/base #:ensure-absolute)
   (:import-from #:serapeum #:make-octet-vector)
   (:export #:update-file-from-url
@@ -57,9 +56,7 @@
 
 (defun update-file-from-url (file url)
   (lret ((file
-          (if (boundp '*base*)
-              (ensure-absolute file)
-              file)))
+          (ensure-absolute file)))
     (if (not (uiop:file-exists-p file))
         (if *offline*
             (error* "Offline: cannot retrieve ~a" file)
@@ -67,29 +64,26 @@
               (when (= status 200)
                 (write-byte-vector-into-file body file))))
         (online-only ()
-          (let ((fwd (file-write-date file)))
-            (multiple-value-bind (body status)
-                (http-request/binary
-                 url
-                 :additional-headers
-                 `((:if-modified-since . ,(format-mtime fwd))))
-              (when (= status 200)
-                (unless (vector= body (read-file-into-byte-vector file))
-                  (write-byte-vector-into-file body file :if-exists :supersede)))))))))
+                     (let ((fwd (file-write-date file)))
+                       (multiple-value-bind (body status)
+                           (http-request/binary
+                            url
+                            :additional-headers
+                            `((:if-modified-since . ,(format-mtime fwd))))
+                         (when (= status 200)
+                           (unless (vector= body (read-file-into-byte-vector file))
+                             (write-byte-vector-into-file body file :if-exists :supersede)))))))))
 
 (defun ensure-file-from-url (file url)
   "Unlike `update-file-from-url' this does not preserve URL's
 timestamp."
-  (lret ((file
-          (if (boundp '*base*)
-              (ensure-absolute file)
-              file)))
+  (lret ((file (ensure-absolute file)))
     (unless (uiop:file-exists-p file)
       (online-only ()
-        (multiple-value-bind (body status) (http-request/binary url)
-          (if (= status 200)
-              (write-byte-vector-into-file body file)
-              (error* "Could not fetch ~a: code ~a" url status)))))))
+                   (multiple-value-bind (body status) (http-request/binary url)
+                     (if (= status 200)
+                         (write-byte-vector-into-file body file)
+                         (error* "Could not fetch ~a: code ~a" url status)))))))
 
 (defun go-offline ()
   (setf *offline* t))

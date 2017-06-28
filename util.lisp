@@ -1,6 +1,5 @@
 (cl:defpackage #:overlord/util
   (:use :cl :alexandria :serapeum)
-  (:import-from :overlord/specials :*base*)
   (:import-from :overlord/types :case-mode)
   (:import-from :uiop
     :pathname-directory-pathname

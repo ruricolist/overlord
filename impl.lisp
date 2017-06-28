@@ -535,7 +535,7 @@ it."
             (package (find-package (string name))))
        (if package far-future never)))
     (directory-ref
-     (let ((dir (resolve-target (ref.name target) *base*)))
+     (let ((dir (resolve-target (ref.name target) (base))))
        (if (directory-exists-p dir)
            far-future
            never)))
@@ -926,7 +926,7 @@ distributed."
            (constantly nil)
            (lambda ()
              (let ((*building-root* t)
-                   ;; `depends-on' needs it to be bound to something.
+                   ;; `depends-on' needs `*base*' to be bound to something.
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
@@ -937,7 +937,7 @@ distributed."
      (let ((dir (ref.name target)))
        (task target
              (lambda ()
-               (let ((dir (resolve-target dir *base*)))
+               (let ((dir (resolve-target dir (base))))
                  (ensure-directories-exist dir)))
              (constantly nil))))
     (package-ref
@@ -1143,7 +1143,7 @@ Possibly useful for testing.")
            :reader overlord-error-target)))
 
 (defun depends-on/1 (target)
-  (let ((target (resolve-target target *base*)))
+  (let ((target (resolve-target target (base))))
     (restart-case
         (signal 'dependency :target target)
       (continue ()
@@ -1164,7 +1164,6 @@ particular order."
 
 (defun depends-on-all (deps)
   ;; NB This is where you would add parallelism.
-  (assert (boundp '*base*))
   (map nil #'depends-on/1 (reshuffle deps))
   (values))
 
@@ -1174,7 +1173,6 @@ If any of DEPS is a list, it will be descended into."
   (depends-on-all* deps))
 
 (defun depends-on-all* (deps)
-  (assert (boundp '*base*))
   (map nil #'depends-on/1 deps)
   (values))
 
@@ -1213,8 +1211,7 @@ safely, overwrite DEST with the contents of the temporary file."
 (defun build-conf (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
-  (let* ((*base* (eif (boundp '*base*) *base* (base)))
-         (old (symbol-value name)))
+  (let ((old (symbol-value name)))
     (if (funcall test old new)
         old
         (progn
@@ -1266,20 +1263,24 @@ value and NEW do not match under TEST."
 
 (defun run-cmd (cmd &rest args)
   "Like `uiop:run-program, but defaulting the `:directory' argument to
-`*base*'."
+the current base."
   (multiple-value-call #'uiop:run-program
     cmd
     (values-list args)
-    :directory *base*))
+    :directory (base)))
 
 
 ;;; Bindings.
 
+(defun save-base (form)
+  `(let ((*base* ,(base)))
+     ,form))
+
 (defmacro defconfig (name init &key (test '#'equal)
                                     documentation)
   (let ((init
-          `(let ((*base* ,(base)))
-             (with-defaults-from-base
+          (save-base
+            `(with-defaults-from-base
                (with-keyword-macros
                  ,init)))))
     `(progn
@@ -1300,17 +1301,17 @@ value and NEW do not match under TEST."
 
 (defmacro deps-thunk (&body body)
   `(lambda ()
-     (let ((*base* ,(base)))
-       (with-defaults-from-base
-         (with-keyword-macros
-           ,@body)))))
+     ,(save-base
+        `(with-defaults-from-base
+           (with-keyword-macros
+             ,@body)))))
 
 (defmacro init-thunk (&body body)
   `(lambda ()
-     (let ((*base* ,(base)))
-       (with-defaults-from-base
-         (with-keyword-macros
-           ,@body)))))
+     ,(save-base
+        `(with-defaults-from-base
+           (with-keyword-macros
+             ,@body)))))
 
 (defmacro define-script (name expr)
   `(defconfig ,name ',expr
@@ -1413,19 +1414,19 @@ rebuilt."
       `(progn
          ;; Make the task accessible by name.
          (def ,name ,pathname)
-         (let ((*base* ,base))
-           (with-defaults-from-base
-             (save-file-task ,pathname
-                             (init-thunk
-                               ,(if (null tmp)
-                                    ;; No temp file needed.
-                                    init
-                                    ;; Write to a temp file and rename.
-                                    `(call/temp-file ,pathname
-                                                     (lambda (,tmp)
-                                                       ,init)))
-                               (assert (file-exists-p ,pathname)))
-                             (deps-thunk ,@deps))))
+         ,(save-base
+            `(with-defaults-from-base
+               (save-file-task ,pathname
+                               (init-thunk
+                                 ,(if (null tmp)
+                                      ;; No temp file needed.
+                                      init
+                                      ;; Write to a temp file and rename.
+                                      `(call/temp-file ,pathname
+                                                       (lambda (,tmp)
+                                                         ,init)))
+                                 (assert (file-exists-p ,pathname)))
+                               (deps-thunk ,@deps))))
          ',pathname))))
 
 
@@ -1694,7 +1695,7 @@ interoperation with Emacs."
 
 (defun load-module (lang source)
   (ensure-pathnamef source)
-  (let ((*base* source))
+  (let ((*base* (pathname-directory-pathname source)))
     (with-defaults-from-base
       (load-fasl-lang lang source))))
 
@@ -1704,7 +1705,7 @@ interoperation with Emacs."
     (snarf-static-exports lang source)))
 
 (defun ensure-static-exports (lang source)
-  (let ((*base* source))
+  (let ((*base* (pathname-directory-pathname source)))
     (~> lang
         (static-exports-pattern source)
         (pattern-ref source)
