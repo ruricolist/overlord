@@ -961,7 +961,7 @@ distributed."
              (lambda ()
                (let ((*input* input)
                      (*output* output))
-                 (let ((*base* input))
+                 (let ((*base* (pathname-directory-pathname input)))
                    (depends-on input))
                  (pattern-depend pattern))))))
     (module-cell
@@ -971,7 +971,7 @@ distributed."
                (let ((*language* lang))
                  (load-module-into-cell target)))
              (lambda ()
-               (let ((*base* source)
+               (let ((*base* (pathname-directory-pathname source))
                      (*language* lang))
                  (with-defaults-from-base
                    ;; Depend on the source file.
