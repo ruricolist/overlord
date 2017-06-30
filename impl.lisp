@@ -2197,7 +2197,7 @@ This should be a superset of the variables bound by CL during calls to
            (pkg (resolve-package pkg-name)))
       (or (and pkg (package-name-keyword pkg))
           (restart-case
-              (error "No such #lang: ~a" name)
+              (error* "No such #lang: ~a" name)
             (load-same-name-system ()
               :test (lambda (c) (declare (ignore c))
                       (asdf:find-system name nil))
@@ -2222,7 +2222,8 @@ the #lang declaration ends."
       (lang-name lang))))
 
 (defun resolve-lang-package (lang)
-  (resolve-package (resolve-lang lang)))
+  (assure package
+    (resolve-package (resolve-lang lang))))
 
 (defmacro with-meta-language ((path stream) &body body)
   (with-thunk (body path stream)
