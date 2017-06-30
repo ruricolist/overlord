@@ -687,7 +687,7 @@ E.g. delete a file, unbind a variable."
         (let ((u1 (time-tuple-universal-time ts1)))
           (or (> u1 ts2)
               (and (= u1 ts2)
-                   (> (time-tuple-real-time 0))))))
+                   (> (time-tuple-real-time ts1) 0)))))
        (time-tuple
         (let ((u1 (time-tuple-universal-time ts1))
               (u2 (time-tuple-universal-time ts2)))
