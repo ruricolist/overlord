@@ -1,6 +1,7 @@
 (defpackage :overlord/types
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
+  (:import-from :uiop :getcwd)
   (:import-from :trivia :match)
   (:export
    ;; Singletons.
@@ -70,6 +71,22 @@
 (define-condition overlord-warning (overlord-condition simple-warning) ())
 
 (defgeneric overlord-error-target (error))
+
+(defun print-current-dir (&optional (stream t))
+  "Print the current directory to STREAM.
+If the value of `*default-pathname-defaults*' and a call to
+`uiop:getcwd' differ, then print them both."
+  (let ((dpd *default-pathname-defaults*)
+        (cwd (getcwd)))
+    (format stream "~2&Working dir: ~s" cwd)
+    (unless (pathname-equal dpd cwd)
+      (format stream "~%~s: ~s"
+              '*default-pathname-defaults*
+              *default-pathname-defaults*))))
+
+(defmethod print-object :after ((x overlord-condition) stream)
+  (unless *print-escape*
+    (print-current-dir stream)))
 
 (defun error* (message &rest args)
   (error 'overlord-error
