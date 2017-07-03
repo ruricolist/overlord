@@ -2184,27 +2184,47 @@ This should be a superset of the variables bound by CL during calls to
 
 ;;; #lang syntax.
 
+(defcondition no-such-lang (overlord-error)
+  ((lang :initarg :lang :type string-designator
+         :reader no-such-lang.lang))
+  (:report (lambda (c s)
+             (with-slots (lang) c
+               (format s "No such language as ~a" lang)))))
+
 (defun load-same-name-system (c)
   (declare (ignore c))
   (invoke-restart 'load-same-name-system))
+
+(defgeneric find-asdf-system (lang)
+  (:method ((lang no-such-lang))
+    (find-asdf-system (no-such-lang.lang lang)))
+  (:method ((lang t))
+    (and (not (frozen?))
+         (let ((lang (string-downcase lang)))
+           (asdf:find-system lang nil)))))
+
+(defun ensure-lang-exists (lang &optional (cont #'identity))
+  (check-type lang package-designator)
+  (check-type cont function)
+  (if (packagep lang) lang
+      (let ((pkg (resolve-package lang)))
+        (or (and pkg (package-name-keyword pkg))
+            (restart-case
+                (error 'no-such-lang :lang lang)
+              (load-same-name-system ()
+                :test find-asdf-system
+                :report (lambda (s)
+                          (format s "Load the system named ~a and try again" lang))
+                (asdf:load-system lang)
+                (funcall cont lang)))))))
 
 (defun lookup-hash-lang (name)
   (assure (or null lang-name)
     (let* ((pkg-name (assure (satisfies valid-lang-name?)
                        ;; Set the case as if the string were being
                        ;; read, without using `read`.
-                       (coerce-case name)))
-           (pkg (resolve-package pkg-name)))
-      (or (and pkg (package-name-keyword pkg))
-          (restart-case
-              (error* "No such #lang: ~a" name)
-            (load-same-name-system ()
-              :test (lambda (c) (declare (ignore c))
-                      (asdf:find-system name nil))
-              :report (lambda (s)
-                        (format s "Load the system named ~a and try again" name))
-              (asdf:load-system name)
-              (lookup-hash-lang name)))))))
+                       (coerce-case name))))
+      (ensure-lang-exists pkg-name #'lookup-hash-lang))))
 
 (defun guess-lang+pos (file)
   "If FILE has a #lang line, return the lang and the position at which
@@ -2468,6 +2488,7 @@ Can't use eval-when because it has to work for local bindings."
   "Check that BINDINGS is free of duplicates. Also, using
 `module-static-exports', check that all of the symbols being bound are
 actually exported by the module specified by LANG and SOURCE."
+  (ensure-lang-exists lang)
   (when bindings
     (when (relative-pathname-p source)
       (setf source (merge-pathnames* source (base))))
