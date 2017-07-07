@@ -1086,9 +1086,33 @@ Possibly useful for testing.")
   (target-table-member *already-built* target))
 
 (defun print-target-being-built (target)
-  (message "~a(build ~a)"
-           (make-string (1- *depth*) :initial-element #\Space)
-           target))
+  "Print the target being built.
+The idea here (borrowed from Apenwarr redo) is that the user should be
+able to simply evaluate the form for a given target to pick up
+building from there."
+  (message "~Vt~s"
+           (1- *depth*)
+           `(build ,(dump-target/pretty target))))
+
+(defun dump-target/pretty (target)
+  "Return a form which, when evaluated, returns a target identical to
+TARGET."
+  (etypecase-of target target
+    (pathname target)
+    (bindable-symbol `(quote ,target))
+    (root-target 'root-target)
+    (module-cell
+     (with-slots (lang source) target
+       `(find-module ,lang ,source)))
+    (directory-ref
+     `(directory-ref ,(ref.name target)))
+    (package-ref
+     `(package-ref ,(ref.name target)
+                   :nicknames ,(package-ref.nicknames target)
+                   :use-list ,(package-ref.use-list target)))
+    (pattern-ref
+     `(pattern-ref ,(pattern-ref.pattern target)
+                   ,(pattern-ref.input target)))))
 
 (defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
