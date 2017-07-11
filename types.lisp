@@ -119,13 +119,12 @@ If the value of `*default-pathname-defaults*' and a call to
 (deftype list-without-nil ()
   `(and list (satisfies list-without-nil?)))
 
-(defun list-without-nil? (list)
+(defloop list-without-nil? (list)
   (declare (optimize speed (debug 0)))
-  (nlet list-without-nil? ((list list))
-    (match list
-      (() t)
-      ((list* nil _) nil)
-      (otherwise (list-without-nil? (cdr list))))))
+  (match list
+    (() t)
+    ((list* nil _) nil)
+    (otherwise (list-without-nil? (cdr list)))))
 
 (deftype list-of (a)
   ;; We don't check that every element is of type A (that could be
@@ -151,14 +150,13 @@ If the value of `*default-pathname-defaults*' and a call to
 (deftype plist ()
   '(and list (satisfies plist?)))
 
-(defun plist? (list)
+(defloop plist? (list)
   (declare (optimize speed (debug 0)))
-  (nlet plist? ((list list))
-    (match list
-      (() t)
-      ((list* (and _ (type symbol)) _ list)
-       (plist? list))
-      (otherwise nil))))
+  (match list
+    (() t)
+    ((list* (and _ (type symbol)) _ list)
+     (plist? list))
+    (otherwise nil)))
 
 (deftype case-mode ()
   "Possible values for a readtable's case mode."
