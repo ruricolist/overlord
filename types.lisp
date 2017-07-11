@@ -119,12 +119,9 @@ If the value of `*default-pathname-defaults*' and a call to
 (deftype list-without-nil ()
   `(and list (satisfies list-without-nil?)))
 
-(defloop list-without-nil? (list)
-  (declare (optimize speed (debug 0)))
-  (match list
-    (() t)
-    ((list* nil _) nil)
-    (otherwise (list-without-nil? (cdr list)))))
+(defsubst list-without-nil? (list)
+  (declare (inline memq))
+  (not (memq nil list)))
 
 (deftype list-of (a)
   ;; We don't check that every element is of type A (that could be
