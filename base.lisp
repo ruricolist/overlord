@@ -6,6 +6,8 @@
     :overlord/global-state)
   (:import-from :overlord/specials
     :*base* :*cli*)
+  (:import-from :named-readtables
+    :find-readtable)
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
@@ -123,15 +125,21 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
                      *package*
                      (current-lisp-file))))))
 
+(defun find-system (system &optional error-p)
+  (let ((*readtable* (find-readtable :standard))
+        (*read-base* 10)
+        (*read-default-float-format* 'double-float))
+    (asdf:find-system system error-p)))
+
 (defun system-base (system)
-  (setf system (asdf:find-system system))
+  (setf system (find-system system))
   (let ((base (asdf:system-relative-pathname system "")))
     (if (absolute-pathname-p base)
         base
         (if (typep system 'asdf:package-inferred-system)
             (let* ((system-name (asdf:primary-system-name system))
                    (base-system-name (take-while (op (not (eql _ #\/))) system-name))
-                   (base-system (asdf:find-system base-system-name)))
+                   (base-system (find-system base-system-name)))
               (system-base base-system))
             (error* "System ~a has no base." system)))))
 
@@ -149,7 +157,7 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 (defun read-system-by-name ()
   (format t "~&Type a system name: ")
   (let ((name (make-keyword (string (read)))))
-    (or (asdf:find-system name nil)
+    (or (find-system name nil)
         (progn
           (cerror* "Supply another name"
                    "No such system as ~a" name)
@@ -161,7 +169,7 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 (defun infer-system-from-package ()
   (some (lambda (name)
           (when-let (guess (package-name-system name))
-            (asdf:find-system guess nil)))
+            (find-system guess nil)))
         (package-names *package*)))
 
 ;;; XXX
@@ -177,7 +185,7 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
   (and-let* ((file (current-lisp-file))
              ((not (typep file 'temporary-file)))
              (.asd (nearest-asdf-file file)))
-    (asdf:find-system (pathname-name .asd) nil)))
+    (find-system (pathname-name .asd) nil)))
 
 (defun nearest-asdf-file (file)
   (locate-dominating-file file "*.asd"))
