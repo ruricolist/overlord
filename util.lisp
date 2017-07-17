@@ -28,7 +28,7 @@
 (cl:in-package #:overlord/util)
 
 ;;; TODO This cries out for a compiler macro.
-(-> compare (function function t &rest t) t)
+(-> compare (function function &rest t) t)
 (defun compare (test accessor &rest xs)
   (cond ((null xs) t)
         ((single xs) t)
