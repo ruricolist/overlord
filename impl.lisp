@@ -1576,13 +1576,6 @@ depends on that."
 ;;; language is an abstract relationship between a file and Lisp
 ;;; binding.
 
-(deftype fasl-version () '(integer 1 *))
-
-(defparameter *fasl-version* 7
-  "Versioning for fasls.
-Incrementing this should be sufficient to invalidate old fasls.")
-(declaim (type fasl-version *fasl-version*))
-
 (defun delete-versioned-fasls (&optional (version *fasl-version*))
   (uiop:delete-directory-tree
    (fasl-version-dir version)
@@ -1708,6 +1701,7 @@ interoperation with Emacs."
     (xdg-cache-home "overlord"
                     version-string
                     :implementation
+                    "fasls"
                     lang-string
                     suffix)))
 
