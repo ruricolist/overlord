@@ -15,7 +15,8 @@
            #:*language*
            #:*phase*
            #:*source*
-           #:*depth*))
+           #:*depth*
+           #:*fasl-version*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -45,3 +46,8 @@ has to see before the other forms.")
 
 (defvar *depth* 0)
 (declaim (type (integer 0 #.most-positive-fixnum) *depth*))
+
+(defparameter *fasl-version* 8
+  "Versioning for fasls.
+Incrementing this should be sufficient to invalidate old fasls.")
+(declaim (type fasl-version *fasl-version*))
