@@ -10,7 +10,7 @@
 (in-package :overlord/message)
 
 (define-global-state *message-stream*
-    (make-synonym-stream '*trace-output*)
+  (make-synonym-stream '*trace-output*)
   "The stream printed to by the default message handler.")
 
 (defun default-message-handler (msg)
