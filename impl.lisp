@@ -237,6 +237,8 @@ on Lisp/OS/filesystem combinations that support it."
     string
     (cons file-size target-timestamp)))
 
+(defconst deleted "deleted")
+
 (deftype lang-name ()
   ;; Keywords can be language names.
   '(and symbol (not (member t nil))))
@@ -1284,10 +1286,12 @@ TARGET."
       (pathname
        ;; TODO use stat instead of serapeum:file-size. (Or, use stat
        ;; in Serapeum?)
-       (if (directory-pathname-p target)
-           (target-timestamp target)
-           (cons (file-size target)
-                 (target-timestamp target)))))))
+       (cond ((file-exists-p target)
+              (cons (file-size target)
+                    (target-timestamp target)))
+             ((directory-pathname-p target)
+              (target-timestamp target))
+             (t deleted))))))
 
 (defplace saved-stamp (target)
   (prop target :stamp))
