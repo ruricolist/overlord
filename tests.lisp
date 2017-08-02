@@ -34,7 +34,7 @@
   ;; everything is being compiled clean.
   (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
         (fiveam:*on-error* :debug)
-        (overlord/impl::*fasl-version* most-positive-fixnum))
+        (overlord/specials:*fasl-version* most-positive-fixnum))
     (unwind-protect
          (progn
            (format t "~&First run (1/2)~%")
