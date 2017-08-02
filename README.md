@@ -475,7 +475,7 @@ someone else did them.
 - A language for literate programming.
 - A language with an ML-style type system.
 - `#lang shen`.
-- An array language.
+- The [Snowball][] language.
 - A unit-aware language (compare [Frink][]).
 - Any language or meta-language you care to implement.
 
