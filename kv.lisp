@@ -17,7 +17,8 @@
    :prop :has-prop? :delete-prop
    :save-database
    :compact-database
-   :saving-database))
+   :saving-database
+   :clear-db))
 (in-package :overlord/kv)
 
 (deftype kv-key ()
@@ -43,7 +44,11 @@
    (log
     :initarg :log
     :type :pathname
-    :reader kv.log)))
+    :reader kv.log))
+  (:default-initargs
+   :current-map (fset:empty-map)
+   :last-saved-map (fset:empty-map)
+   :log (log-file-path)))
 
 (defmethod print-object ((self kv) stream)
   (print-unreadable-object (self stream :type t)
@@ -167,6 +172,9 @@
     (kv.sync kv)
     (log.squash (kv.log kv))))
 
+(defun empty-kv ()
+  (make 'kv))
+
 (defun load-kv (log)
   (let ((map (log.load log)))
     (make 'kv
@@ -191,7 +199,7 @@
 (define-global-state *kv* nil)
 
 (defun kv ()
-  (synchronized ()
+  (synchronized ('*kv)
     (ensure-kv)
     (check-version))
   *kv*)
@@ -199,6 +207,11 @@
 (defun ensure-kv ()
   (ensure *kv*
     (reload-kv)))
+
+(defun clear-db ()
+  (let ((empty (empty-kv)))
+    (synchronized ('*kv*)
+      (setq *kv* empty))))
 
 (defun check-version ()
   (unless (= (kv.version *kv*)

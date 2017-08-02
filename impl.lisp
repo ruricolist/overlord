@@ -957,6 +957,15 @@ distributed."
 (defun frozen? ()
   *frozen*)
 
+(defparameter *freeze-fmakunbound-hit-list*
+  '(unfreeze
+    build
+    unbuild
+    run
+    dynamic-require-as
+    saved-stamp
+    '(setf saved-stamp)))
+
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
@@ -976,7 +985,8 @@ distributed."
                ;; The table of module cells needs special handling.
                (clear-module-cells)
                (clrhash (symbol-value '*claimed-module-names*))
-               (dolist (fn '(unfreeze build unbuild run dynamic-require-as))
+               (clear-db)
+               (dolist (fn *freeze-fmakunbound-hit-list*)
                  (fmakunbound fn))))
       (ecase-of freeze-policy *freeze-policy*
         ((nil))
