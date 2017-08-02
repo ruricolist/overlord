@@ -64,16 +64,16 @@
 (defmethods kv (self version current-map last-saved-map log)
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
-      (format stream "v.~a ~d record~:p, ~:d byte~:p (~a)"
+      ;; version record-count byte-count saved or not?
+      (format stream "v.~a ~d record~:p, ~:d byte~:p~@[ (~a)~]"
               version
               (fset:size current-map)
               (let ((log log))
                 (if (file-exists-p log)
                     (file-size log)
                     0))
-              (if (eql current-map last-saved-map)
-                  "saved"
-                  "unsaved"))))
+              (and (not (eql current-map last-saved-map))
+                   "unsaved"))))
 
   (:method kv.ref (self key)
     (multiple-value-bind (value bool)
@@ -169,22 +169,28 @@
 (defun log.load (log)
   (if (not (file-exists-p log))
       (values (fset:empty-map) 0)
-      (let* ((*readtable* kv-readtable)
-             ;; So symbols can be read properly.
-             (*package* (find-package :keyword))
-             (records
-               (with-standard-io-syntax
-                 (with-input-from-file (in log :element-type 'character)
-                   ;; TODO ignore errors?
-                   (loop for record = (read in nil nil)
-                         while (typep record 'log-record)
-                         collect record))))
-             (maps
-               (mapcar #'log-record.data records)))
-        (values
-         (reduce #'map-union/tombstones maps
-                 :initial-value (fset:empty-map))
-         (length maps)))))
+      (restart-case
+          (let* ((*readtable* kv-readtable)
+                 ;; So symbols can be read properly.
+                 (*package* (find-package :keyword))
+                 (records
+                   (with-standard-io-syntax
+                     (with-input-from-file (in log :element-type 'character)
+                       ;; TODO ignore errors?
+                       (loop with eof = "eof"
+                             for record = (read in nil eof)
+                             until (eq record eof)
+                             collect record))))
+                 (maps
+                   (mapcar #'log-record.data records)))
+            (values
+             (reduce #'map-union/tombstones maps
+                     :initial-value (fset:empty-map))
+             (length maps)))
+        (truncate-db ()
+          :report "Ignore the corrupt database"
+          (return-from log.load
+            (values (fset:empty-map) 0))))))
 
 (defun log.squash (log)
   (mvlet ((map map-count (log.load log))
