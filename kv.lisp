@@ -140,7 +140,9 @@
          temp)
     (when (> map-count 1)
       (message "Compacting log")
-      (uiop:with-temporary-file (:stream s :pathname p :keep t
+      (uiop:with-temporary-file (:stream s
+                                 :pathname p
+                                 :keep t
                                  :direction :output
                                  :element-type 'character)
         (setq temp p)
@@ -180,11 +182,17 @@
     (log.squash path)
     (load-kv path)))
 
-(define-global-state *kv* (reload-kv))
+(define-global-state *kv* nil)
 
 (defun kv ()
-  (check-version)
+  (synchronized ()
+    (ensure-kv)
+    (check-version))
   *kv*)
+
+(defun ensure-kv ()
+  (ensure *kv*
+    (reload-kv)))
 
 (defun check-version ()
   (unless (= (kv.version *kv*)
