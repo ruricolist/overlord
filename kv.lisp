@@ -9,7 +9,8 @@
     :rename-file-overwriting-target
     :file-exists-p
     :xdg-cache-home
-    :merge-pathnames*)
+    :merge-pathnames*
+    :pathname-directory-pathname)
   (:import-from :fset)
   (:import-from :local-time)
   (:export
@@ -144,7 +145,10 @@
                                  :pathname p
                                  :keep t
                                  :direction :output
-                                 :element-type 'character)
+                                 :element-type 'character
+                                 ;; Ensure the temp file is on the
+                                 ;; same file system as the log.
+                                 :directory (pathname-directory-pathname log))
         (setq temp p)
         (kv-write map s))
       (rename-file-overwriting-target temp log)))
