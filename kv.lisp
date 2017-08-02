@@ -10,10 +10,12 @@
     :xdg-cache-home
     :merge-pathnames*)
   (:import-from :fset)
+  (:import-from :local-time)
   (:export
    :prop :has-prop? :delete-prop
    :save-database
-   :compact-database))
+   :compact-database
+   :saving-database))
 (in-package :overlord/kv)
 
 (deftype kv-key ()
@@ -67,27 +69,40 @@
 
 ;;; TODO use a binary representation for the log.
 
+(def kv-readtable
+  (lret ((*readtable*
+          (copy-readtable fset::*fset-rereading-readtable*)))
+    (local-time:enable-read-macros)))
+
+(defun kv-write (obj stream)
+  (write obj :stream stream
+             :readably t
+             :pretty nil
+             :circle nil))
+
 (defun log.update (log last-saved-map current-map)
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
-      (with-open-file (out log
-                           :direction :output
-                           :element-type 'character
-                           :if-does-not-exist :create
-                           :if-exists :append)
-        (prin1 diff out)
-        (finish-output out)))))
+      (unless (fset:empty? diff)
+        (with-open-file (out log
+                             :direction :output
+                             :element-type 'character
+                             :if-does-not-exist :create
+                             :if-exists :append)
+          (kv-write diff out)
+          (finish-output out))))))
 
 (defun map-union/tombstones (map1 map2)
   (fset:do-map (k v map2)
     (setf map1
           (if (eql v tombstone)
               (fset:less map1 k)
-              (fset:with map1 k v)))))
+              (fset:with map1 k v))))
+  map1)
 
 (defun log.load (log)
   (if (not (file-exists-p log)) (fset:empty-map)
-      (let* ((*readtable* fset::*fset-rereading-readtable*)
+      (let* ((*readtable* kv-readtable)
              ;; So symbols can be read properly.
              (*package* (find-package :keyword))
              (maps
@@ -102,14 +117,17 @@
          (length maps)))))
 
 (defun log.squash (log)
-  (let ((map (log.load log))
-        temp)
-    (uiop:with-temporary-file (:stream s :pathname p :keep t
-                               :direction :output
-                               :element-type 'character)
-      (setq temp p)
-      (princ map s))
-    (rename-file-overwriting-target temp log)))
+  (mvlet ((map map-count (log.load log))
+         temp)
+    (when (> map-count 1)
+      (message "Compacting log")
+      (uiop:with-temporary-file (:stream s :pathname p :keep t
+                                 :direction :output
+                                 :element-type 'character)
+        (setq temp p)
+        (kv-write map s))
+      (rename-file-overwriting-target temp log)))
+  log)
 
 (defun kv.sync (kv)
   (with-slots (last-saved-map current-map log) kv
@@ -139,8 +157,10 @@
 
 (define-global-state *kv*
   (progn
-    (message "Reloading log")
-    (load-kv (log-file-path))))
+    (message "Reloading database")
+    (let ((path (log-file-path)))
+      (log.squash path)
+      (load-kv path))))
 
 (defplace kv-ref* (key)
   (kv.ref *kv* key))
@@ -157,7 +177,21 @@
   (kv.del *kv* (cons obj prop)))
 
 (defun save-database ()
+  (message "Saving Overlord database")
   (kv.sync *kv*))
 
 (defun compact-database ()
   (kv.squash *kv*))
+
+(defvar *save-pending* nil)
+
+(defun call/saving-database (thunk)
+  (if *save-pending*
+      (funcall thunk)
+      (let ((*save-pending* t))
+        (funcall thunk)
+        (save-database))))
+
+(defmacro saving-database (&body body)
+  (with-thunk (body)
+    `(call/saving-database ,body)))
