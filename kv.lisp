@@ -94,22 +94,23 @@
     (local-time:enable-read-macros)))
 
 (defun kv-write (obj stream)
-  (write obj :stream stream
-             :readably t
-             :pretty nil
-             :circle nil))
+  (with-standard-io-syntax
+    (write obj :stream stream
+               :readably t
+               :pretty nil
+               :circle nil)))
 
 (defun log.update (log last-saved-map current-map)
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
-        (with-open-file (out log
-                             :direction :output
-                             :element-type 'character
-                             :if-does-not-exist :create
-                             :if-exists :append)
-          (kv-write diff out)
-          (finish-output out))))))
+        (with-standard-io-syntax
+          (with-output-to-file (out log
+                                    :element-type 'character
+                                    :if-does-not-exist :create
+                                    :if-exists :append)
+            (kv-write diff out)
+            (finish-output out)))))))
 
 (defun map-union/tombstones (map1 map2)
   (fset:do-map (k v map2)
@@ -126,11 +127,12 @@
              ;; So symbols can be read properly.
              (*package* (find-package :keyword))
              (maps
-               (with-input-from-file (in log)
-                 ;; TODO ignore errors?
-                 (loop for map = (read in nil nil)
-                       while (typep map 'fset:map)
-                       collect map))))
+               (with-standard-io-syntax
+                 (with-input-from-file (in log :element-type 'character)
+                   ;; TODO ignore errors?
+                   (loop for map = (read in nil nil)
+                         while (typep map 'fset:map)
+                         collect map)))))
         (values
          (reduce #'map-union/tombstones maps
                  :initial-value (fset:empty-map))
