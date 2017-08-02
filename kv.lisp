@@ -36,6 +36,10 @@
 
 (defconst tombstone '%tombstone)
 
+(defstruct-read-only (log-record (:conc-name log-record.))
+  (timestamp (get-universal-time) :type (integer 0 *))
+  (data :type fset:map))
+
 (defclass kv ()
   ((version
     :initform *fasl-version*
@@ -145,13 +149,14 @@
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
-        (with-standard-io-syntax
-          (with-output-to-file (out log
-                                    :element-type 'character
-                                    :if-does-not-exist :create
-                                    :if-exists :append)
-            (kv-write diff out)
-            (finish-output out)))))))
+        (let ((record (make-log-record :data diff)))
+          (with-standard-io-syntax
+            (with-output-to-file (out (ensure-directories-exist log)
+                                      :element-type 'character
+                                      :if-does-not-exist :create
+                                      :if-exists :append)
+              (kv-write record out)
+              (finish-output out))))))))
 
 (defun map-union/tombstones (map1 map2)
   (fset:do-map (k v map2)
@@ -167,13 +172,15 @@
       (let* ((*readtable* kv-readtable)
              ;; So symbols can be read properly.
              (*package* (find-package :keyword))
-             (maps
+             (records
                (with-standard-io-syntax
                  (with-input-from-file (in log :element-type 'character)
                    ;; TODO ignore errors?
-                   (loop for map = (read in nil nil)
-                         while (typep map 'fset:map)
-                         collect map)))))
+                   (loop for record = (read in nil nil)
+                         while (typep record 'log-record)
+                         collect record))))
+             (maps
+               (mapcar #'log-record.data records)))
         (values
          (reduce #'map-union/tombstones maps
                  :initial-value (fset:empty-map))
