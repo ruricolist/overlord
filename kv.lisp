@@ -18,7 +18,8 @@
    :save-database
    :compact-database
    :saving-database
-   :clear-db))
+   :unload-db
+   :deactivate-db))
 (in-package :overlord/kv)
 
 (deftype kv-key ()
@@ -26,6 +27,12 @@
 
 (deftype kv-value ()
   't)
+
+(defgeneric kv.ref (kv key))
+(defgeneric (setf kv.ref) (value kv key))
+(defgeneric kv.del (kv key))
+(defgeneric kv.sync (kv))
+(defgeneric kv.squash (kv))
 
 (defconst tombstone '%tombstone)
 
@@ -50,46 +57,75 @@
    :last-saved-map (fset:empty-map)
    :log (log-file-path)))
 
-(defmethod print-object ((self kv) stream)
-  (print-unreadable-object (self stream :type t)
-    (format stream "v.~a ~d record~:p, ~:d byte~:p (~a)"
-            (kv.version self)
-            (fset:size (kv.current-map self))
-            (let ((log (kv.log self)))
-              (if (file-exists-p log)
-                  (file-size log)
-                  0))
-            (if (eql (kv.current-map self)
-                     (kv.last-saved-map self))
-                "saved"
-                "unsaved"))))
+(defmethods kv (self version current-map last-saved-map log)
+  (:method print-object (self stream)
+    (print-unreadable-object (self stream :type t)
+      (format stream "v.~a ~d record~:p, ~:d byte~:p (~a)"
+              version
+              (fset:size current-map)
+              (let ((log log))
+                (if (file-exists-p log)
+                    (file-size log)
+                    0))
+              (if (eql current-map last-saved-map)
+                  "saved"
+                  "unsaved"))))
 
-(defun kv.ref (kv key)
-  (multiple-value-bind (value bool)
-      (fset:lookup (kv.current-map kv)
-                   (assure kv-key key))
-    (if (eql value tombstone)
-        (values nil nil)
-        (values (assure kv-value value)
-                (assure boolean bool)))))
+  (:method kv.ref (self key)
+    (multiple-value-bind (value bool)
+        (fset:lookup current-map
+                     (assure kv-key key))
+      (if (eq value tombstone)
+          (values nil nil)
+          (values (assure kv-value value)
+                  (assure boolean bool)))))
 
-(defun (setf kv.ref) (value kv key)
-  (check-type key kv-key)
-  (check-type value kv-value)
-  (prog1 value
-    ;; TODO More CAS.
-    #+sbcl
-    (sb-ext:atomic-update (slot-value kv 'current-map)
-                          (lambda (map)
-                            (fset:with map key value)))
-    #-sbcl
-    (synchronized (kv)
-      (setf (kv.current-map kv)
-            (fset:with (kv.current-map kv)
-                       key value)))))
+  (:method (setf kv.ref) (value self key)
+    (check-type key kv-key)
+    (check-type value kv-value)
+    (prog1 value
+      ;; TODO More CAS.
+      #+sbcl
+      (sb-ext:atomic-update (slot-value kv 'current-map)
+                            (lambda (map)
+                              (fset:with map key value)))
+      #-sbcl
+      (synchronized (self)
+        (setf current-map
+              (fset:with current-map
+                         key value)))))
 
-(defun kv.del (kv key)
-  (setf (kv.ref kv key) tombstone))
+  (:method kv.del (self key)
+    (setf (kv.ref self key) tombstone)
+    (values))
+
+  (:method kv.sync (self)
+    (synchronized (self)
+      (log.update log last-saved-map current-map)
+      (setf last-saved-map current-map)))
+
+  (:method kv.squash (self)
+    (synchronized (self)
+      (kv.sync self)
+      (log.squash log))))
+
+(defclass dead-kv (kv)
+  ())
+
+(defmethods dead-kv (self)
+  (:method kv.ref (self key)
+    (declare (ignore key))
+    (values nil nil))
+  (:method (setf kv.ref) (value self key)
+    (declare (ignore key))
+    value)
+  (:method kv.del (self key)
+    (declare (ignore key))
+    (values))
+  (:method kv.sync (self)
+    (values))
+  (:method kv.squash (self)
+    (values)))
 
 ;;; TODO use a binary representation for the log.
 
@@ -161,17 +197,6 @@
       (rename-file-overwriting-target temp log)))
   log)
 
-(defun kv.sync (kv)
-  (with-slots (last-saved-map current-map log) kv
-    (synchronized (kv)
-      (log.update log last-saved-map current-map)
-      (setf last-saved-map current-map))))
-
-(defun kv.squash (kv)
-  (synchronized (kv)
-    (kv.sync kv)
-    (log.squash (kv.log kv))))
-
 (defun empty-kv ()
   (make 'kv))
 
@@ -208,10 +233,17 @@
   (ensure *kv*
     (reload-kv)))
 
-(defun clear-db ()
-  (let ((empty (empty-kv)))
-    (synchronized ('*kv*)
-      (setq *kv* empty))))
+(defun unload-db ()
+  "Clear the DB out of memory in such a way that it can still be
+reloaded on demand."
+  ;; TODO Force a full GC afterwards?
+  (synchronized ('*kv*)
+    (nix *kv*)))
+
+(defun deactivate-db ()
+  "Clear the DB out of memory in such a way that it will not be reloaded on demand."
+  (synchronized ('*kv*)
+    (setq *kv* (make 'dead-kv))))
 
 (defun check-version ()
   (unless (= (kv.version *kv*)

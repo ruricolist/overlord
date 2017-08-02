@@ -972,6 +972,8 @@ distributed."
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
                (build root-target)
+               ;; The DB can still be reloaded, but is not in memory.
+               (unload-db)
                (setf *frozen* t))
              (hard-freeze ()
                (freeze)
@@ -985,7 +987,8 @@ distributed."
                ;; The table of module cells needs special handling.
                (clear-module-cells)
                (clrhash (symbol-value '*claimed-module-names*))
-               (clear-db)
+               ;; The DB will not be reloaded.
+               (deactivate-db)
                (dolist (fn *freeze-fmakunbound-hit-list*)
                  (fmakunbound fn))))
       (ecase-of freeze-policy *freeze-policy*
