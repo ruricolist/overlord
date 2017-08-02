@@ -45,7 +45,7 @@ several important properties:
    like Lisp code, and are compiled into FASLs, just like Lisp
    code.
 
-2. Languages can use *any syntax*. Unlike emedded DSLs, which are
+2. Languages can use *any syntax*. Unlike embedded DSLs, which are
    limited by what can be done with reader macros, full languages can
    use any parser they like.
 
