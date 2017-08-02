@@ -29,7 +29,10 @@
     ;; Time tuples.
     :overlord/time-tuple
     ;; Running shell commands.
-    :overlord/cmd)
+    :overlord/cmd
+    ;; The database.
+    :overlord/kv)
+  (:import-from :fset)
   (:import-from :trivia
     :match :ematch)
   ;; Portability shim for "global" or "static" vars. They have global
@@ -226,6 +229,14 @@ on Lisp/OS/filesystem combinations that support it."
     never
     far-future))
 
+(deftype file-size ()
+  '(integer 0 *))
+
+(deftype stamp ()
+  '(or target-timestamp
+    string
+    (cons file-size target-timestamp)))
+
 (deftype lang-name ()
   ;; Keywords can be language names.
   '(and symbol (not (member t nil))))
@@ -255,7 +266,12 @@ on Lisp/OS/filesystem combinations that support it."
   (:method make-load-form (self &optional env)
     (declare (ignore env))
     `(make-instance ,(class-of self)
-                    :name ,name)))
+                    :name ,name))
+
+  (:method fset:compare (self (other ref))
+    (fset:compare-slots self other #'class-of #'ref.name)))
+
+(fset:define-cross-type-compare-methods ref)
 
 (defclass directory-ref (ref)
   ((name
@@ -337,8 +353,11 @@ on Lisp/OS/filesystem combinations that support it."
             (merge-pattern-defaults pattern input))))
 
   (:method print-object (self stream)
-    (print-unreadable-object (self stream :type t)
-      (format stream "~a -> ~a" input output)))
+    (if *print-escape*
+        (format stream "#.~s"
+                (make-load-form self))
+        (print-unreadable-object (self stream :type t)
+          (format stream "~a -> ~a" input output))))
 
   (:method make-load-form (self &optional env)
     (make-load-form-saving-slots self
@@ -435,11 +454,14 @@ resolved at load time."
     (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
 
   (:method print-object (self stream)
-    (print-unreadable-object (self stream :type t)
-      (format stream "~a (~a) (~:[not loaded~;loaded~])"
-              source
-              lang
-              module)))
+    (if *print-escape*
+        (format stream "#.~s"
+                (make-load-form self))
+        (print-unreadable-object (self stream :type t)
+          (format stream "~a (~a) (~:[not loaded~;loaded~])"
+                  source
+                  lang
+                  module))))
 
   (:method module-ref (self name)
     (module-ref* module name))
@@ -470,8 +492,17 @@ resolved at load time."
 it."
   (timestamp never :type target-timestamp))
 
-(defmethod print-object ((self root-target) stream)
-  (print-unreadable-object (self stream :type t)))
+(defmethods root-target (self)
+  (:method print-object (self stream)
+    (if *print-escape*
+        (format stream "#.~s" '*root-target*)
+        (print-unreadable-object (self stream :type t))))
+  (:method fset:compare (self (obj t))
+    (if (eq self obj) :equal :unequal))
+  (:method fset:compare ((obj t) self)
+    (if (eq self obj) :equal :unequal)))
+
+(fset:define-cross-type-compare-methods root-target)
 
 (defvar *root-target*
   (prog1 (make-root-target)
@@ -516,6 +547,28 @@ it."
     (pathname
      (or (file-exists-p path)
          (directory-exists-p path)))))
+
+(defun target-exists? (target)
+  ;; (not (eql never (target-timestamp target)))
+  (etypecase-of target target
+    (root-target t)
+    (bindable-symbol (boundp target))
+    (pathname (pathname-exists? target))
+    (package-ref
+     (~> target
+         ref.name
+         string
+         find-package))
+    (directory-ref
+     (~> target
+         ref.name
+         (resolve-target (base))
+         directory-exists-p))
+    (pattern-ref
+     (~> target
+         pattern-ref.output
+         pathname-exists?))
+    (module-cell (module-cell.module target))))
 
 (defun target-timestamp (target)
   (etypecase-of target target
@@ -702,6 +755,69 @@ E.g. delete a file, unbind a variable."
        (far-future nil)))
     (never nil)
     (far-future t)))
+
+(defun target-timestamp= (ts1 ts2 &key (precise *preserve-fractional-seconds*))
+  "Is TS1 greater than TS2?"
+  ;; NB Note that conversion from timestamp to universal rounds down
+  ;; (loses nsecs), so when comparing one of each, whether you convert
+  ;; the universal time to a timestamp, or the timestamp to a
+  ;; universal time, actually matters.
+  (etypecase-of target-timestamp ts1
+    (timestamp
+     (etypecase-of target-timestamp ts2
+       (timestamp (timestamp= ts1 ts2))
+       (universal-time
+        (if precise
+            (timestamp= ts1 (universal-to-timestamp ts2))
+            (= (timestamp-to-universal ts1) ts2)))
+       (time-tuple
+        ;; TODO Should we consider precision here?
+        (timestamp= ts1 (time-tuple->timestamp ts2)))
+       (never nil)
+       (far-future nil)))
+    (universal-time
+     (etypecase-of target-timestamp ts2
+       (universal-time
+        (= ts1 ts2))
+       (time-tuple
+        (= ts1
+           (time-tuple-universal-time ts2)))
+       (timestamp
+        (if precise
+            (timestamp= (universal-to-timestamp ts1)
+                        ts2)
+            (= ts1
+               (timestamp-to-universal ts2))))
+       (never nil)
+       (far-future nil)))
+    (time-tuple
+     (etypecase-of target-timestamp ts2
+       (universal-time
+        (let ((u1 (time-tuple-universal-time ts1)))
+          (and (= u1 ts2)
+               (if precise
+                   (= (time-tuple-real-time ts1) 0)
+                   t))))
+       (time-tuple
+        (let ((u1 (time-tuple-universal-time ts1))
+              (u2 (time-tuple-universal-time ts2)))
+          (and (= u1 u2)
+               (if precise
+                   (= (time-tuple-real-time ts1)
+                      (time-tuple-real-time ts2))
+                   t))))
+       (timestamp
+        (timestamp= (time-tuple->timestamp ts1) ts2))
+       (never nil)
+       (far-future nil)))
+    (never
+     (etypecase-of target-timestamp ts2
+       (never t)
+       (target-timestamp nil)))
+    (far-future
+     (etypecase-of target-timestamp ts2
+       (far-future t)
+       (target-timestamp nil)))))
 
 (defun target-newer? (t1 t2)
   (timestamp-newer?
@@ -973,13 +1089,12 @@ distributed."
              (lambda ()
                (let ((*base* (pathname-directory-pathname source))
                      (*language* lang))
-                 (with-defaults-from-base
-                   ;; Depend on the source file.
-                   (depends-on source)
-                   ;; The stashed recursive dependencies of the module.
-                   (depends-on-all (module-deps target))
-                   ;; Let the language tell you what else to depend on.
-                   (lang-deps lang source)))))))))
+                 ;; Depend on the source file.
+                 (depends-on source)
+                 ;; The stashed recursive dependencies of the module.
+                 (depends-on-all (module-deps target))
+                 ;; Let the language tell you what else to depend on.
+                 (lang-deps lang source))))))))
 
 (defcondition no-such-task (overlord-error)
   ((target :type target :initarg :target :reader overlord-error-target))
@@ -1114,6 +1229,64 @@ TARGET."
      `(pattern-ref ,(pattern-ref.pattern target)
                    ,(pattern-ref.input target)))))
 
+(defun target-changed? (target)
+  (let ((saved-stamp (saved-stamp target)))
+    (cond ((null saved-stamp)            t)
+          ((eql saved-stamp far-future)  t)
+          ((eql saved-stamp never)       t)
+          (t (not
+              (stamp= (target-stamp target)
+                      saved-stamp))))))
+
+(defun stamp= (s1 s2)
+  (etypecase-of stamp s1
+    (target-timestamp
+     (etypecase-of stamp s2
+       (target-timestamp (target-timestamp= s1 s2))
+       (stamp nil)))
+    (string
+     (etypecase-of stamp s2
+       (string (string= s1 s2))
+       (stamp nil)))
+    ((cons file-size target-timestamp)
+     (etypecase-of stamp s2
+       ((cons file-size target-timestamp)
+        (destructuring-bind (size1 . ts1) s1
+          (destructuring-bind (size2 . ts2) s2
+            (and (= size1 size2)
+                 (target-timestamp= ts1 ts2)))))
+       (stamp nil)))))
+
+(defun target-stamp (target)
+  (assure stamp
+    (etypecase-of target target
+      ((or root-target
+           bindable-symbol
+           package-ref
+           pattern-ref
+           ;; TODO?
+           directory-ref
+           module-cell)
+       (target-timestamp target))
+      (pathname
+       ;; TODO use stat instead of serapeum:file-size. (Or, use stat
+       ;; in Serapeum?)
+       (if (directory-pathname-p target)
+           (target-timestamp target)
+           (cons (file-size target)
+                 (target-timestamp target)))))))
+
+(defplace saved-stamp (target)
+  (prop target :stamp))
+
+(defun update-saved-stamp (target)
+  (setf (saved-stamp target)
+        (target-stamp target)))
+
+(defun ensure-saved-stamp (target)
+  (ensure2 (saved-stamp target)
+    (target-stamp target)))
+
 (defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
   (labels
@@ -1121,6 +1294,9 @@ TARGET."
          (let ((*deps*))
            (funcall deps)
            (reverse *deps*)))
+
+       (never-been-built? (target)
+         (not (target-exists? target)))
 
        (needs-building? (target deps-thunk)
          (let ((timestamp (target-timestamp target))
@@ -1133,11 +1309,10 @@ TARGET."
                ;; Just because it's never been built doesn't mean it
                ;; has no dependencies.
                (or (eql timestamp never)
-                   (some (op (timestamp-newer? _ timestamp))
-                         (mapcar #'target-timestamp deps))))))
+                   (some #'target-changed? deps)))))
 
        (rec (target)
-         (assure target-timestamp
+         (assure stamp
            (if (already-built? target)
                (target-timestamp target)
                (progn
@@ -1145,17 +1320,24 @@ TARGET."
                  (let ((*target* target))
                    (receive (target thunk deps)
                        (target-task-values target)
-                     (when (needs-building? target deps)
-                       (let ((*depth* (1+ *depth*)))
-                         (print-target-being-built target)
-                         (funcall thunk)))
-                     (target-timestamp target))))))))
-
-    (handler-bind ((dependency #'redo))
-      (let ((*already-built*
-              (or (bound-value '*already-built*)
-                  (make-target-table))))
-        (rec target)))))
+                     (cond ((never-been-built? target)
+                            (build-deps deps)
+                            (let ((*depth* (1+ *depth*)))
+                              (funcall thunk))
+                            (update-saved-stamp target))
+                           ((needs-building? target deps)
+                            (let ((*depth* (1+ *depth*)))
+                              (print-target-being-built target)
+                              (funcall thunk))
+                            (update-saved-stamp target))
+                           (t nil))
+                     (ensure-saved-stamp target))))))))
+    (saving-database
+      (handler-bind ((dependency #'redo))
+        (let ((*already-built*
+                (or (bound-value '*already-built*)
+                    (make-target-table))))
+          (rec target))))))
 
 (defun redo (&optional c)
   (when-let (r (find-restart 'redo c))

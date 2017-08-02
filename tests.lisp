@@ -32,9 +32,10 @@
 (defun run-overlord-tests ()
   ;; Use a ridiculous fasl version so we can be reasonably sure
   ;; everything is being compiled clean.
-  (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
-        (fiveam:*on-error* :debug)
-        (overlord/specials:*fasl-version* most-positive-fixnum))
+  (let* ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
+         (fiveam:*on-error* :debug)
+         (overlord/specials:*fasl-version* most-positive-fixnum)
+         (overlord/kv::*kv* (overlord/kv::reload-kv)))
     (unwind-protect
          (progn
            (format t "~&First run (1/2)~%")

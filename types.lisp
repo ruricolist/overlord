@@ -48,7 +48,8 @@
    #:binding-designator
    #:canonical-binding
    #:non-keyword
-   #:fasl-version))
+   #:fasl-version
+   #:qualified-symbol))
 
 (in-package :overlord/types)
 
@@ -229,6 +230,11 @@ If the value of `*default-pathname-defaults*' and a call to
     (not (satisfies constantp))
     (not keyword)                       ;works for functions, though.
     (not cl-symbol)))
+
+(deftype qualified-symbol ()
+  `(and symbol
+        (not keyword)
+        (not cl-symbol)))
 
 (deftype non-keyword ()
   `(and symbol

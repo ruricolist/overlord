@@ -1,6 +1,7 @@
 (defpackage :overlord/kv
   (:use :cl :alexandria :serapeum
     :overlord/specials
+    :overlord/types
     :overlord/message
     :overlord/global-state)
   (:import-from :uiop
@@ -27,7 +28,10 @@
 (defconst tombstone '%tombstone)
 
 (defclass kv ()
-  ((current-map
+  ((version
+    :initform *fasl-version*
+    :reader kv.version)
+   (current-map
     :initarg :current-map
     :type fset-map
     :accessor kv.current-map)
@@ -38,7 +42,21 @@
    (log
     :initarg :log
     :type :pathname
-    :accessor kv.log)))
+    :reader kv.log)))
+
+(defmethod print-object ((self kv) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "v.~a ~d record~:p, ~:d byte~:p (~a)"
+            (kv.version self)
+            (fset:size (kv.current-map self))
+            (let ((log (kv.log self)))
+              (if (file-exists-p log)
+                  (file-size log)
+                  0))
+            (if (eql (kv.current-map self)
+                     (kv.last-saved-map self))
+                "saved"
+                "unsaved"))))
 
 (defun kv.ref (kv key)
   (multiple-value-bind (value bool)
@@ -101,7 +119,8 @@
   map1)
 
 (defun log.load (log)
-  (if (not (file-exists-p log)) (fset:empty-map)
+  (if (not (file-exists-p log))
+      (values (fset:empty-map) 0)
       (let* ((*readtable* kv-readtable)
              ;; So symbols can be read properly.
              (*package* (find-package :keyword))
@@ -155,33 +174,60 @@
                    :implementation
                    "log")))
 
-(define-global-state *kv*
-  (progn
-    (message "Reloading database")
-    (let ((path (log-file-path)))
-      (log.squash path)
-      (load-kv path))))
+(defun reload-kv ()
+  (message "Reloading database")
+  (let ((path (log-file-path)))
+    (log.squash path)
+    (load-kv path)))
+
+(define-global-state *kv* (reload-kv))
+
+(defun kv ()
+  (check-version)
+  *kv*)
+
+(defun check-version ()
+  (unless (= (kv.version *kv*)
+             *fasl-version*)
+    (cerror "Load the correct database"
+            "Database version mismatch")
+    (setq *kv* (reload-kv))))
 
 (defplace kv-ref* (key)
-  (kv.ref *kv* key))
+  (kv.ref (kv) key))
 
 ;;; But should be manipulating stored plists instead?
 
+(defun unqualify-symbol (x)
+  (eif (symbolp x)
+      (eif (keywordp x)
+          x
+          (eif (eql (symbol-package x)
+                    #.(find-package :cl))
+              x
+              (cons (package-name (symbol-package x))
+                    (symbol-name x))))
+      x))
+
+(defun prop-key (obj prop)
+  (cons (unqualify-symbol obj)
+        (unqualify-symbol prop)))
+
 (defplace prop (obj prop)
-  (kv.ref *kv* (cons obj prop)))
+  (kv.ref (kv) (prop-key obj prop)))
 
 (defun has-prop? (obj prop)
-  (nth-value 1 (prop obj prop)))
+  (nth-value 1 (prop-key obj prop)))
 
 (defun delete-prop (obj prop)
-  (kv.del *kv* (cons obj prop)))
+  (kv.del (kv) (prop-key obj prop)))
 
 (defun save-database ()
   (message "Saving Overlord database")
-  (kv.sync *kv*))
+  (kv.sync (kv)))
 
 (defun compact-database ()
-  (kv.squash *kv*))
+  (kv.squash (kv)))
 
 (defvar *save-pending* nil)
 
