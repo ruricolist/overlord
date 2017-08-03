@@ -1508,8 +1508,13 @@ value and NEW do not match under TEST."
               (:cmd (&rest args)
                 `(cmd ,@args))
               (:message (control-string &rest args)
-                `(message ,control-string ,@args)))
+                `(message ,control-string ,@args))
+              (:basename (file)
+                `(basename ,file)))
      ,@body))
+
+(defun basename (file)
+  (enough-pathname file (pathname-directory-pathname file)))
 
 (defun run-cmd (cmd &rest args)
   "Like `uiop:run-program, but defaulting the `:directory' argument to
