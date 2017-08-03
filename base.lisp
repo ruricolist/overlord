@@ -39,6 +39,7 @@
 
 (defun (setf current-dir!) (dir)
   (check-type dir (and absolute-pathname directory-pathname))
+  (ensure-directories-exist dir)
   (unless (pathname-equal dir (getcwd))
     (chdir dir))
   (unless (pathname-equal dir *default-pathname-defaults*)
