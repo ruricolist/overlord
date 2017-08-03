@@ -1296,25 +1296,39 @@ TARGET."
        (file-meta (file-meta= s1 s2))
        (stamp nil)))))
 
+(defvar *custom-stamps*)
+
+(defun custom-stamp (target)
+  (if-let (table (bound-value '*custom-stamps*))
+    (target-table-ref table target)
+    nil))
+
+(defun (setf custom-stamp) (stamp target)
+  (assert (boundp '*custom-stamps*))
+  (setf (target-table-ref *custom-stamps*
+                          target)
+        (assure string stamp)))
+
 (defun target-stamp (target)
   (assure stamp
-    (etypecase-of target target
-      ((or root-target
-           bindable-symbol
-           package-ref
-           pattern-ref
-           ;; TODO?
-           directory-ref
-           module-cell)
-       (target-timestamp target))
-      (pathname
-       ;; TODO use stat instead of serapeum:file-size. (Or, use stat
-       ;; in Serapeum?)
-       (cond ((file-exists-p target)
-              (file-meta target))
-             ((directory-pathname-p target)
-              (target-timestamp target))
-             (t deleted))))))
+    (or (custom-stamp target)
+        (etypecase-of target target
+          ((or root-target
+               bindable-symbol
+               package-ref
+               pattern-ref
+               ;; TODO?
+               directory-ref
+               module-cell)
+           (target-timestamp target))
+          (pathname
+           ;; TODO use stat instead of serapeum:file-size. (Or, use stat
+           ;; in Serapeum?)
+           (cond ((file-exists-p target)
+                  (file-meta target))
+                 ((directory-pathname-p target)
+                  (target-timestamp target))
+                 (t deleted)))))))
 
 (defconst stamp-prop :stamp)
 
@@ -1323,6 +1337,8 @@ TARGET."
 
 (defun unsave-stamp (target)
   (delete-prop target stamp-prop))
+
+(defun update-saved-stamp (target)
   (setf (saved-stamp target)
         (target-stamp target)))
 
@@ -1379,6 +1395,9 @@ TARGET."
       (handler-bind ((dependency #'redo))
         (let ((*already-built*
                 (or (bound-value '*already-built*)
+                    (make-target-table)))
+              (*custom-stamps*
+                (or (bound-value '*custom-stamps*)
                     (make-target-table))))
           (rec target))))))
 
@@ -1516,7 +1535,9 @@ value and NEW do not match under TEST."
               (:message (control-string &rest args)
                 `(message ,control-string ,@args))
               (:basename (file)
-                `(basename ,file)))
+                `(basename ,file))
+              (:stamp (stamp)
+                `(setf (custom-stamp *target*) ,stamp)))
      ,@body))
 
 (defun basename (file)
