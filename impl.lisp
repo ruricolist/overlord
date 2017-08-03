@@ -1335,9 +1335,8 @@ TARGET."
        (never-been-built? (target)
          (not (target-exists? target)))
 
-       (needs-building? (target deps-thunk)
-         (let ((timestamp (target-timestamp target))
-               (deps (build-deps deps-thunk)))
+       (needs-building? (target deps)
+         (let ((timestamp (target-timestamp target)))
            ;; Wait to check FORCE until after DEPS has been evaluated, in
            ;; case it has side effects.
            (or force
@@ -1355,20 +1354,21 @@ TARGET."
                (progn
                  (setf (target-table-member *already-built* target) t)
                  (let ((*target* target))
-                   (receive (target thunk deps)
+                   (receive (target thunk deps-thunk)
                        (target-task-values target)
-                     (cond ((never-been-built? target)
-                            (build-deps deps)
-                            (let ((*depth* (1+ *depth*)))
-                              (funcall thunk))
-                            (update-saved-stamp target))
-                           ((needs-building? target deps)
-                            (let ((*depth* (1+ *depth*)))
-                              (print-target-being-built target)
-                              (funcall thunk))
-                            (update-saved-stamp target))
-                           (t nil))
-                     (ensure-saved-stamp target))))))))
+                     (let ((deps (build-deps deps-thunk)))
+                       (flet ((rebuild ()
+                                (let ((*depth* (1+ *depth*)))
+                                  (print-target-being-built target)
+                                  (funcall thunk)
+                                  (update-saved-stamp target))))
+                         (declare (dynamic-extent #'rebuild))
+                         (cond ((never-been-built? target)
+                                (rebuild))
+                               ((needs-building? target deps)
+                                (rebuild))
+                               (t nil))
+                         (ensure-saved-stamp target))))))))))
     (saving-database
       (handler-bind ((dependency #'redo))
         (let ((*already-built*
