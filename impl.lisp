@@ -55,7 +55,7 @@
   (:import-from :cl-custom-hash-table
     :define-custom-hash-table-constructor
     :with-custom-hash-table)
-  (:shadow :defconfig :import :now)
+  (:shadow :defconfig :import :now :file-size)
   ;; Shadow for style.
   (:shadow
    :defmacro                            ;Hygienic pathnames.
@@ -231,6 +231,9 @@ on Lisp/OS/filesystem combinations that support it."
 
 (deftype file-size ()
   '(integer 0 *))
+
+(defsubst file-size (file)
+  (serapeum:file-size file))
 
 (defstruct-read-only (file-stamp (:conc-name file-stamp.))
   "Metadata to track whether a file has changed."
