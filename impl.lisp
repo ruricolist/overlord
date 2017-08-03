@@ -232,10 +232,16 @@ on Lisp/OS/filesystem combinations that support it."
 (deftype file-size ()
   '(integer 0 *))
 
+(defstruct-read-only (file-stamp (:conc-name file-stamp.))
+  "Metadata to track whether a file has changed."
+  ;; TODO hash?
+  (size :type (integer 0 *))
+  (timestamp :type target-timestamp))
+
 (deftype stamp ()
   '(or target-timestamp
     string
-    (cons file-size target-timestamp)))
+    file-stamp))
 
 (defconst deleted "deleted")
 
@@ -1263,13 +1269,15 @@ TARGET."
      (etypecase-of stamp s2
        (string (string= s1 s2))
        (stamp nil)))
-    ((cons file-size target-timestamp)
+    (file-stamp
      (etypecase-of stamp s2
-       ((cons file-size target-timestamp)
-        (destructuring-bind (size1 . ts1) s1
-          (destructuring-bind (size2 . ts2) s2
-            (and (= size1 size2)
-                 (target-timestamp= ts1 ts2)))))
+       (file-stamp
+        (let ((size1 (file-stamp.size s1))
+              (size2 (file-stamp.size s2))
+              (ts1 (file-stamp.timestamp s1))
+              (ts2 (file-stamp.timestamp s2)))
+          (and (= size1 size2)
+               (target-timestamp= ts1 ts2))))
        (stamp nil)))))
 
 (defun target-stamp (target)
