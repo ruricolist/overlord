@@ -1070,8 +1070,10 @@ distributed."
   (etypecase-of target target
     (root-target (error* "Cannot forget root target."))
     ((or bindable-symbol pathname)
+     (unsave-stamp target)
      (remhash target *tasks*))
     ((or directory-ref package-ref pattern-ref module-cell)
+     (unsave-stamp target)
      (setf (target-table-member *all-targets* target) nil))))
 
 (defun find-saved-task (target)
@@ -1314,10 +1316,13 @@ TARGET."
               (target-timestamp target))
              (t deleted))))))
 
-(defplace saved-stamp (target)
-  (prop target :stamp))
+(defconst stamp-prop :stamp)
 
-(defun update-saved-stamp (target)
+(defplace saved-stamp (target)
+  (prop target stamp-prop))
+
+(defun unsave-stamp (target)
+  (delete-prop target stamp-prop))
   (setf (saved-stamp target)
         (target-stamp target)))
 
@@ -1824,16 +1829,17 @@ depends on that."
     :initarg :module-cell
     :reader module-dependency.module-cell)))
 
-(symbol-macrolet ((key :deps))
-  (defun module-deps (m)
-    (check-type m module-cell)
-    (mapply #'module-cell (prop m key)))
+(defconst module-deps-prop :module-deps)
 
-  (defun (setf module-deps) (deps m)
-    (check-type m module-cell)
-    (check-type deps list)
-    (let ((deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
-      (setf (prop m key) deps-table))))
+(defun module-deps (m)
+  (check-type m module-cell)
+  (mapply #'module-cell (prop m module-deps-prop)))
+
+(defun (setf module-deps) (deps m)
+  (check-type m module-cell)
+  (check-type deps list)
+  (let ((deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
+    (setf (prop m module-deps-prop) deps-table)))
 
 (defun flatten-module-deps (m)
   (collecting
