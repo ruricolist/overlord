@@ -33,6 +33,12 @@ download [Core Lisp][], and, if not on Windows, you must have the
 `touch` program in your search path. (On Windows, Powershell is
 used instead).
 
+Overlord stores its persistent data structures in a cache directory.
+On Linux, this is `~/.cache/overlord/`. The data structures stored
+there are versioned. Since this version number is increasing rapidly,
+it might worth checking the cache directory from time to time to
+delete obsolete files.
+
 When I say “experimental”, I mean it. Anything may change at any time.
 This code is not ready for use. It may not even be ready for release.
 
