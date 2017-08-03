@@ -1659,29 +1659,30 @@ rebuilt."
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
-  (setf pathname (resolve-target pathname (base)))
   (let* ((base (base))
+         (pathname (resolve-target pathname base))
+         (dir (pathname-directory-pathname pathname))
          (init
            `(progn
-              (uiop:chdir ,base)
+              (setf (current-dir!) ,dir)
               ,init)))
     (with-script-dependency (name init deps)
       `(progn
          ;; Make the task accessible by name.
          (def ,name ,pathname)
-         ,(save-base
-            `(with-defaults-from-base
-               (save-file-task ,pathname
-                               (init-thunk
-                                 ,(if (null tmp)
-                                      ;; No temp file needed.
-                                      init
-                                      ;; Write to a temp file and rename.
-                                      `(call/temp-file ,pathname
-                                                       (lambda (,tmp)
-                                                         ,init)))
-                                 (assert (file-exists-p ,pathname)))
-                               (deps-thunk ,@deps))))
+         (with-defaults-from-base
+           (save-file-task ,pathname
+                           (init-thunk
+                             (let ((*base* (bound-value '*base*)))
+                               ,(if (null tmp)
+                                    ;; No temp file needed.
+                                    init
+                                    ;; Write to a temp file and rename.
+                                    `(call/temp-file ,pathname
+                                                     (lambda (,tmp)
+                                                       ,init))))
+                             (assert (file-exists-p ,pathname)))
+                           (deps-thunk ,@deps)))
          ',pathname))))
 
 
