@@ -877,8 +877,10 @@ E.g. delete a file, unbind a variable."
                      (debug 0)
                      (compilation-speed 0)))
   (etypecase-of target target
-    ((or root-target bindable-symbol pathname)
-     (sxhash target))
+    (root-target
+     (load-time-value (sxhash *root-target*)))
+    (bindable-symbol (sxhash target))
+    (pathname (sxhash target))
     (module-cell
      (dx-sxhash
       (list 'module-cell
@@ -994,7 +996,6 @@ distributed."
                (clear-target-table (symbol-value '*all-targets*))
                (clrhash (symbol-value '*symbol-timestamps*))
                (clrhash (symbol-value '*tasks*))
-               (clrhash (symbol-value '*module-deps*))
                ;; The table of module cells needs special handling.
                (clear-module-cells)
                (clrhash (symbol-value '*claimed-module-names*))
@@ -1803,21 +1804,21 @@ depends on that."
 (defvar-unbound *module-chain*
   "The chain of modules being loaded.")
 
-(define-global-state *module-deps* (dict))
-
 (defcondition module-dependency ()
   ((module-cell
     :initarg :module-cell
     :reader module-dependency.module-cell)))
 
-(defun module-deps (m)
-  (check-type m module-cell)
-  (gethash m *module-deps*))
+(symbol-macrolet ((key :deps))
+  (defun module-deps (m)
+    (check-type m module-cell)
+    (mapply #'module-cell (prop m key)))
 
-(defun (setf module-deps) (value m)
-  (check-type m module-cell)
-  (check-type value list)
-  (setf (gethash m *module-deps*) value))
+  (defun (setf module-deps) (deps m)
+    (check-type m module-cell)
+    (check-type deps list)
+    (let ((deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
+      (setf (prop m key) deps-table))))
 
 (defun flatten-module-deps (m)
   (collecting
@@ -2195,8 +2196,7 @@ if it does not exist."
         lang *input*)
        (ensure-directories-exist *output*)
        :top-level (package-compile-top-level? lang)
-       :source *source*))
-    (save-module-deps lang *input*))
+       :source *source*)))
 
   (:method pattern-depend (self)
     (depends-on-all
@@ -2208,25 +2208,8 @@ if it does not exist."
 (defun fasl-lang-pattern-ref (lang source)
   (pattern-ref (fasl-lang-pattern lang source) source))
 
-(defun save-module-deps (lang source)
-  (setf lang (lang-name lang))
-  (let* ((mc (module-cell lang source))
-         (deps (module-deps mc))
-         (file (deps-file lang source))
-         (deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
-    (write-form-as-file deps-table file)))
-
-(defun snarf-module-deps (lang source)
-  (let ((file (deps-file lang source)))
-    (mapply #'module-cell
-            (read-file-form file))))
-
 (defun module-static-dependencies (lang source)
-  (snarf-module-deps lang source))
-
-(defun deps-file (lang source)
-  (make-pathname :defaults (faslize lang source)
-                 :type "deps"))
+  (module-deps (module-cell lang source)))
 
 (defmacro with-input-from-source ((stream source) &body body)
   "Read from SOURCE, skipping any #lang declaration."
