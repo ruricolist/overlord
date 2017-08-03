@@ -254,12 +254,13 @@ on Lisp/OS/filesystem combinations that support it."
        (compare #'= #'file-meta.size x y)
        (compare #'target-timestamp= #'file-meta.timestamp x y)))
 
-(deftype stamp ()
-  '(or target-timestamp
-    string
-    file-meta))
+(defconst deleted :deleted)
 
-(defconst deleted "deleted")
+(deftype stamp ()
+  `(or target-timestamp
+       (eql ,deleted)
+       string
+       file-meta))
 
 (deftype lang-name ()
   ;; Keywords can be language names.
@@ -1278,6 +1279,7 @@ TARGET."
 
 (defun stamp= (s1 s2)
   (etypecase-of stamp s1
+    ((eql #.deleted) nil)
     (target-timestamp
      (etypecase-of stamp s2
        (target-timestamp (target-timestamp= s1 s2))
