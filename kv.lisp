@@ -90,7 +90,7 @@
     (prog1 value
       ;; TODO More CAS.
       #+sbcl
-      (sb-ext:atomic-update (slot-value kv 'current-map)
+      (sb-ext:atomic-update (slot-value self 'current-map)
                             (lambda (map)
                               (fset:with map key value)))
       #-sbcl
