@@ -235,7 +235,14 @@ on Lisp/OS/filesystem combinations that support it."
 (defsubst file-size (file)
   (serapeum:file-size file))
 
-(defstruct-read-only (file-stamp (:conc-name file-stamp.))
+(declaim (inline file-meta))
+(defstruct-read-only (file-meta
+                      (:conc-name file-meta.)
+                      ;; Define the constructor here so it can be
+                      ;; inlined.
+                      (:constructor file-meta
+                          (file &aux (size (file-size file))
+                                     (timestamp (target-timestamp file)))))
   "Metadata to track whether a file has changed."
   ;; TODO hash?
   (size :type (integer 0 *))
@@ -244,7 +251,7 @@ on Lisp/OS/filesystem combinations that support it."
 (deftype stamp ()
   '(or target-timestamp
     string
-    file-stamp))
+    file-meta))
 
 (defconst deleted "deleted")
 
@@ -1273,13 +1280,13 @@ TARGET."
      (etypecase-of stamp s2
        (string (string= s1 s2))
        (stamp nil)))
-    (file-stamp
+    (file-meta
      (etypecase-of stamp s2
-       (file-stamp
-        (let ((size1 (file-stamp.size s1))
-              (size2 (file-stamp.size s2))
-              (ts1 (file-stamp.timestamp s1))
-              (ts2 (file-stamp.timestamp s2)))
+       (file-meta
+        (let ((size1 (file-meta.size s1))
+              (size2 (file-meta.size s2))
+              (ts1 (file-meta.timestamp s1))
+              (ts2 (file-meta.timestamp s2)))
           (and (= size1 size2)
                (target-timestamp= ts1 ts2))))
        (stamp nil)))))
@@ -1299,8 +1306,7 @@ TARGET."
        ;; TODO use stat instead of serapeum:file-size. (Or, use stat
        ;; in Serapeum?)
        (cond ((file-exists-p target)
-              (cons (file-size target)
-                    (target-timestamp target)))
+              (file-meta target))
              ((directory-pathname-p target)
               (target-timestamp target))
              (t deleted))))))
