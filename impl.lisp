@@ -248,6 +248,12 @@ on Lisp/OS/filesystem combinations that support it."
   (size :type (integer 0 *))
   (timestamp :type target-timestamp))
 
+(defun file-meta= (x y)
+  (and (typep x 'file-meta)
+       (typep y 'file-meta)
+       (compare #'= #'file-meta.size x y)
+       (compare #'target-timestamp= #'file-meta.timestamp x y)))
+
 (deftype stamp ()
   '(or target-timestamp
     string
@@ -1282,13 +1288,7 @@ TARGET."
        (stamp nil)))
     (file-meta
      (etypecase-of stamp s2
-       (file-meta
-        (let ((size1 (file-meta.size s1))
-              (size2 (file-meta.size s2))
-              (ts1 (file-meta.timestamp s1))
-              (ts2 (file-meta.timestamp s2)))
-          (and (= size1 size2)
-               (target-timestamp= ts1 ts2))))
+       (file-meta (file-meta= s1 s2))
        (stamp nil)))))
 
 (defun target-stamp (target)
