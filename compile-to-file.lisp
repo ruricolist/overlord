@@ -11,7 +11,7 @@
   (not (eq x no-module)))
 
 (deftype module ()
-  '(not (satisfies module?)))
+  '(satisfies module?))
 
 (defconst fasl-ext
   (pathname-type
