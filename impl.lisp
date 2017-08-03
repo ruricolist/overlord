@@ -110,6 +110,7 @@
 
    :import :import/local
    :import-as-package
+   :import-as-subpackage
    :with-imports
    :reintern :reinterning
    :*file-local-variables*
@@ -2988,3 +2989,18 @@ the symbols bound in the body of the import form."
            :binding ,(intern-spec bindings)
            :values  ,(intern-spec values)
            ,@body)))))
+
+(defun subpackage-full-name (child-package-name)
+  (let* ((parent-package *package*)
+         (parent-package-name (package-name parent-package))
+         (child-package-name (string child-package-name))
+         (full-package-name
+           (fmt "~a.~a" parent-package-name child-package-name)))
+    (make-keyword full-package-name)))
+
+(defmacro import-as-subpackage (child-package-name
+                                &body body
+                                &key
+                                &allow-other-keys)
+  `(import-as-package ,(subpackage-full-name child-package-name)
+     ,@body))
