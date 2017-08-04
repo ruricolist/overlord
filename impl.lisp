@@ -388,7 +388,13 @@ on Lisp/OS/filesystem combinations that support it."
   (:method make-load-form (self &optional env)
     (make-load-form-saving-slots self
                                  :slot-names '(pattern name output)
-                                 :environment env)))
+                                 :environment env))
+
+  (:method fset:compare (self (other pattern-ref))
+    (fset:compare-slots self other
+                        #'pattern-ref.input
+                        #'pattern-ref.pattern
+                        #'pattern-ref.output)))
 
 (defun pattern-ref (pattern file)
   "Make a pattern reference, or a list of pattern references."
