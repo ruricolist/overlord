@@ -56,6 +56,9 @@
     :define-custom-hash-table-constructor
     :with-custom-hash-table)
   (:shadow :defconfig :import :now :file-size)
+  (:shadowing-import-from :overlord/file-size
+    :file-size)
+  (:shadow :defconfig :import :now)
   ;; Shadow for style.
   (:shadow
    :defmacro                            ;Hygienic pathnames.
@@ -229,12 +232,6 @@ on Lisp/OS/filesystem combinations that support it."
     universal-time
     never
     far-future))
-
-(deftype file-size ()
-  '(integer 0 *))
-
-(defsubst file-size (file)
-  (serapeum:file-size file))
 
 (declaim (inline file-meta))
 (defstruct-read-only (file-meta
