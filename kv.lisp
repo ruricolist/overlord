@@ -31,7 +31,7 @@
 (defgeneric kv.ref (kv key))
 (defgeneric (setf kv.ref) (value kv key))
 (defgeneric kv.del (kv key))
-(defgeneric kv.sync (kv))
+(defgeneric kv.sync (kv &key))
 (defgeneric kv.squash (kv))
 
 (defconst tombstone '%tombstone)
@@ -103,14 +103,18 @@
     (setf (kv.ref self key) tombstone)
     (values))
 
-  (:method kv.sync (self)
-    (synchronized (self)
-      (log.update log last-saved-map current-map)
-      (setf last-saved-map current-map)))
+  (:method kv.sync (self &key (lock t))
+    (flet ((sync ()
+             (log.update log last-saved-map current-map)
+             (setf last-saved-map current-map)))
+      (if lock
+          (synchronized (self)
+            (sync))
+          (sync))))
 
   (:method kv.squash (self)
     (synchronized (self)
-      (kv.sync self)
+      (kv.sync self :lock nil)
       (log.squash log))))
 
 (defclass dead-kv (kv)
@@ -126,7 +130,7 @@
   (:method kv.del (self key)
     (declare (ignore key))
     (values))
-  (:method kv.sync (self)
+  (:method kv.sync (self &key)
     (values))
   (:method kv.squash (self)
     (values)))
@@ -167,30 +171,37 @@
   map1)
 
 (defun log.load (log)
+  (declare (optimize safety debug))
   (if (not (file-exists-p log))
       (values (fset:empty-map) 0)
-      (restart-case
-          (let* ((*readtable* kv-readtable)
-                 ;; So symbols can be read properly.
-                 (*package* (find-package :keyword))
-                 (records
-                   (with-standard-io-syntax
-                     (with-input-from-file (in log :element-type 'character)
-                       ;; TODO ignore errors?
-                       (loop with eof = "eof"
-                             for record = (read in nil eof)
-                             until (eq record eof)
-                             collect record))))
-                 (maps
-                   (mapcar #'log-record.data records)))
-            (values
-             (reduce #'map-union/tombstones maps
-                     :initial-value (fset:empty-map))
-             (length maps)))
-        (truncate-db ()
-          :report "Ignore the corrupt database"
-          (return-from log.load
-            (values (fset:empty-map) 0))))))
+      (tagbody
+       :retry
+         (restart-case
+             (return-from log.load
+               (with-standard-io-syntax
+                 (let* ((*readtable* kv-readtable)
+                        ;; So symbols can be read properly.
+                        (*package* (find-package :keyword))
+                        (records
+                          (with-input-from-file (in log :element-type 'character)
+                            ;; TODO ignore errors?
+                            (loop with eof = "eof"
+                                  for record = (read in nil eof)
+                                  until (eq record eof)
+                                  collect record)))
+                        (maps
+                          (mapcar #'log-record.data records)))
+                   (values
+                    (reduce #'map-union/tombstones maps
+                            :initial-value (fset:empty-map))
+                    (length maps)))))
+           (retry ()
+             :report "Try loading the database again."
+             (go :retry))
+           (truncate-db ()
+             :report "Ignore the corrupt database."
+             (return-from log.load
+               (values (fset:empty-map) 0)))))))
 
 (defun log.squash (log)
   (mvlet ((map map-count (log.load log))
