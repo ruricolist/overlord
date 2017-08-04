@@ -206,7 +206,7 @@
                                  ;; same file system as the log.
                                  :directory (pathname-directory-pathname log))
         (setq temp p)
-        (kv-write map s))
+        (kv-write (make-log-record :data map) s))
       (rename-file-overwriting-target temp log)))
   log)
 
