@@ -239,6 +239,9 @@ on Lisp/OS/filesystem combinations that support it."
 (declaim (inline file-meta))
 (defstruct-read-only (file-meta
                       (:conc-name file-meta.)
+                      ;; Ensure a default constructor so the struct
+                      ;; can be read.
+                      :constructor
                       ;; Define the constructor here so it can be
                       ;; inlined.
                       (:constructor file-meta
