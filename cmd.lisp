@@ -26,5 +26,4 @@
       tokens
       (values-list plist)
       :output t
-      :error-output t
-      :directory (base))))
+      :error-output t)))

@@ -1700,16 +1700,17 @@ rebuilt."
          (with-defaults-from-base
            (save-file-task ,pathname
                            (init-thunk
-                             (let ((*base* (bound-value '*base*)))
-                               ,(if (null tmp)
-                                    ;; No temp file needed.
-                                    init
-                                    ;; Write to a temp file and rename.
-                                    `(call/temp-file ,pathname
-                                                     (lambda (,tmp)
-                                                       ,init))))
+                             ,(if (null tmp)
+                                  ;; No temp file needed.
+                                  init
+                                  ;; Write to a temp file and rename.
+                                  `(call/temp-file ,pathname
+                                                   (lambda (,tmp)
+                                                     ,init)))
                              (assert (file-exists-p ,pathname)))
-                           (deps-thunk ,@deps)))
+                           (deps-thunk
+                             (setf (current-dir!) ,dir)
+                             ,@deps)))
          ',pathname))))
 
 
