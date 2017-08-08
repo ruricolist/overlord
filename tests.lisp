@@ -21,6 +21,11 @@
 
 (overlord:set-package-base (asdf:system-relative-pathname :overlord ""))
 
+(defun nap (&optional (n 1))
+  (loop with start = (get-universal-time)
+        until (< start (get-universal-time))
+        do (sleep n)))
+
 
 ;;; Suite.
 
@@ -41,7 +46,7 @@
            (format t "~&First run (1/2)~%")
            (run! 'overlord)
            (format t "~&Resetting global state for second run...~%")
-           (sleep 2)
+           (nap 2)
            (format t "~&Second run (2/2)~%")
            (overlord/global-state:reset-global-state)
            (run! 'overlord))
@@ -113,7 +118,7 @@
   (:depends-on +literal-string-file+))
 
 (test const/deps
-  (sleep 1)
+  (nap 1)
   (local
     (def original #.+literal-string+)
     (touch +literal-string-file+)
@@ -131,7 +136,7 @@
     (is (stringp string2))
     (is (not (eq string1 string2)))
 
-    (sleep 1)
+    (nap 1)
 
     (touch '+literal-string-file+)
     (overlord:build '*literal-string*)
