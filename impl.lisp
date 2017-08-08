@@ -854,9 +854,6 @@ E.g. delete a file, unbind a variable."
 
 ;;; Target table abstract data type.
 
-(deftype target-table ()
-  'hash-table)
-
 (defun target-type-of (x)
   (typecase-of target x
     (root-target 'root-target)
@@ -915,20 +912,15 @@ E.g. delete a file, unbind a variable."
       (list 'package-ref
             (ref.name target))))))
 
-(define-custom-hash-table-constructor %make-target-table
-  :test target=
-  :hash-function hash-target)
-
-(defun make-target-table (&rest args &key &allow-other-keys)
-  (apply #'%make-target-table args))
+(defstruct (target-table (:conc-name target-table.))
+  (map (fset:empty-map) :type fset:map))
 
 (defun target-table-ref (table key)
-  (with-custom-hash-table
-    (gethash key table)))
+  (fset:lookup (target-table.map table) key))
 
 (defun (setf target-table-ref) (value table key)
-  (with-custom-hash-table
-    (setf (gethash key table) value)))
+  (callf #'fset:with (target-table.map table) key value)
+  value)
 
 (defun target-table-member (table key)
   (nth-value 1
@@ -938,19 +930,17 @@ E.g. delete a file, unbind a variable."
   (prog1 value
     (if value
         (setf (target-table-ref table key) nil)
-        (with-custom-hash-table
-          (remhash key table)))))
+        (callf #'fset:less (target-table.map table) key))))
 
 (defun target-table-keys (table)
   (collecting
-    (with-custom-hash-table
-      (maphash (lambda (k v) (declare (ignore v))
-                 (collect k))
-               table))))
+    (fset:do-map (k v (target-table.map table))
+      (declare (ignore v))
+      (collect k))))
 
 (defun clear-target-table (table)
-  (with-custom-hash-table
-    (clrhash table)))
+  (setf (target-table.map table)
+        (fset:empty-map)))
 
 
 ;;; Building.
@@ -1040,7 +1030,7 @@ distributed."
 (define-global-state *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(define-global-state *all-targets* (make-target-table :size 8192))
+(define-global-state *all-targets* (make-target-table))
 (declaim (type target-table *all-targets*))
 
 (defun list-all-targets ()
