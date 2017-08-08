@@ -52,12 +52,8 @@
     :xdg-cache-home)
   ;; How to escape names for use in pathnames.
   (:import-from :quri :url-encode)
-  (:import-from :cl-custom-hash-table
-    :define-custom-hash-table-constructor
-    :with-custom-hash-table)
-  (:shadow :defconfig :import :now :file-size)
-  (:shadowing-import-from :overlord/file-size
-    :file-size)
+  (:shadowing-import-from :trivial-file-size
+    :file-size-in-octets)
   (:shadow :defconfig :import :now)
   ;; Shadow for style.
   (:shadow
@@ -236,13 +232,12 @@ on Lisp/OS/filesystem combinations that support it."
 (declaim (inline file-meta))
 (defstruct-read-only (file-meta
                       (:conc-name file-meta.)
-                      ;; Ensure a default constructor so the struct
-                      ;; can be read.
+                      ;; Ensure a default constructor so the struct can be read.
                       :constructor
                       ;; Define the constructor here so it can be
                       ;; inlined.
                       (:constructor file-meta
-                          (file &aux (size (file-size file))
+                          (file &aux (size (file-size-in-octets file))
                                      (timestamp (target-timestamp file)))))
   "Metadata to track whether a file has changed."
   ;; TODO hash?
@@ -1328,8 +1323,6 @@ TARGET."
                module-cell)
            (target-timestamp target))
           (pathname
-           ;; TODO use stat instead of serapeum:file-size. (Or, use stat
-           ;; in Serapeum?)
            (cond ((file-exists-p target)
                   (file-meta target))
                  ((directory-pathname-p target)
