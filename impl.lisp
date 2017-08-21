@@ -290,7 +290,7 @@ on Lisp/OS/filesystem combinations that support it."
                     :name ,name))
 
   (:method fset:compare (self (other ref))
-    (fset:compare-slots self other #'class-of #'ref.name)))
+    (fset:compare-slots self other #'class-name-of #'ref.name)))
 
 (fset:define-cross-type-compare-methods ref)
 
