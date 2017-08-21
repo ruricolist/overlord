@@ -250,6 +250,11 @@ on Lisp/OS/filesystem combinations that support it."
        (compare #'= #'file-meta.size x y)
        (compare #'target-timestamp= #'file-meta.timestamp x y)))
 
+(defmethod fset:compare ((x file-meta) (y file-meta))
+  (if (file-meta= x y)
+      :equal
+      :unequal))
+
 (defconst deleted :deleted)
 
 (deftype stamp ()
