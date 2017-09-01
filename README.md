@@ -40,7 +40,12 @@ it might worth checking the cache directory from time to time to
 delete obsolete files.
 
 When I say “experimental”, I mean it. Anything may change at any time.
-This code is not ready for use. It may not even be ready for release.
+
+### About Quicklisp
+
+Overlord is now in [Quicklisp][]. This does not mean Overlord is done:
+it remains pre-alpha. But it does mean that bleeding-edge development
+will now take place in a [separate `dev` branch][dev].
 
 ## Embedding languages
 
@@ -540,6 +545,8 @@ You might want them again later. -->
 [Make]: https://www.gnu.org/software/make/
 [Roswell]: https://github.com/roswell/roswell
 [cl-launch]: http://cliki.net/cl-launch
+[dev]: /tbrss/overlord/tree/dev
+[Quicklisp]: https://www.quicklisp.org/beta/
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
