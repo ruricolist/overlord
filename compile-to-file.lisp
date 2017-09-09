@@ -52,7 +52,8 @@
     (with-compilation-unit (:allow-other-keys t
                             ;; SBCL
                             :source-namestring namestring)
-      (let ((*package* package))
+      (let ((*package* package)
+            (*readtable* (copy-readtable nil)))
         (compile-file universal-file
                       :allow-other-keys t
                       :output-file output-file
