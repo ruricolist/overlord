@@ -144,23 +144,24 @@
 
 (defun kv-write (obj stream)
   (with-standard-io-syntax
-    (write obj :stream stream
-               :readably t
-               :pretty nil
-               :circle nil)))
+    ;; It's possible a writer may look at the current readtable.
+    (let ((*readtable* kv-readtable))
+      (write obj :stream stream
+                 :readably t
+                 :pretty nil
+                 :circle nil))))
 
 (defun log.update (log last-saved-map current-map)
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
         (let ((record (make-log-record :data diff)))
-          (with-standard-io-syntax
-            (with-output-to-file (out (ensure-directories-exist log)
-                                      :element-type 'character
-                                      :if-does-not-exist :create
-                                      :if-exists :append)
-              (kv-write record out)
-              (finish-output out))))))))
+          (with-output-to-file (out (ensure-directories-exist log)
+                                    :element-type 'character
+                                    :if-does-not-exist :create
+                                    :if-exists :append)
+            (kv-write record out)
+            (finish-output out)))))))
 
 (defun map-union/tombstones (map1 map2)
   (fset:do-map (k v map2)
@@ -180,8 +181,6 @@
              (return-from log.load
                (with-standard-io-syntax
                  (let* ((*readtable* kv-readtable)
-                        ;; So symbols can be read properly.
-                        (*package* (find-package :keyword))
                         (records
                           (with-input-from-file (in log :element-type 'character)
                             ;; TODO ignore errors?
@@ -199,7 +198,7 @@
              :report "Try loading the database again."
              (go :retry))
            (truncate-db ()
-             :report "Ignore the corrupt database."
+             :report "Treat the database as corrupt and discard it."
              (return-from log.load
                (values (fset:empty-map) 0)))))))
 
