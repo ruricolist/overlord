@@ -154,9 +154,8 @@ shell-based means for passing information between parent and child
 scripts. (See §5.4.2 in [Grosskurth 2007][Grosskurth].)
 
 The *important* difference is that Overlord uses *two* scripts per
-target: one for building the target, and another for computing its
-dependencies. This (mostly) replaces the need to maintain a database
-of dependencies.
+target: one for building the target, and another for computing extra
+dependencies without involving the database.
 
 ## CLI
 
