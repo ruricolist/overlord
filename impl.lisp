@@ -35,7 +35,7 @@
   (:import-from :fset)
   (:import-from :trivia
     :match :ematch)
-  ;; Portability shim for "global" or "static" vars. They have global
+  ;; Portability shim for "global" or "static" vars. They  global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
     :define-global-var)
@@ -1112,8 +1112,6 @@ distributed."
                      (*language* lang))
                  ;; Depend on the source file.
                  (depends-on source)
-                 ;; The stashed recursive dependencies of the module.
-                 (depends-on-all (module-deps target))
                  ;; Let the language tell you what else to depend on.
                  (lang-deps lang source))))))))
 
@@ -1324,12 +1322,43 @@ TARGET."
   (ensure2 (saved-stamp target)
     (target-stamp target)))
 
+(defun save-dependency (dep)
+  ;; Is this right?
+  (when (boundp '*deps*)
+    (push (assure target dep) *deps*)))
+
+(defconst init-deps-prop :init-deps)
+
+(defun init-deps (target)
+  (check-type target target)
+
+  (assure list
+    (prop target init-deps-prop)))
+
+(defun (setf init-deps) (value target)
+  (check-type target target)
+  (check-type value (list-of target))
+  (setf (prop target init-deps-prop)
+        (nub value :test #'target=)))
+
+(defun call/init-deps (target thunk)
+  (let ((*deps*))
+    (multiple-value-prog1
+        (handler-bind ((dependency #'redo))
+          (funcall thunk))
+      (setf (init-deps target)
+            (reverse *deps*)))))
+
+(defmacro with-init-deps-saved ((target) &body body)
+  (with-thunk (body)
+    `(call/init-deps ,target ,body)))
+
 (defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
   (labels
-      ((build-deps (deps)
-         (let ((*deps*))
-           (funcall deps)
+      ((deps-list (target deps-thunk)
+         (let ((*deps* (init-deps target)))
+           (funcall deps-thunk)
            (reverse *deps*)))
 
        (never-been-built? (target)
@@ -1345,30 +1374,31 @@ TARGET."
                ;; Just because it's never been built doesn't mean it
                ;; has no dependencies.
                (or (eql timestamp never)
-                   (some #'target-changed? deps)))))
+                   (some #'target-changed?
+                         (nub deps :test #'target=))))))
 
        (rec (target)
          (assure stamp
            (if (already-built? target)
                (target-timestamp target)
-               (progn
+               (let ((*target* target))
                  (setf (target-table-member *already-built* target) t)
-                 (let ((*target* target))
-                   (receive (target thunk deps-thunk)
-                       (target-task-values target)
-                     (let ((deps (build-deps deps-thunk)))
-                       (flet ((rebuild ()
-                                (let ((*depth* (1+ *depth*)))
-                                  (print-target-being-built target)
-                                  (funcall thunk)
-                                  (update-saved-stamp target))))
-                         (declare (dynamic-extent #'rebuild))
-                         (cond ((never-been-built? target)
-                                (rebuild))
-                               ((needs-building? target deps)
-                                (rebuild))
-                               (t nil))
-                         (ensure-saved-stamp target))))))))))
+                 (receive (target thunk deps-thunk)
+                     (target-task-values target)
+                   (flet ((rebuild ()
+                            (with-init-deps-saved (target)
+                              (let ((*depth* (1+ *depth*)))
+                                (print-target-being-built target)
+                                (funcall thunk)
+                                (update-saved-stamp target)))))
+                     (let ((deps (deps-list target deps-thunk)))
+                       (declare (dynamic-extent #'rebuild))
+                       (cond ((never-been-built? target)
+                              (rebuild))
+                             ((needs-building? target deps)
+                              (rebuild))
+                             (t nil))
+                       (ensure-saved-stamp target)))))))))
     (saving-database
       (handler-bind ((dependency #'redo))
         (let ((*already-built*
@@ -1403,10 +1433,10 @@ TARGET."
         :report "Ignore the dependency and move on.")
       (save ()
         :report "Save the dependency, but don't build it."
-        (push target *deps*))
+        (pushnew target *deps*))
       (redo ()
         :report "Build the dependency."
-        (push target *deps*)
+        (save-dependency target)
         (build target)))))
 
 (defun depends-on (&rest deps)
@@ -1817,61 +1847,6 @@ depends on that."
   (ensure-directory-pathname
    (xdg-cache-home "overlord" (fmt "v~a" version))))
 
-;;; Module dependencies: when compiling module X requires module Y,
-;;; save the information that X depends on Y so Y can be checked when
-;;; determining if X needs rebuilding.
-
-(defvar-unbound *module-chain*
-  "The chain of modules being loaded.")
-
-(defcondition module-dependency ()
-  ((module-cell
-    :initarg :module-cell
-    :reader module-dependency.module-cell)))
-
-(defconst module-deps-prop :module-deps)
-
-(defun module-deps (m)
-  (check-type m module-cell)
-  (mapply #'module-cell (prop m module-deps-prop)))
-
-(defun (setf module-deps) (deps m)
-  (check-type m module-cell)
-  (check-type deps list)
-  (let ((deps-table (mapcar (juxt #'module-cell.lang #'module-cell.source) deps)))
-    (setf (prop m module-deps-prop) deps-table)))
-
-(defun flatten-module-deps (m)
-  (collecting
-    (labels ((rec (m)
-               (collect m)
-               (dolist (d (module-deps m))
-                 (rec d))))
-      (rec m))))
-
-(defmacro with-module-dependency-tracking ((&key) &body body)
-  "Sugar for `call/module-dependency-tracking'."
-  (with-thunk (body)
-    `(call/module-dependency-tracking ,body)))
-
-(defun call/module-dependency-tracking (thunk)
-  "Ensure that `*module-chain*' is bound around THUNK."
-  (fbind (thunk)
-    (if (boundp '*module-chain*)
-        (thunk)
-        (let ((*module-chain* '()))
-          (handler-bind ((module-dependency
-                           (lambda (c)
-                             (let ((mc (module-dependency.module-cell c)))
-                               (when-let (prev (first *module-chain*))
-                                 (pushnew mc (module-deps prev)))
-                               (push mc *module-chain*)))))
-            (thunk))))))
-
-(defun save-module-dependency (mc)
-  (check-type mc module-cell)
-  (signal 'module-dependency :module-cell mc))
-
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
   (with-defaults-from-base
@@ -1885,9 +1860,8 @@ depends on that."
   (setf lang (or lang (guess-lang+pos source)))
   (when force
     (dynamic-unrequire-as lang source))
-  (with-module-dependency-tracking ()
+  (assure (not module-cell)
     (let ((mc (module-cell lang source)))
-      (save-module-dependency mc)
       (build mc)
       (module-cell.module mc))))
 
@@ -2217,20 +2191,13 @@ if it does not exist."
         lang *input*)
        (ensure-directories-exist *output*)
        :top-level (package-compile-top-level? lang)
-       :source *source*)))
-
-  (:method pattern-depend (self)
-    (depends-on-all
-     (module-static-dependencies lang *input*))))
+       :source *source*))))
 
 (defun fasl-lang-pattern (lang source)
   (make 'fasl-lang-pattern :lang lang :source source))
 
 (defun fasl-lang-pattern-ref (lang source)
   (pattern-ref (fasl-lang-pattern lang source) source))
-
-(defun module-static-dependencies (lang source)
-  (module-deps (module-cell lang source)))
 
 (defmacro with-input-from-source ((stream source) &body body)
   "Read from SOURCE, skipping any #lang declaration."
@@ -2759,7 +2726,7 @@ actually exported by the module specified by LANG and SOURCE."
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
-  (save-module-dependency (module-cell as from))
+  (save-dependency (module-cell as from))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias

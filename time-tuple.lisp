@@ -20,6 +20,7 @@
 
 (defstruct-read-only
     (time-tuple
+     :constructor                       ;Default constructor
      (:constructor %time-tuple (universal-time real-time)))
   "A timestamp consisting of a universal time and a remainder of
 internal time units."

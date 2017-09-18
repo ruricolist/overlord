@@ -6,7 +6,6 @@
    #:module-ref*
    #:module-exports
    #:module-static-exports #:module-static-exports/cache
-   #:module-static-dependencies
    #:with-static-exports-cache
    #:current-module
    #:current-module-cell
