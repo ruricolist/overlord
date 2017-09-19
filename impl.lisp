@@ -900,15 +900,52 @@ E.g. delete a file, unbind a variable."
       (list 'package-ref
             (ref.name target))))))
 
+(deftype hash-friendly-target ()
+  '(or root-target bindable-symbol pathname))
+
 (defstruct (target-table (:conc-name target-table.))
-  (map (fset:empty-map) :type fset:map))
+  (map (fset:empty-map) :type fset:map)
+  (hash-table (make-hash-table :test 'equal :size 1024)
+   :type hash-table)
+  (lock (bt:make-recursive-lock))
+  (synchronized nil :type boolean))
+
+(defmacro with-target-table-locked ((target-table) &body body)
+  (once-only (target-table)
+    (with-thunk (body)
+      `(if (target-table.synchronized ,target-table)
+           (bt:with-recursive-lock-held ((target-table.lock ,target-table))
+             (funcall ,body))
+           (funcall ,body)))))
 
 (defun target-table-ref (table key)
-  (fset:lookup (target-table.map table) key))
+  (with-target-table-locked (table)
+    (etypecase-of target key
+      (hash-friendly-target
+       (let ((hash (target-table.hash-table table)))
+         (gethash key hash)))
+      (target
+       (fset:lookup (target-table.map table) key)))))
 
 (defun (setf target-table-ref) (value table key)
-  (callf #'fset:with (target-table.map table) key value)
-  value)
+  (prog1 value
+    (with-target-table-locked (table)
+      (etypecase-of target key
+        (hash-friendly-target
+         (let ((hash (target-table.hash-table table)))
+           (setf (gethash key hash) value)))
+        (target
+         (callf #'fset:with (target-table.map table) key value))))))
+
+(defun target-table-rem (table key)
+  (prog1 nil
+    (with-target-table-locked (table)
+      (etypecase-of target key
+        (hash-friendly-target
+         (let ((hash (target-table.hash-table table)))
+           (remhash key hash)))
+        (target
+         (callf #'fset:less (target-table.map table) key))))))
 
 (defun target-table-member (table key)
   (nth-value 1
@@ -917,19 +954,28 @@ E.g. delete a file, unbind a variable."
 (defun (setf target-table-member) (value table key)
   (prog1 value
     (if value
-        (unless (target-table-member table key)
-          (setf (target-table-ref table key) nil))
-        (callf #'fset:less (target-table.map table) key))))
+        (with-target-table-locked (table)
+          (unless (target-table-member table key)
+            (setf (target-table-ref table key) nil)))
+        (target-table-rem table key))))
 
 (defun target-table-keys (table)
-  (collecting
-    (fset:do-map (k v (target-table.map table))
-      (declare (ignore v))
-      (collect k))))
+  (with-target-table-locked (table)
+    (collecting
+      ;; Keys from the hash table.
+      (do-hash-table (k v (target-table.hash-table table))
+        (declare (ignore v))
+        (collect k))
+      ;; Keys from the Fset map.
+      (fset:do-map (k v (target-table.map table))
+        (declare (ignore v))
+        (collect k)))))
 
 (defun clear-target-table (table)
-  (setf (target-table.map table)
-        (fset:empty-map)))
+  (with-target-table-locked (table)
+    (clrhash (target-table.hash-table table))
+    (setf (target-table.map table)
+          (fset:empty-map))))
 
 (defun deduplicate-targets (targets)
   (if (< (length targets) 20)
@@ -1027,7 +1073,7 @@ distributed."
 (define-global-state *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(define-global-state *all-targets* (make-target-table))
+(define-global-state *all-targets* (make-target-table :synchronized t))
 (declaim (type target-table *all-targets*))
 
 (defun list-all-targets ()
@@ -1412,10 +1458,10 @@ TARGET."
       (handler-bind ((dependency #'redo))
         (let ((*already-built*
                 (or (bound-value '*already-built*)
-                    (make-target-table)))
+                    (make-target-table :synchronized t)))
               (*custom-stamps*
                 (or (bound-value '*custom-stamps*)
-                    (make-target-table))))
+                    (make-target-table :synchronized t))))
           (rec target))))))
 
 (defun redo (&optional c)
