@@ -917,7 +917,8 @@ E.g. delete a file, unbind a variable."
 (defun (setf target-table-member) (value table key)
   (prog1 value
     (if value
-        (setf (target-table-ref table key) nil)
+        (unless (target-table-member table key)
+          (setf (target-table-ref table key) nil))
         (callf #'fset:less (target-table.map table) key))))
 
 (defun target-table-keys (table)
@@ -929,6 +930,14 @@ E.g. delete a file, unbind a variable."
 (defun clear-target-table (table)
   (setf (target-table.map table)
         (fset:empty-map)))
+
+(defun deduplicate-targets (targets)
+  (if (< (length targets) 20)
+      (nub targets :test #'target=)
+      (target-table-keys
+       (lret ((table (make-target-table)))
+         (dolist (target targets)
+           (setf (target-table-member table target) t))))))
 
 
 ;;; Building.
@@ -1339,7 +1348,7 @@ TARGET."
   (check-type target target)
   (check-type value (list-of target))
   (setf (prop target init-deps-prop)
-        (nub value :test #'target=)))
+        (deduplicate-targets value)))
 
 (defun call/init-deps (target thunk)
   (let ((*deps*))
@@ -1375,7 +1384,7 @@ TARGET."
                ;; has no dependencies.
                (or (eql timestamp never)
                    (some #'target-changed?
-                         (nub deps :test #'target=))))))
+                         (deduplicate-targets deps))))))
 
        (rec (target)
          (assure stamp
