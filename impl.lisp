@@ -903,12 +903,18 @@ E.g. delete a file, unbind a variable."
 (deftype hash-friendly-target ()
   '(or root-target bindable-symbol pathname))
 
-(defstruct (target-table (:conc-name target-table.))
+(defstruct (target-table (:conc-name target-table.)
+                         (:constructor %make-target-table))
   (map (fset:empty-map) :type fset:map)
   (hash-table (make-hash-table :test 'equal :size 1024)
    :type hash-table)
   (lock (bt:make-recursive-lock))
   (synchronized nil :type boolean))
+
+(defun make-target-table (&key (size 1024) synchronized)
+  (%make-target-table
+   :hash-table (make-hash-table :test 'equal :size size)
+   :synchronized synchronized))
 
 (defmacro with-target-table-locked ((target-table) &body body)
   (once-only (target-table)
@@ -978,12 +984,10 @@ E.g. delete a file, unbind a variable."
           (fset:empty-map))))
 
 (defun deduplicate-targets (targets)
-  (if (< (length targets) 20)
-      (nub targets :test #'target=)
   (if (length< targets 20)
       (remove-duplicates targets :test #'target=)
       (target-table-keys
-       (lret ((table (make-target-table)))
+       (lret ((table (make-target-table :size (length targets))))
          (dolist (target targets)
            (setf (target-table-member table target) t))))))
 
