@@ -980,6 +980,8 @@ E.g. delete a file, unbind a variable."
 (defun deduplicate-targets (targets)
   (if (< (length targets) 20)
       (nub targets :test #'target=)
+  (if (length< targets 20)
+      (remove-duplicates targets :test #'target=)
       (target-table-keys
        (lret ((table (make-target-table)))
          (dolist (target targets)
@@ -2755,7 +2757,7 @@ actually exported by the module specified by LANG and SOURCE."
                   (mapcar (op (import-keyword (first _)))
                           (canonicalize-bindings bindings))))
             ;; Check for duplicated bindings.
-            (unless (set-equal bindings (nub bindings))
+            (unless (set-equal bindings (remove-duplicates bindings))
               (error* "Duplicated bindings."))
             ;; Make sure the bindings match the exports.
             (unless (subsetp bindings exports :test #'string=)
