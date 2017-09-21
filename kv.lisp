@@ -305,7 +305,7 @@ reloaded on demand."
   (kv.del (kv) (prop-key obj prop)))
 
 (defun save-database ()
-  (message "Run complete, saving Overlord database.")
+  (message "Run complete, saving database.")
   (kv.sync (kv)))
 
 (defun compact-database ()
