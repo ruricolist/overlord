@@ -104,8 +104,7 @@
 
 ;;; Definition form tests.
 
-(overlord:defconfig
-    +literal-string-file+ #p"tests/literal.txt")
+(overlord:defconfig +literal-string-file+ #p"tests/literal.txt")
 
 (overlord:defconfig/deps +literal-string+
     (read-file-into-string +literal-string-file+)

@@ -57,7 +57,6 @@
   (:shadow :defconfig :import :now)
   ;; Shadow for style.
   (:shadow
-   :defmacro                            ;Hygienic pathnames.
    :if                                  ;Always ternary.
    :if-let                              ;Ditto.
    :cond                                ;Require exhaustive.
@@ -131,19 +130,6 @@
 
 (deftype pathname ()
   'cl:pathname)
-
-;;; Resolve literal relative pathnames in macro bodies at compile
-;;; time.
-
-(cl:defmacro defmacro (name args &body body)
-  (receive (body decls docstring)
-      (parse-body body :documentation t)
-    `(cl:defmacro ,name ,args
-       ,@(unsplice docstring)
-       ,@decls
-       ;; Expand all literal relative pathnames.
-       (hygienic-pathnames
-        (local ,@body)))))
 
 ;;; Conditionals should always be exhaustive.
 
@@ -1625,6 +1611,7 @@ the current base."
 
 (defun save-base (form)
   `(let ((*base* ,(base)))
+     (setf (current-dir!) (pathname-directory-pathname *base*))
      ,form))
 
 (defmacro defconfig (name init &key (test '#'equal)
@@ -2186,8 +2173,7 @@ if it does not exist."
 
 (defmacro define-loader-language-1 (package-name (source) &body (reader &key extension))
   "The part that gets expanded once PACKAGE-NAME exists."
-  (let* ((reader (hygienic-pathnames reader))
-         (p (find-package package-name))
+  (let* ((p (find-package package-name))
          (syms (mapcar (op (find-symbol (string _) p))
                        (loader-language-exports))))
     (destructuring-bind (load read ext script) syms

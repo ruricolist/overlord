@@ -22,7 +22,6 @@
    :set-package-base
    :base-relative-pathname
    :with-defaults-from-base
-   :hygienic-pathnames
    :infer-system
    :ensure-absolute
    :cd))
@@ -190,10 +189,3 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 
 (defun nearest-asdf-file (file)
   (locate-dominating-file file "*.asd"))
-
-(defun hygienic-pathnames (form &optional (base (base)))
-  (leaf-map (lambda (form)
-              (if (typep form 'relative-pathname)
-                  (merge-pathnames* form base)
-                  form))
-            form))
