@@ -70,8 +70,8 @@
       ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
 
-(defstruct-read-only (simple-module (:conc-name sm.))
-  (thunk :type function))
+(defconstructor simple-module
+  (thunk function))
 
 (defmethod print-object ((self simple-module) stream)
   (print-unreadable-object (self stream :type t)))
@@ -79,16 +79,15 @@
 (def list-exports '%list-exports)
 
 (defmethod module-ref ((sm simple-module) (key symbol))
-  (funcall (sm.thunk sm) key))
+  (funcall (simple-module-thunk sm) key))
 
 (defmethod module-exports ((sm simple-module))
   (module-ref* sm list-exports))
 
 (defmacro simple-module ((&rest exports) &body body)
-  `(make-simple-module
-    :thunk
-    (mlet ,exports
-      ,@body)))
+  `(simple-module
+       (mlet ,exports
+         ,@body)))
 
 (defmacro mlet (exports &body body)
   `(local*

@@ -1073,12 +1073,11 @@ distributed."
           (list-module-cells)
           (target-table-keys *all-targets*)))
 
-(defstruct-read-only (task
-                      (:constructor task (target init deps))
-                      (:conc-name task.))
-  (target :type target)
-  (init :type function)
-  (deps :type function))
+(defconstructor task
+  "A task."
+  (target target)
+  (init function)
+  (deps function))
 
 (defun save-task (target thunk deps)
   (check-not-frozen)
@@ -1197,9 +1196,9 @@ Don't know how to build missing prerequisite ~s."
 
 (defun target-task-values (target &optional (errorp t))
   (let ((task (target-task target errorp)))
-    (values (task.target task)
-            (task.init task)
-            (task.deps task))))
+    (values (task-target task)
+            (task-init task)
+            (task-deps task))))
 
 (define-global-state *always-rebuild* nil
   "Flag to always rebuild.
