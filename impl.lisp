@@ -209,32 +209,29 @@ on Lisp/OS/filesystem combinations that support it."
   (funcall *now-function*))
 
 (deftype target-timestamp ()
+  "Possible formats for the timestamp of a target."
   '(or timestamp
     time-tuple
     universal-time
     never
     far-future))
 
-(declaim (inline file-meta))
-(defstruct-read-only (file-meta
-                      (:conc-name file-meta.)
-                      ;; Ensure a default constructor so the struct can be read.
-                      :constructor
-                      ;; Define the constructor here so it can be
-                      ;; inlined.
-                      (:constructor file-meta
-                          (file &aux (size (file-size-in-octets file))
-                                     (timestamp (target-timestamp file)))))
+(defconstructor file-meta
   "Metadata to track whether a file has changed."
   ;; TODO hash?
-  (size :type (integer 0 *))
-  (timestamp :type target-timestamp))
+  (size (integer 0 *))
+  (timestamp target-timestamp))
+
+(defun get-file-meta (file)
+  (let ((size (file-size-in-octets file))
+        (timestamp (target-timestamp file)))
+    (file-meta size timestamp)))
 
 (defun file-meta= (x y)
   (and (typep x 'file-meta)
        (typep y 'file-meta)
-       (compare #'= #'file-meta.size x y)
-       (compare #'target-timestamp= #'file-meta.timestamp x y)))
+       (compare #'= #'file-meta-size x y)
+       (compare #'target-timestamp= #'file-meta-timestamp x y)))
 
 (defmethod fset:compare ((x file-meta) (y file-meta))
   (if (file-meta= x y)
@@ -1347,7 +1344,7 @@ TARGET."
            (target-timestamp target))
           (pathname
            (cond ((file-exists-p target)
-                  (file-meta target))
+                  (get-file-meta target))
                  ((directory-pathname-p target)
                   (target-timestamp target))
                  (t deleted)))))))
