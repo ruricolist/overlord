@@ -47,7 +47,7 @@ has to see before the other forms.")
 (defvar *depth* 0)
 (declaim (type (integer 0 #.most-positive-fixnum) *depth*))
 
-(defparameter *fasl-version* 13
+(defparameter *fasl-version* 14
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type fasl-version *fasl-version*))
