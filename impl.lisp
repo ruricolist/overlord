@@ -34,7 +34,7 @@
     :overlord/kv)
   (:import-from :fset)
   (:import-from :trivia
-    :match :ematch)
+    :match :ematch :let-match1)
   ;; Portability shim for "global" or "static" vars. They  global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
@@ -392,6 +392,12 @@ on Lisp/OS/filesystem combinations that support it."
               :pattern pattern
               :input file))))
 
+(defconstructor module-spec
+  (lang lang-name)
+  (path absolute-pathname))
+
+(fset:define-cross-type-compare-methods module-spec)
+
 (defclass module-cell ()
   ((timestamp
     :type target-timestamp
@@ -443,6 +449,10 @@ forever."))
                `(module-cell ,val ,path))))
         (t call)))
 
+(defun module-spec-cell (spec)
+  (let-match1 (module-spec lang path) spec
+    (module-cell lang path)))
+
 (defun module-cell-meta (cell key)
   (synchronized (cell)
     (getf (module-cell.meta cell) key)))
@@ -468,27 +478,26 @@ resolved at load time."
     ;; Give the lock a name.
     (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
 
-  (:method print-object (self stream)
-    (if *print-escape*
-        (format stream "#.~s"
-                (make-load-form self))
-        (print-unreadable-object (self stream :type t)
-          (format stream "~a (~a) (~:[not loaded~;loaded~])"
-                  source
-                  lang
-                  module))))
-
   (:method module-ref (self name)
     (module-ref* module name))
 
   (:method module-exports (self)
     (module-exports module))
 
+  ;; NB When you print a module cell readably, or generate a load
+  ;; form, what you get is not a module cell but a module spec.
+
+  (:method print-object (self stream)
+    (if *print-escape*
+        (print-object (module-spec lang source) stream)
+        (print-unreadable-object (self stream :type t)
+          (format stream "~a (~a) (~:[not loaded~;loaded~])"
+                  source
+                  lang
+                  module))))
+
   (:method make-load-form (self &optional env)
-    (declare (ignore env))
-    `(module-cell ,lang
-                  ,(assure absolute-pathname
-                     source))))
+    (make-load-form (module-spec lang source) env)))
 
 (defun load-module-into-cell (cell)
   (lret ((module
@@ -542,6 +551,7 @@ it."
     package-ref
     directory-ref
     pattern-ref
+    module-spec
     module-cell))
 
 (defvar-unbound *target*
@@ -583,6 +593,8 @@ it."
      (~> target
          pattern-ref.output
          pathname-exists?))
+    (module-spec
+     (target-exists? (module-spec-cell target)))
     (module-cell (module-cell.module target))))
 
 (defun target-timestamp (target)
@@ -612,6 +624,8 @@ it."
        (if (pathname-exists? output)
            (file-mtime output)
            never)))
+    (module-spec
+     (target-timestamp (module-spec-cell target)))
     (module-cell
      (with-slots (module timestamp) target
        (if (null module) never timestamp)))))
@@ -641,6 +655,9 @@ it."
     ((or pattern-ref package-ref)
      ;; TODO Or does it?
      (error* "Setting the timestamp of ~s does not make sense."))
+    (module-spec
+     (let ((cell (module-spec-cell target)))
+       (setf (target-timestamp cell) timestamp)))
     (module-cell
      (setf (module-cell.timestamp target) timestamp))))
 
@@ -663,6 +680,8 @@ E.g. delete a file, unbind a variable."
      (delete-file-or-directory (pattern-ref.output target)))
     (directory-ref
      (delete-directory-tree (ref.name target)))
+    (module-spec
+     (unbuild (module-spec-cell target)))
     (module-cell
      (with-slots (lang source) target
        (clear-module-cell lang source)
@@ -692,6 +711,8 @@ E.g. delete a file, unbind a variable."
       ;; Could this be wild?
       (assure tame-pathname
         (merge-pathnames* (ref.name target) base))))
+    (module-spec
+     (resolve-target (module-spec-cell target) base))
     (module-cell
      (with-slots (lang source) target
        (module-cell lang
@@ -830,6 +851,7 @@ E.g. delete a file, unbind a variable."
     (root-target 'root-target)
     (bindable-symbol 'bindable-symbol)
     (pathname 'pathname)
+    (module-spec 'module-spec)
     (module-cell 'module-cell)
     (package-ref 'package-ref)
     (directory-ref 'directory-ref)
@@ -845,6 +867,12 @@ E.g. delete a file, unbind a variable."
              (root-target t)            ;There's only one.
              (bindable-symbol (eql x y))
              (pathname (pathname-equal x y))
+             (module-spec
+              (nest
+               (let-match1 (module-spec lang1 path1) x)
+               (let-match1 (module-spec lang2 path2) y)
+               (and (eql lang1 lang2)
+                    (pathname-equal path1 path2))))
              (module-cell (eql x y))
              (package-ref
               (compare #'string= #'ref.name x y))
@@ -865,6 +893,9 @@ E.g. delete a file, unbind a variable."
      (load-time-value (sxhash *root-target*)))
     (bindable-symbol (sxhash target))
     (pathname (sxhash target))
+    (module-spec
+     (let-match1 (module-spec lang path) target
+       (dx-sxhash (list 'module-spec lang path))))
     (module-cell
      (dx-sxhash
       (list 'module-cell
@@ -1083,7 +1114,7 @@ distributed."
     ((or bindable-symbol pathname)
      (let ((task (task target thunk deps)))
        (setf (gethash target *tasks*) task)))
-    (module-cell)
+    ((or module-spec module-cell))
     ((or directory-ref package-ref pattern-ref)
      (setf (target-table-member *all-targets* target) t)
      (values))))
@@ -1094,7 +1125,7 @@ distributed."
     ((or bindable-symbol pathname)
      (unsave-stamp target)
      (remhash target *tasks*))
-    ((or directory-ref package-ref pattern-ref module-cell)
+    ((or directory-ref package-ref pattern-ref module-cell module-spec)
      (unsave-stamp target)
      (setf (target-table-member *all-targets* target) nil))))
 
@@ -1144,6 +1175,8 @@ distributed."
                  (let ((*base* (pathname-directory-pathname input)))
                    (depends-on input))
                  (pattern-depend pattern))))))
+    (module-spec
+     (find-saved-task (module-spec-cell target)))
     (module-cell
      (with-slots (lang source) target
        (task target
@@ -1272,15 +1305,18 @@ building from there."
            `(build ,(dump-target/pretty target))))
 
 (defun dump-target/pretty (target)
-  "Return a form which, when evaluated, returns a target identical to
+  "Return a form which, when evaluated, returns a target equivalent to
 TARGET."
   (etypecase-of target target
     (pathname target)
     (bindable-symbol `(quote ,target))
     (root-target 'root-target)
+    (module-spec
+     (let-match1 (module-spec lang path) target
+       `(module-spec ,lang ,path)))
     (module-cell
      (with-slots (lang source) target
-       `(find-module ,lang ,source)))
+       (dump-target/pretty (module-spec lang source))))
     (directory-ref
      `(directory-ref ,(ref.name target)))
     (package-ref
@@ -1340,6 +1376,7 @@ TARGET."
                pattern-ref
                ;; TODO?
                directory-ref
+               module-spec
                module-cell)
            (target-timestamp target))
           (pathname
@@ -1502,7 +1539,7 @@ If any of DEPS is a list, it will be descended into."
   (map nil #'depends-on/1 deps)
   (values))
 
-(defun call/temp-file (dest fn)
+(defun call/temp-file-pathname (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
 safely, overwrite DEST with the contents of the temporary file."
   (let* ((ok nil)
@@ -1576,7 +1613,7 @@ value and NEW do not match under TEST."
               (:pattern (name input)
                 `(pattern-ref ,name ,input))
               (:module (lang source)
-                `(module-cell ',lang ,source))
+                `(module-spec ',lang ,source))
               (:extension (ext)
                 `(extension ,ext))
               (:run (cmd &rest args)
@@ -1756,9 +1793,9 @@ rebuilt."
                                   ;; No temp file needed.
                                   init
                                   ;; Write to a temp file and rename.
-                                  `(call/temp-file ,pathname
-                                                   (lambda (,tmp)
-                                                     ,init)))
+                                  `(call/temp-file-pathname ,pathname
+                                                            (lambda (,tmp)
+                                                              ,init)))
                              (assert (file-exists-p ,pathname)))
                            (deps-thunk
                              (setf (current-dir!) ,dir)
@@ -1901,13 +1938,15 @@ depends on that."
 
 (defun dynamic-require-as (lang source &key force)
   (check-type source (and absolute-pathname file-pathname))
-  (setf lang (or lang (guess-lang+pos source)))
+  (ensure lang (guess-lang+pos source))
+  (setf lang (lang-name lang))
   (when force
     (dynamic-unrequire-as lang source))
   (assure (not module-cell)
-    (let ((mc (module-cell lang source)))
-      (build mc)
-      (module-cell.module mc))))
+    (let ((spec (module-spec lang source)))
+      (build spec)
+      (let ((cell (module-spec-cell spec)))
+        (module-cell.module cell)))))
 
 (defun %unrequire-as (lang source *base*)
   (with-defaults-from-base
@@ -2194,7 +2233,7 @@ if it does not exist."
       (recompile-object-file ()
         :report "Recompile the object file."
         (delete-file-if-exists object-file)
-        (build (module-cell lang source))
+        (build (module-spec lang source))
         (load-fasl-lang lang source)))))
 
 (defmethod lang-deps ((lang package) (source cl:pathname))
@@ -2736,7 +2775,7 @@ actually exported by the module specified by LANG and SOURCE."
       (setf source (merge-pathnames* source (base))))
     (restart-case
         (progn
-          (build (module-cell lang source))
+          (build (module-spec lang source))
           (let ((exports
                   (module-static-exports lang source))
                 (bindings
@@ -2753,7 +2792,7 @@ actually exported by the module specified by LANG and SOURCE."
       (recompile-object-file ()
         :report "Recompile the object file."
         (let ((object-file (faslize lang source))
-              (target (module-cell lang source)))
+              (target (module-spec lang source)))
           (delete-file-if-exists object-file)
           (build target)
           (check-static-bindings lang source bindings))))))
@@ -2769,7 +2808,7 @@ actually exported by the module specified by LANG and SOURCE."
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
-  (save-dependency (module-cell as from))
+  (save-dependency (module-spec as from))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias
