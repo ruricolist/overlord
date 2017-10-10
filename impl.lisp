@@ -927,9 +927,9 @@ E.g. delete a file, unbind a variable."
                          (:constructor %make-target-table))
   (map (fset:empty-map) :type fset:map)
   (hash-table (make-hash-table :test 'equal :size 1024)
-   :type hash-table)
-  (lock (bt:make-recursive-lock))
-  (synchronized nil :type boolean))
+   :type hash-table :read-only t)
+  (lock (bt:make-recursive-lock) :read-only t)
+  (synchronized nil :type boolean :read-only t))
 
 (defun make-target-table (&key (size 1024) synchronized)
   (%make-target-table
