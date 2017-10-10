@@ -65,6 +65,7 @@
    :typecase                            ;Use typecase-of instead.
    :etypecase                           ;Use etypecase-of instead.
    :ctypecase                           ;Use ctypecase-of instead.
+   :case :ecase :ccase
    :file-write-date                     ;Use file-mtime instead.
    :pathname                            ;Use ensure-pathname.
    :multiple-value-bind                 ;Use receive.
