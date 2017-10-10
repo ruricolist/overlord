@@ -861,27 +861,33 @@ E.g. delete a file, unbind a variable."
 
 (defun target= (x y)
   "Are two targets the same?"
-  (or (eql x y)
-      (and (compare #'type= #'target-type-of x y)
-           (etypecase-of target x
-             (root-target t)            ;There's only one.
-             (bindable-symbol (eql x y))
-             (pathname (pathname-equal x y))
-             (module-spec
-              (nest
-               (let-match1 (module-spec lang1 path1) x)
-               (let-match1 (module-spec lang2 path2) y)
-               (and (eql lang1 lang2)
-                    (pathname-equal path1 path2))))
-             (module-cell (eql x y))
-             (package-ref
-              (compare #'string= #'ref.name x y))
-             (directory-ref
-              (compare #'pathname-equal #'ref.name x y))
-             (pattern-ref
-              (and (compare #'equal #'pattern-ref.input    x y)
-                   (compare #'eql   #'pattern-ref.pattern  x y)
-                   (compare #'equal #'pattern-ref.output   x y)))))))
+  (when (eql x y)
+    (return-from target= t))
+  (dispatch-case ((x target) (y target))
+    ((root-target root-target)
+     ;; There's only one.
+     t)
+    ((bindable-symbol bindable-symbol)
+     (eql x y))
+    ((pathname pathname)
+     (pathname-equal x y))
+    ((module-spec module-spec)
+     (nest
+      (let-match1 (module-spec lang1 path1) x)
+      (let-match1 (module-spec lang2 path2) y)
+      (and (eql lang1 lang2)
+           (pathname-equal path1 path2))))
+    ((module-cell module-cell)
+     (eql x y))
+    ((package-ref package-ref)
+     (compare #'string= #'ref.name x y))
+    ((directory-ref directory-ref)
+     (compare #'pathname-equal #'ref.name x y))
+    ((pattern-ref pattern-ref)
+     (and (compare #'equal #'pattern-ref.input    x y)
+          (compare #'eql   #'pattern-ref.pattern  x y)
+          (compare #'equal #'pattern-ref.output   x y)))
+    ((target target) nil)))
 
 (defun hash-target (target)
   (declare (optimize (speed 3)
@@ -1651,9 +1657,9 @@ the current base."
                                     documentation)
   (let ((init
           (save-base
-            `(with-defaults-from-base
-               (with-keyword-macros
-                 ,init)))))
+           `(with-defaults-from-base
+              (with-keyword-macros
+                ,init)))))
     `(progn
        (eval-always
          (define-global-var ,name
@@ -1673,16 +1679,16 @@ the current base."
 (defmacro deps-thunk (&body body)
   `(lambda ()
      ,(save-base
-        `(with-defaults-from-base
-           (with-keyword-macros
-             ,@body)))))
+       `(with-defaults-from-base
+          (with-keyword-macros
+            ,@body)))))
 
 (defmacro init-thunk (&body body)
   `(lambda ()
      ,(save-base
-        `(with-defaults-from-base
-           (with-keyword-macros
-             ,@body)))))
+       `(with-defaults-from-base
+          (with-keyword-macros
+            ,@body)))))
 
 (defmacro define-script (name expr)
   `(defconfig ,name ',expr
@@ -2537,7 +2543,7 @@ the #lang declaration ends."
          (*package* user-package)
          (forms (funcall fn path stream)))
     `(module-progn-in ,(package-name-keyword package)
-                      ,@forms)))
+       ,@forms)))
 
 
 ;;; Imports.
