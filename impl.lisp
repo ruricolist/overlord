@@ -1003,13 +1003,16 @@ E.g. delete a file, unbind a variable."
     (setf (target-table.map table)
           (fset:empty-map))))
 
+(defun deduplicate-targets/table (targets)
+  (target-table-keys
+   (lret ((table (make-target-table :size (length targets))))
+     (dolist (target targets)
+       (setf (target-table-member table target) t)))))
+
 (defun deduplicate-targets (targets)
   (if (length< targets 20)
       (remove-duplicates targets :test #'target=)
-      (target-table-keys
-       (lret ((table (make-target-table :size (length targets))))
-         (dolist (target targets)
-           (setf (target-table-member table target) t))))))
+      (deduplicate-targets/table targets)))
 
 
 ;;; Building.
