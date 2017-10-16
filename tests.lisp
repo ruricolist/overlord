@@ -22,6 +22,7 @@
 (overlord:set-package-base (asdf:system-relative-pathname :overlord ""))
 
 (defun nap (&optional (n 1))
+  "Sleep until the universal time counter ticks over."
   (loop with start = (get-universal-time)
         until (< start (get-universal-time))
         do (sleep n)))
