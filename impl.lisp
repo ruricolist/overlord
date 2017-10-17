@@ -983,7 +983,7 @@ E.g. delete a file, unbind a variable."
     (if value
         (with-target-table-locked (table)
           (unless (target-table-member table key)
-            (setf (target-table-ref table key) nil)))
+            (setf (target-table-ref table key) t)))
         (target-table-rem table key))))
 
 (defun target-table-keys (table)
@@ -1259,6 +1259,7 @@ Possibly useful for testing.")
             (build-task target thunk deps))
           (build root-target)))))
 
+
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
     (and system
@@ -1378,23 +1379,22 @@ TARGET."
 
 (defun target-stamp (target)
   (assure stamp
-    (or (custom-stamp target)
-        (etypecase-of target target
-          ((or root-target
-               bindable-symbol
-               package-ref
-               pattern-ref
-               ;; TODO?
-               directory-ref
-               module-spec
-               module-cell)
-           (target-timestamp target))
-          (pathname
-           (cond ((file-exists-p target)
-                  (get-file-meta target))
-                 ((directory-pathname-p target)
-                  (target-timestamp target))
-                 (t deleted)))))))
+    (etypecase-of target target
+      ((or root-target
+           bindable-symbol
+           package-ref
+           pattern-ref
+           ;; TODO?
+           directory-ref
+           module-spec
+           module-cell)
+       (target-timestamp target))
+      (pathname
+       (cond ((file-exists-p target)
+              (get-file-meta target))
+             ((directory-pathname-p target)
+              (target-timestamp target))
+             (t deleted))))))
 
 (defconst stamp-prop :stamp)
 
@@ -1421,7 +1421,6 @@ TARGET."
 
 (defun init-deps (target)
   (check-type target target)
-
   (assure list
     (prop target init-deps-prop)))
 
@@ -1437,11 +1436,127 @@ TARGET."
         (handler-bind ((dependency #'redo))
           (funcall thunk))
       (setf (init-deps target)
-            (reverse *deps*)))))
+            (deduplicate-targets
+             (reverse *deps*))))))
 
 (defmacro with-init-deps-saved ((target) &body body)
   (with-thunk (body)
     `(call/init-deps ,target ,body)))
+
+(defconst saved-prereqs :saved-prereqs)
+
+(defplace saved-prereqs (target)
+  (prop target saved-prepreqs))
+
+(defconst saved-prereqsnonexist :saved-prereqsnonexist)
+
+(defplace saved-prereqsnonexist (target)
+  (prop target saved-prereqsnonexist))
+
+(defplace nonexist (target)
+  (prop target :nonexist))
+
+(defun target-script (target)
+  (task-init (target-task target)))
+
+(defun redo-ifchange (&rest args)
+  (tagbody
+     (dolist (i args)
+       ;; Part 2. Is this a source or a target?
+
+       ;; "If there is no record of whether a file is a source or target,
+       ;; we check if the file exists: if it does, we assume it is a
+       ;; source file; if not we assume it is a target."
+       (unless (has-prop? i :type)
+         (setf (prop i :type)
+               (if (target-exists? target)
+                   :source
+                   :target)))
+       ;; "Finally, if there is already an `uptodate' entry for this
+       ;; target in the database, we can assume this target has already
+       ;; been built and stop building."
+       (when (has-prop? i :uptodate)
+         (record-regular-prerequisite i *parent*)
+         (go :continue))
+       ;; Part 3. This is a source file. We only need to determine if the
+       ;; file is up to date.
+       (when (eql type :source)
+         (fbind ((current-stamp (once #'target-stamp)))
+           (if (and (has-prop? i :stamp)
+                    (stamp= (prop i :stamp)
+                            (current-stamp)))
+               (setf (prop i :uptodate) t)
+               (progn
+                 (setf (prop i :uptodate) nil)
+                 (when (has-prop i :nonexist)
+                   (delete-prop i :nonexist))))
+           (setf (prop i :stamp)
+                 (current-stamp)))
+         (record-regular-prerequisite i *parent*)
+         (go :continue))
+       ;; Part 4. We know the file is a target file.
+       (when (has-prop? i :prereqs)
+         (setf (prop i :uptodate) t)
+         (dolist (j (prop i :prereqs))
+           (unless (has-prop? j :uptodate)
+             (let ((*parent* i))
+               (redo-ifchange j))
+             (unless (prop j :uptodate)
+               (setf (prop i :uptodate) nil)))))
+       (when (has-prop? i :prereqsnonexist)
+         (dolist (j (prop i :prereqsnonexist))
+           (when (target-exists? j)
+             (setf (prop i :uptodate) nil))))
+       (when (prop i :uptodate)
+         (go :break))
+       (let (buildfile)
+         ;; Part 5. We know the file is out of date and must be rebuilt.
+         (let ((i.do (target-build-script-target i)))
+           (if (target-exists? i.do)
+               (let ((*parent* i))
+                 (redo-ifchange i.do)
+                 (setf buildfile i.do))
+               (let ((default (target-default-build-script i)))
+                 (if (target-exists? default)
+                     (let ((*parent* i))
+                       (redo-ifchange default)
+                       (redo-ifcreate default)
+                       (setf buildfile default))
+                     (error "No build script for ~a." target)))))
+         ;; Part 6. Execute the build script.
+         (run-script buildfile)
+         (let ((current-stamp (target-stamp i)))
+           (when (and (has-prop? target :stamp)
+                      (stamp= (prop target :stamp)
+                              current-stamp))
+             (setf (prop i :uptodate) t))
+           (setf (prop i :stamp) current-stamp)))
+       :continue)
+   :break))
+
+;;; Top-level redo* has no "current target".
+(defun redo* (target)
+  (handler-bind ((dependency
+                   (lambda (c)
+                     (redo-ifchange* (dependency-target c)))))
+    (funcall (target-script *target*))))
+
+(defun redo-ifchange* (target &aux (*target* target))
+  (when (target-exists? target)
+    (multiple-value-bind (deps has-deps?)
+        (target-deps target)
+      (when has-deps?
+        (when (every #'up-to-date? dependencies)
+          (return-from redo-ifchange* nil)))))
+  (let ((*deps*))
+    (handler-bind ((dependency
+                     (lambda (c)
+                       (redo-ifchange* (dependency-target c)))))
+      (funcall (target-script *target*))
+      (setf (target-deps target) *deps*)
+      t)))
+
+(defun redo-ifcreate* (target))
 
 (defun build-recursively (target &aux (force *always-rebuild*))
   (check-not-frozen)
@@ -1449,7 +1564,7 @@ TARGET."
       ((deps-list (target deps-thunk)
          (let ((*deps* (init-deps target)))
            (funcall deps-thunk)
-           (reverse *deps*)))
+           (reverse (deduplicate-targets *deps*))))
 
        (never-been-built? (target)
          (not (target-exists? target)))
@@ -1464,8 +1579,7 @@ TARGET."
                ;; Just because it's never been built doesn't mean it
                ;; has no dependencies.
                (or (eql timestamp never)
-                   (some #'target-changed?
-                         (deduplicate-targets deps))))))
+                   (some #'target-changed? deps)))))
 
        (rec (target)
          (assure stamp
@@ -1513,6 +1627,7 @@ TARGET."
   ((target :initarg :target
            ;; Nothing can depend on the root target.
            :type (and target (not root-target))
+           :reader dependency-target
            :reader overlord-error-target)))
 
 (defun depends-on/1 (target)
