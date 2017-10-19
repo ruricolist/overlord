@@ -202,7 +202,7 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defun redo-ifchange (&rest args)
   (check-parent)
-  (dolist (i args)
+  (do-each (i (reshuffle args))
     ;; "Finally, if there is already an `uptodate' entry for this
     ;; target in the database, we can assume this target has already
     ;; been built and stop building."
@@ -245,7 +245,7 @@ on Lisp/OS/filesystem combinations that support it."
           (target-saved-prereqs i)
         (when prereqs?
           (setf uptodate t)
-          (do-each (j prereqs)
+          (do-each (j (reshuffle prereqs))
             (unless (nth-value 1 (target-up-to-date? j))
               (let ((*parent* i))
                 (redo-ifchange j)))
@@ -285,7 +285,7 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defun redo-ifcreate (&rest targets)
   (check-parent)
-  (dolist (i targets)
+  (do-each (i (reshuffle targets))
     (when (target-exists? i)
       (error* "~a already exists" i))
     (delete-prop i stamp)
