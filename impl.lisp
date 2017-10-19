@@ -1459,80 +1459,89 @@ TARGET."
 (defun target-script (target)
   (task-init (target-task target)))
 
-(defun redo-ifchange (&rest args)
-  (tagbody
-     (dolist (i args)
-       ;; Part 2. Is this a source or a target?
+(defvar *parent*)
 
-       ;; "If there is no record of whether a file is a source or target,
-       ;; we check if the file exists: if it does, we assume it is a
-       ;; source file; if not we assume it is a target."
-       (unless (has-prop? i :type)
-         (setf (prop i :type)
-               (if (target-exists? target)
-                   :source
-                   :target)))
-       ;; "Finally, if there is already an `uptodate' entry for this
-       ;; target in the database, we can assume this target has already
-       ;; been built and stop building."
-       (when (has-prop? i :uptodate)
-         (record-regular-prerequisite i *parent*)
-         (go :continue))
-       ;; Part 3. This is a source file. We only need to determine if the
-       ;; file is up to date.
-       (when (eql type :source)
-         (fbind ((current-stamp (once #'target-stamp)))
-           (if (and (has-prop? i :stamp)
-                    (stamp= (prop i :stamp)
-                            (current-stamp)))
-               (setf (prop i :uptodate) t)
-               (progn
-                 (setf (prop i :uptodate) nil)
-                 (when (has-prop i :nonexist)
-                   (delete-prop i :nonexist))))
-           (setf (prop i :stamp)
-                 (current-stamp)))
-         (record-regular-prerequisite i *parent*)
-         (go :continue))
-       ;; Part 4. We know the file is a target file.
-       (when (has-prop? i :prereqs)
-         (setf (prop i :uptodate) t)
-         (dolist (j (prop i :prereqs))
-           (unless (has-prop? j :uptodate)
-             (let ((*parent* i))
-               (redo-ifchange j))
-             (unless (prop j :uptodate)
-               (setf (prop i :uptodate) nil)))))
-       (when (has-prop? i :prereqsnonexist)
-         (dolist (j (prop i :prereqsnonexist))
-           (when (target-exists? j)
-             (setf (prop i :uptodate) nil))))
-       (when (prop i :uptodate)
-         (go :break))
-       (let (buildfile)
-         ;; Part 5. We know the file is out of date and must be rebuilt.
-         (let ((i.do (target-build-script-target i)))
-           (if (target-exists? i.do)
-               (let ((*parent* i))
-                 (redo-ifchange i.do)
-                 (setf buildfile i.do))
-               (let ((default (target-default-build-script i)))
-                 (if (target-exists? default)
-                     (let ((*parent* i))
-                       (redo-ifchange default)
-                       (redo-ifcreate default)
-                       (setf buildfile default))
-                     (error "No build script for ~a." target)))))
-         ;; Part 6. Execute the build script.
-         (run-script buildfile)
-         (let ((current-stamp (target-stamp i)))
-           (when (and (has-prop? target :stamp)
-                      (stamp= (prop target :stamp)
-                              current-stamp))
-             (setf (prop i :uptodate) t))
-           (setf (prop i :stamp) current-stamp)))
-       :continue)
-   :break))
+(defun redo-ifchange (&rest args)
+  (dolist (i args)
+    ;; "Finally, if there is already an `uptodate' entry for this
+    ;; target in the database, we can assume this target has already
+    ;; been built and stop building."
+    (when (has-prop? i :uptodate)
+      (record-prereq i)
+      (go :continue))
+    ;; Part 2. Is this a source or a target?
+
+    ;; "If there is no record of whether a file is a source or target,
+    ;; we check if the file exists: if it does, we assume it is a
+    ;; source file; if not we assume it is a target."
+
+    ;; Semantically, we only have to check whether the file is present
+    ;; in the database; if it is, it's a target file; if it's not,
+    ;; it's a source file. But: the database is not set up that way;
+    ;; it's not hierachical.
+    (let ((type
+            (if (has-prop? i :type)
+                (prop i :type)
+                (setf (prop i :type)
+                      (if (target-exists? i)
+                          :source
+                          :target))))
+          (uptodate nil))
+      ;; Part 3. This is a source file. We only need to determine if the
+      ;; file is up to date.
+      (when (eql type :source)
+        (when (target-exists? i)
+          (let ((new-stamp (target-stamp i)))
+            (when (has-prop? i :stamp)
+              (let ((old-stamp (prop i :stamp)))
+                (when (stamp= new-stamp old-stamp)
+                  (setf uptodate t)))))
+          (when (has-prop? i :nonexist)
+            (delete-prop i :nonexist))
+          (setf (prop i :uptodate) uptodate)
+          (record-prereq i))
+        (go :continue))
+      ;; Part 4. We know the file is a target file.
+      (when (has-prop? i :prereqs)
+        (setf uptodate t)
+        (dolist (j (prop i :prereqs))
+          (unless (has-prop? j :uptodate)
+            (let ((*parent* i))
+              (redo-ifchange j)))
+          (if (has-prop? j :uptodate)
+              (unless (prop j :uptodate)
+                (setf uptodate nil)
+                (return))
+              (error "~a has no ~s property"
+                     j :uptodate))))
+      (when (has-prop? i :prereqsne)
+        (dolist (j (prop i :prereqsne))
+          (when (target-exists? j)
+            (setf uptodate nil))))
+      ;; Part 5. We know the file is out of date and must be rebuilt.
+      (unless uptodate
+        (delete-prop i :prereqs)
+        (delete-prop i :prereqsne)
+        ;; Patterns are their own kind of target, so we don't have to
+        ;; worry about dealing with them here.
+        (let ((buildfile (target-build-script-target i)))
+          (let ((*parent* i))
+            (redo-ifchange buildfile)
+            (run-script buildfile)))
+        ;; Since we have exceptions, we don't have to worry about the
+        ;; result.
+        (let ((new-stamp (target-stamp i)))
+          (when (has-prop? i :stamp)
+            (let ((old-stamp (prop i :stamp)))
+              (if (stamp= new-stamp old-stamp)
+                  (setf uptodate t)
+                  (setf (prop i :stamp) new-stamp)))))
+        (message "Rebuilt ~a" i)))
+    :continue))
+
+(defun record-prereq (target &optional (parent *parent*))
+  (pushnew target (prop parent :prereqs) :test #'target=))
+
 
 ;;; Top-level redo* has no "current target".
 (defun redo* (target)
