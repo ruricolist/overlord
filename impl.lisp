@@ -180,117 +180,85 @@ on Lisp/OS/filesystem combinations that support it."
 
 ;;; The logic of redo.
 
-(defvar *parent*)
 (defconst source    :source)
 (defconst target    :target)
 (defconst nonexist  :nonexist)
 (defconst prereqs   :prereqs)
 (defconst prereqsne :prereqsne)
 (defconst stamp     :stamp)
+(defconst uptodate  :uptodate)
 (defconst it 'it)
 
-;; (declaim (type target-table *uptodate*))
-(defvar *uptodate*)
+;; (declaim (type target *parent*))
+(defvar *parent*)
 
-(defun redo ()
-  ;; (ensure-db)
-  ;; (clear-uptodate)
-  ;; (clear-preqreqs)
-  ;; (clear-preqreqsne)
-  (let ((*uptodate* (make-target-table)))
-    (redo-ifchange it)))
-
-(defun redo-ifchange (&rest args)
-  (check-parent)
+;;; The only thing special about redo-ifchange is that it writes out
+;;; hashes for its deps.
+(defun redo (&rest args)
   (do-each (i (reshuffle args))
-    ;; "Finally, if there is already an `uptodate' entry for this
-    ;; target in the database, we can assume this target has already
-    ;; been built and stop building."
-    (when (nth-value 1 (target-up-to-date? i))
-      (record-prereq i)
-      (go :continue))
-    ;; Part 2. Is this a source or a target?
+    (unless (eql source (target-type i))
+      (let ((buildfile
+              ;; TODO What directory should be current? Or should the script take care of that?
+              (let ((script-target (target-build-script-target i)))
+                (if (target-exists? script-target)
+                    (prog1 script-target
+                      (let ((*parent* i))
+                        (redo-ifchange script-target)))
+                    (let ((default (target-default-build-script-target i)))
+                      (if (target-exists? default)
+                          (prog1 default
+                            (let ((*parent* i))
+                              (redo-ifchange default)
+                              (redo-ifcreate script-target)))
+                          (error* "No script found for ~a" i)))))))
+        (delete-prop i uptodate)
+        (let ((*parent* i))
+          (run-script buildfile)))
+      (setf (prop target uptodate) t))))
 
-    ;; "If there is no record of whether a file is a source or target,
-    ;; we check if the file exists: if it does, we assume it is a
-    ;; source file; if not we assume it is a target."
+(defun changed? (target)
+  (let ((result nil))
+    ;; This can't be an or, since we have to check (and possibly
+    ;; rebuild in turn) each target.
+    (unless (target-exists? target)
+      (setf result t))
+    ;; Check regular prerequisites.
+    (let ((outdated '()))
+      (do-each (req (reshuffle (prop target prereqs)))
+        (destructuring-bind (req . stamp) req
+          (declare (ignore stamp))
+          (when (changed? req)
+            (push req outdated))))
+      (when outdated
+        ;; XXX redo $outdated || result=0
+        (apply #'redo outdated))
+      ;; XXX?
+      (do-each (req (prop target (prop target prereqs)))
+        (destructuring-bind (req stamp) req
+          (unless (stamp= stamp (target-stamp req))
+            (setf result t)
+            (return)))))
+    ;; Check non-existent prereqs.
+    (when (has-prop? target prereqsne)
+      (do-each (ne (prop target prereqsne))
+        (when (target-exists? ne)
+          (setf result t))))
+    result))
 
-    ;; Semantically, we only have to check whether the file is present
-    ;; in the database; if it is, it's a target file; if it's not,
-    ;; it's a source file. But: the database is not set up that way;
-    ;; it's not hierachical.
-    (let ((type
-            (ensure2 (target-saved-type i)
-              (if (target-exists? i) source target)))
-          (uptodate nil))
-      ;; Part 3. This is a source file. We only need to determine if the
-      ;; file is up to date.
-      (when (eql type source)
-        ;; Check stamp.
-        (when (target-exists? i)
-          (let ((new-stamp (target-stamp i)))
-            (receive (old-stamp saved?) (target-saved-stamp i)
-              (if saved?
-                  (when (stamp= new-stamp old-stamp)
-                    (setf uptodate t))
-                  (when (has-prop? i nonexist)
-                    (delete-prop i nonexist))))
-            (setf (target-saved-stamp i) new-stamp)))
-        (setf (target-up-to-date? i) uptodate)
-        (record-prereq i)
-        (go :continue))
-      ;; Part 4. We know the file is a target file.
-      ;; Check regular prereqs.
-      (receive (prereqs prereqs?)
-          (target-saved-prereqs i)
-        (when prereqs?
-          (setf uptodate t)
-          (do-each (j (reshuffle prereqs))
-            (unless (nth-value 1 (target-up-to-date? j))
-              (let ((*parent* i))
-                (redo-ifchange j)))
-            (if (nth-value 1 (target-up-to-date? j))
-                (unless (target-up-to-date? j)
-                  (setf uptodate nil)
-                  (return))
-                (error* "Cannot tell if ~a is up to date." j)))))
-      ;; Check nonexistent prereqs.
-      (receive (prereqsne prereqsne?)
-          (target-saved-prereqsne i)
-        (when prereqsne?
-          (do-each (j prereqsne)
-            (when (target-exists? j)
-              (setf uptodate nil)))))
-      ;; Part 5. We know the file is out of date and must be rebuilt.
-      (unless uptodate
-        (delete-prop i prereqs)
-        (delete-prop i prereqsne)
-        ;; Patterns are their own kind of target, so we don't have to
-        ;; worry about dealing with them here.
-        (let ((buildfile (target-build-script-target i)))
-          (let ((*parent* i))
-            (redo-ifchange buildfile)
-            (run-script buildfile)))
-        ;; Since we have exceptions, we don't have to worry about the
-        ;; return code.
-        (let ((new-stamp (target-stamp i)))
-          (receive (old-stamp saved?)
-              (target-saved-stamp i)
-            (when saved?
-              (if (stamp= new-stamp old-stamp)
-                  (setf uptodate t)
-                  (setf (target-saved-stamp i) new-stamp)))))
-        (message "Rebuilt ~a" i)))
-    :continue))
+(defun redo-ifchange (args)
+  (do-each (i (reshuffle args))
+    (when (changed? i)
+      (redo i))
+    (record-prereq i)))
 
 (defun redo-ifcreate (&rest targets)
   (check-parent)
   (do-each (i (reshuffle targets))
     (when (target-exists? i)
       (error* "~a already exists" i))
-    (delete-prop i stamp)
-    (setf (prop i nonexist) t)
-    (pushnew target (prop *parent* prereqsne) :test #'target=)))
+    ;; (delete-prop i stamp)
+    ;; (setf (prop i nonexist) t)
+    (record-prereqne i)))
 
 
 ;;; Auxiliary functions.
@@ -300,13 +268,26 @@ on Lisp/OS/filesystem combinations that support it."
     (error* "No parent.")))
 
 (defun record-prereq (target &optional (parent *parent*))
-  (pushnew target (prop parent :prereqs) :test #'target=))
+  (when parent
+    (pushnew (cons target (target-stamp target))
+             (prop parent prereqs)
+             :test (op (target= (car _) (car _))))))
+
+(defun record-prereqne (target &optional (parent *parent*))
+  (when parent
+    (pushnew target (prop parent prereqsne) :test #'target=)))
+
+(defun target-kind (target)
+  (if (nor (target-exists? target)
+           (has-prop? target
+                      uptodate
+                      prereqs
+                      prereqsne))
+      source
+      target))
 
 (defplace target-up-to-date? (target)
   (target-table-ref *uptodate* target))
-
-(defplace target-saved-type (target)
-  (prop target :type))
 
 (defplace target-saved-stamp (target)
   (prop target :stamp))
