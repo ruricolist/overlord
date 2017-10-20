@@ -195,26 +195,27 @@ on Lisp/OS/filesystem combinations that support it."
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; hashes for its deps.
 (defun redo (&rest args)
-  (do-each (i (reshuffle args))
-    (unless (eql source (target-type i))
-      (let ((buildfile
+  (do-each (target (reshuffle args))
+    (unless (eql source (target-kind target))
+      (let ((build-script
               ;; TODO What directory should be current? Or should the script take care of that?
-              (let ((script-target (target-build-script-target i)))
+              (let ((script-target (target-build-script-target target)))
+                ;; TODO Should we support default build scripts?
                 (if (target-exists? script-target)
                     (prog1 script-target
-                      (let ((*parent* i))
+                      (let ((*parent* target))
                         (redo-ifchange script-target)))
-                    (let ((default (target-default-build-script-target i)))
+                    (let ((default (target-default-build-script-target target)))
                       (if (target-exists? default)
                           (prog1 default
-                            (let ((*parent* i))
+                            (let ((*parent* target))
                               (redo-ifchange default)
                               (redo-ifcreate script-target)))
-                          (error* "No script found for ~a" i)))))))
-        (delete-prop i uptodate)
-        (let ((*parent* i))
-          (run-script buildfile)))
-      (setf (prop target uptodate) t))))
+                          (error* "No script found for ~a" target)))))))
+        (nix (target-up-to-date? target))
+        (let ((*parent* target))
+          (run-script build-script))
+        (setf (target-up-to-date? target) t)))))
 
 (defun changed? (target)
   (let ((result nil))
@@ -224,7 +225,7 @@ on Lisp/OS/filesystem combinations that support it."
       (setf result t))
     ;; Check regular prerequisites.
     (let ((outdated '()))
-      (do-each (req (reshuffle (prop target prereqs)))
+      (do-each (req (reshuffle (target-saved-prereqs target)))
         (destructuring-bind (req . stamp) req
           (declare (ignore stamp))
           (when (changed? req)
@@ -233,16 +234,15 @@ on Lisp/OS/filesystem combinations that support it."
         ;; XXX redo $outdated || result=0
         (apply #'redo outdated))
       ;; XXX?
-      (do-each (req (prop target (prop target prereqs)))
+      (do-each (req (reshuffle (target-saved-prereqs target)))
         (destructuring-bind (req stamp) req
           (unless (stamp= stamp (target-stamp req))
             (setf result t)
             (return)))))
     ;; Check non-existent prereqs.
-    (when (has-prop? target prereqsne)
-      (do-each (ne (prop target prereqsne))
-        (when (target-exists? ne)
-          (setf result t))))
+    (do-each (ne (target-saved-prereqsne target))
+      (when (target-exists? ne)
+        (setf result t)))
     result))
 
 (defun redo-ifchange (args)
@@ -255,9 +255,7 @@ on Lisp/OS/filesystem combinations that support it."
   (check-parent)
   (do-each (i (reshuffle targets))
     (when (target-exists? i)
-      (error* "~a already exists" i))
-    ;; (delete-prop i stamp)
-    ;; (setf (prop i nonexist) t)
+      (error* "Non-existent prerequisite ~a already exists" i))
     (record-prereqne i)))
 
 
@@ -286,17 +284,20 @@ on Lisp/OS/filesystem combinations that support it."
       source
       target))
 
-(defplace target-up-to-date? (target)
-  (target-table-ref *uptodate* target))
+(defun target-up-to-date? (target)
+  (prop target uptodate))
 
-(defplace target-saved-stamp (target)
-  (prop target :stamp))
+(defun (setf target-up-to-date?) (value target)
+  (check-type value boolean)
+  (if value
+      (setf (prop target uptodate) t)
+      (delete-prop target uptodate)))
 
 (defplace target-saved-prereqs (target)
-  (prop target :prereqs))
+  (prop target prereqs))
 
 (defplace target-saved-prereqsne (target)
-  (prop target :prereqsne))
+  (prop target prereqsne))
 
 
 ;;; Types.
