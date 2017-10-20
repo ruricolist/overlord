@@ -842,28 +842,19 @@ E.g. delete a file, unbind a variable."
                     (assure tame-pathname
                       (merge-pathnames* source base)))))))
 
-(defparameter *preserve-fractional-seconds* nil
-  "When comparing precise timestamps (local-time timestamps) and
-  imprecise timestamps (universal times), should we conserve
-  precision (convert the imprecise timestamp to a precise timestamp)
-  or lose precision (convert the precise timestamp to an imprecise
-  timestamp)?
+;; NB Note that conversion from timestamp to universal rounds down
+;; (loses nsecs), so when comparing one of each, whether you convert
+;; the universal time to a timestamp, or the timestamp to a universal
+;; time, actually matters. What we do is to round the more precise to
+;; match the less precise. It might seem perverse to lose information,
+;; but think about it in terms of subtyping relationships. If Y is a
+;; subtype of X, and X has an equality predicate defined on it, then
+;; comparing an instance of X and an instance of Y will only take into
+;; account the information they have in common, and lose the extra
+;; information in Y.
 
-  This matters at the REPL. It's perfectly possible to edit a file,
-  build a target that depends on it, edit the file again, try to build
-  it, and have nothing happen, because the file timestamp is not
-  precise enough.
-
-  Still, I'm not sure what the right thing to do here is -- which is
-  why it is configurable. If I come to a definite decision, this
-  parameter will be removed.")
-
-(defun timestamp-newer? (ts1 ts2 &key (precise *preserve-fractional-seconds*))
+(defun timestamp-newer? (ts1 ts2)
   "Is TS1 greater than TS2?"
-  ;; NB Note that conversion from timestamp to universal rounds down
-  ;; (loses nsecs), so when comparing one of each, whether you convert
-  ;; the universal time to a timestamp, or the timestamp to a
-  ;; universal time, actually matters.
   (dispatch-case ((ts1 target-timestamp)
                   (ts2 target-timestamp))
     ((target-timestamp never) t)
@@ -874,9 +865,7 @@ E.g. delete a file, unbind a variable."
     ((timestamp timestamp)
      (timestamp> ts1 ts2))
     ((timestamp universal-time)
-     (if precise
-         (timestamp> ts1 (universal-to-timestamp ts2))
-         (> (timestamp-to-universal ts1) ts2)))
+     (> (timestamp-to-universal ts1) ts2))
     ((timestamp time-tuple)
      ;; TODO Should we consider precision here?
      (timestamp> ts1 (time-tuple->timestamp ts2)))
@@ -888,11 +877,7 @@ E.g. delete a file, unbind a variable."
      (> ts1
         (time-tuple-universal-time ts2)))
     ((universal-time timestamp)
-     (if precise
-         (timestamp> (universal-to-timestamp ts1)
-                     ts2)
-         (> ts1
-            (timestamp-to-universal ts2))))
+     (> ts1 (timestamp-to-universal ts2)))
 
     ((time-tuple universal-time)
      (let ((u1 (time-tuple-universal-time ts1)))
@@ -910,20 +895,14 @@ E.g. delete a file, unbind a variable."
      (timestamp> (time-tuple->timestamp ts1)
                  ts2))))
 
-(defun target-timestamp= (ts1 ts2 &key (precise *preserve-fractional-seconds*))
+(defun target-timestamp= (ts1 ts2)
   "Is TS1 greater than TS2?"
-  ;; NB Note that conversion from timestamp to universal rounds down
-  ;; (loses nsecs), so when comparing one of each, whether you convert
-  ;; the universal time to a timestamp, or the timestamp to a
-  ;; universal time, actually matters.
   (dispatch-case ((ts1 target-timestamp)
                   (ts2 target-timestamp))
     ((timestamp timestamp)
      (timestamp= ts1 ts2))
     ((timestamp universal-time)
-     (if precise
-         (timestamp= ts1 (universal-to-timestamp ts2))
-         (= (timestamp-to-universal ts1) ts2)))
+     (= (timestamp-to-universal ts1) ts2))
     ((timestamp time-tuple)
      ;; TODO Should we consider precision here?
      (timestamp= ts1 (time-tuple->timestamp ts2)))
@@ -934,28 +913,19 @@ E.g. delete a file, unbind a variable."
      (= ts1
         (time-tuple-universal-time ts2)))
     ((universal-time timestamp)
-     (if precise
-         (timestamp= (universal-to-timestamp ts1)
-                     ts2)
-         (= ts1
-            (timestamp-to-universal ts2))))
+     (= ts1 (timestamp-to-universal ts2)))
 
     ((time-tuple universal-time)
      (let ((u1 (time-tuple-universal-time ts1)))
-       (and (= u1 ts2)
-            (if precise
-                (= (time-tuple-real-time ts1) 0)
-                t))))
+       (= u1 ts2)))
     ((time-tuple time-tuple)
      (let ((u1 (time-tuple-universal-time ts1))
            (u2 (time-tuple-universal-time ts2)))
        (and (= u1 u2)
-            (if precise
-                (= (time-tuple-real-time ts1)
-                   (time-tuple-real-time ts2))
-                t))))
+            (= (time-tuple-real-time ts1)
+               (time-tuple-real-time ts2)))))
     ((time-tuple timestamp)
-     (timestamp= (time-tuple->timestamp ts1) ts2) (timestamp= (time-tuple->timestamp ts1) ts2))
+     (timestamp= (time-tuple->timestamp ts1) ts2))
 
     ((never never) t)
     ((far-future far-future) t)
@@ -1482,6 +1452,10 @@ TARGET."
 
     ((file-meta file-meta)
      (file-meta= s1 s2))
+    ((file-meta target-timestamp)
+     (stamp= (file-meta-timestamp s1) s2))
+    ((target-timestamp file-meta)
+     (stamp= s1 (file-meta-timestamp s2)))
     ((file-meta stamp) nil)
 
     (((eql #.deleted) stamp) nil)))
