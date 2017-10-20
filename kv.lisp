@@ -298,8 +298,9 @@ reloaded on demand."
 (defplace prop (obj prop)
   (kv.ref (kv) (prop-key obj prop)))
 
-(defun has-prop? (obj prop)
-  (nth-value 1 (prop-key obj prop)))
+(defun has-prop? (obj prop &rest props)
+  (some (op (nth-value 1 (prop obj _)))
+        (cons prop props)))
 
 (defun delete-prop (obj prop)
   (kv.del (kv) (prop-key obj prop)))
@@ -317,8 +318,9 @@ reloaded on demand."
   (if *save-pending*
       (funcall thunk)
       (let ((*save-pending* t))
-        (funcall thunk)
-        (save-database))))
+        (unwind-protect
+             (funcall thunk)
+          (save-database)))))
 
 (defmacro saving-database (&body body)
   (with-thunk (body)
