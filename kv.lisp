@@ -305,9 +305,11 @@ reloaded on demand."
 (defun delete-prop (obj prop)
   (kv.del (kv) (prop-key obj prop)))
 
-(defun save-database ()
-  (message "Run complete, saving database.")
-  (kv.sync (kv)))
+(defun save-database (&optional time-units)
+  (message "Run complete, saving database~@[ (~as)~]."
+           (/ time-units internal-time-units-per-second))
+  (kv.sync (kv))
+  (values))
 
 (defun compact-database ()
   (kv.squash (kv)))
@@ -317,10 +319,12 @@ reloaded on demand."
 (defun call/saving-database (thunk)
   (if *save-pending*
       (funcall thunk)
-      (let ((*save-pending* t))
+      (let ((*save-pending* t)
+            (start (get-internal-real-time)))
         (unwind-protect
              (funcall thunk)
-          (save-database)))))
+          (let ((end (get-internal-real-time)))
+            (save-database (- end start)))))))
 
 (defmacro saving-database (&body body)
   (with-thunk (body)
