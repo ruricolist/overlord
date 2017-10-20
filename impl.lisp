@@ -202,15 +202,14 @@ on Lisp/OS/filesystem combinations that support it."
               (let ((script-target (target-build-script-target target)))
                 ;; TODO Should we support default build scripts?
                 (if (target-exists? script-target)
-                    (prog1 script-target
-                      (let ((*parent* target))
-                        (redo-ifchange script-target)))
+                    (let ((*parent* target))
+                      (redo-ifchange script-target)
+                      script-target)
                     (let ((default (target-default-build-script-target target)))
                       (if (target-exists? default)
-                          (prog1 default
-                            (let ((*parent* target))
-                              (redo-ifchange default)
-                              (redo-ifcreate script-target)))
+                          (let ((*parent* target))
+                            (redo-ifchange default) (redo-ifcreate script-target)
+                            default)
                           (error* "No script found for ~a" target)))))))
         (nix (target-up-to-date? target))
         (let ((*parent* target))
@@ -223,25 +222,24 @@ on Lisp/OS/filesystem combinations that support it."
     ;; rebuild in turn) each target.
     (unless (target-exists? target)
       (setf result t))
-    ;; Check regular prerequisites.
-    (let ((outdated '()))
-      (do-each (req (reshuffle (target-saved-prereqs target)))
-        (destructuring-bind (req . stamp) req
-          (declare (ignore stamp))
-          (when (changed? req)
-            (push req outdated))))
-      (when outdated
-        ;; XXX redo $outdated || result=0
-        (apply #'redo outdated))
-      ;; XXX?
-      (do-each (req (reshuffle (target-saved-prereqs target)))
-        (destructuring-bind (req stamp) req
-          (unless (stamp= stamp (target-stamp req))
-            (setf result t)
-            (return)))))
+    (let* ((prereqs (target-saved-prereqs target))
+           (reqs (map 'list #'prereq-target prereqs)))
+      ;; Check regular prerequisites.
+      (let* ((outdated (filter #'changed? (reshuffle reqs)))
+             (outdated (coerce outdated 'list)))
+        (when outdated
+          ;; TODO redo $outdated || result=0
+          (apply #'redo outdated))
+        ;; Have any of the stamps changed?
+        (flet ((unchanged? (prereq)
+                 (let ((req   (prereq-target prereq))
+                       (stamp (prereq-stamp prereq)))
+                   (stamp= stamp (target-stamp req)))))
+          (when (notevery #'unchanged? (reshuffle prereqs))
+            (setf result t)))))
     ;; Check non-existent prereqs.
-    (do-each (ne (target-saved-prereqsne target))
-      (when (target-exists? ne)
+    (let ((prereqsne (target-saved-prereqsne target)))
+      (when (some #'target-exists? prereqsne)
         (setf result t)))
     result))
 
@@ -267,9 +265,14 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defun record-prereq (target &optional (parent *parent*))
   (when parent
-    (pushnew (cons target (target-stamp target))
+    (pushnew (prereq target)
              (prop parent prereqs)
-             :test (op (target= (car _) (car _))))))
+             :test (op (target= (prereq-target _)
+                                (prereq-target _))))))
+
+(defun prereq (targ) (cons targ (target-stamp targ)))
+(defun prereq-target (p) (car p))
+(defun prereq-stamp (p) (cdr p))
 
 (defun record-prereqne (target &optional (parent *parent*))
   (when parent
