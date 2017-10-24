@@ -6,6 +6,7 @@
   (:export #:*base*
            #:*cli*
            #:*target*
+           #:*parent*
            #:*input*
            #:*output*
            #:*module*
@@ -24,6 +25,8 @@
 (defvar-unbound *output* "Output of a pattern.")
 (defvar-unbound *deps* "Dependencies being collected.")
 (defvar-unbound *source* "Source file being compiled.")
+
+(defvar-unbound *parent* "Parent of the target being built.")
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
 

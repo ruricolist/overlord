@@ -8,6 +8,8 @@
     :uiop/filesystem
     :uiop/pathname
 
+    ;; What we need to implement.
+    :overlord/redo
     ;; Resettable global state.
     :overlord/global-state
     ;; Types common to the project.
@@ -178,105 +180,27 @@ on Lisp/OS/filesystem combinations that support it."
   (cl:file-write-date pathname))
 
 
-;;; The logic of redo.
-
-(defconst source    :source)
-(defconst target    :target)
-(defconst nonexist  :nonexist)
-(defconst prereqs   :prereqs)
-(defconst prereqsne :prereqsne)
-(defconst stamp     :stamp)
-(defconst uptodate  :uptodate)
-(defconst it 'it)
-
-;; (declaim (type target *parent*))
-(defvar *parent*)
-
-;;; The only thing special about redo-ifchange is that it writes out
-;;; hashes for its deps.
-(defun redo (&rest args)
-  ;; NB This is where you would add parallelism.
-  (do-each (target (reshuffle args))
-    (unless (eql source (target-kind target))
-      (let ((build-script
-              ;; TODO What directory should be current? Or should the script take care of that?
-              (let ((script-target (target-build-script-target target)))
-                ;; TODO Should we support default build scripts?
-                (if (target-exists? script-target)
-                    (let ((*parent* target))
-                      (redo-ifchange script-target)
-                      script-target)
-                    (let ((default (target-default-build-script-target target)))
-                      (if (target-exists? default)
-                          (let ((*parent* target))
-                            (redo-ifchange default) (redo-ifcreate script-target)
-                            default)
-                          (error* "No script found for ~a" target)))))))
-        (nix (target-up-to-date? target))
-        (let ((*parent* target))
-          (run-script build-script))
-        (setf (target-up-to-date? target) t)))))
-
-;;; Should be (target).
-(-> changed? (t) boolean)
-(defun changed? (target)
-  (let ((result nil))
-    ;; This can't be an or, since we have to check (and possibly
-    ;; rebuild in turn) each target.
-    (unless (target-exists? target)
-      (setf result t))
-    (let* ((prereqs (target-saved-prereqs target))
-           (reqs (map 'list #'prereq-target prereqs)))
-      ;; Check regular prerequisites.
-      (let* ((outdated (filter #'changed? (reshuffle reqs)))
-             (outdated (coerce outdated 'list)))
-        (when outdated
-          ;; TODO redo $outdated || result=0
-          (apply #'redo outdated))
-        ;; Have any of the stamps changed?
-        (flet ((unchanged? (prereq)
-                 (let ((req   (prereq-target prereq))
-                       (stamp (prereq-stamp prereq)))
-                   (stamp= stamp (target-stamp req)))))
-          (when (notevery #'unchanged? (reshuffle prereqs))
-            (setf result t)))))
-    ;; Check non-existent prereqs.
-    (let ((prereqsne (target-saved-prereqsne target)))
-      (when (some #'target-exists? prereqsne)
-        (setf result t)))
-    result))
-
-(defun redo-ifchange (args)
-  ;; NB This is where you would add parallelism.
-  (do-each (i (reshuffle args))
-    (when (changed? i)
-      (redo i))
-    (record-prereq i)))
-
-(defun redo-ifcreate (&rest targets)
-  (check-parent)
-  (do-each (i (reshuffle targets))
-    (when (target-exists? i)
-      (error* "Non-existent prerequisite ~a already exists" i))
-    (record-prereqne i)))
-
 ;;; Auxiliary functions.
 
-(defun check-parent ()
-  (unless (boundp '*parent*)
-    (error* "No parent.")))
+(define-symbol-macro source    :source)
+(define-symbol-macro target    :target)
+(define-symbol-macro nonexist  :nonexist)
+(define-symbol-macro prereqs   :prereqs)
+(define-symbol-macro prereqsne :prereqsne)
+(define-symbol-macro stamp     :stamp)
+(define-symbol-macro uptodate  :uptodate)
 
 (defun record-prereq (target &optional (parent *parent*))
   (check-type target target)
   (when parent
-    (pushnew (prereq target)
+    (pushnew (saved-prereq target)
              (prop parent prereqs)
-             :test (op (target= (prereq-target _)
-                                (prereq-target _))))))
+             :test (op (target= (saved-prereq-target _)
+                                (saved-prereq-target _))))))
 
-(defun prereq (x) (cons x (target-stamp x)))
-(defun prereq-target (p) (car p))
-(defun prereq-stamp (p) (cdr p))
+(defun saved-prereq (x) (cons x (target-stamp x)))
+(defun saved-prereq-target (p) (car p))
+(defun saved-prereq-stamp (p) (cdr p))
 
 (defun record-prereqne (target &optional (parent *parent*))
   (check-type target target)
@@ -691,8 +615,6 @@ it."
 
 
 ;;; Targets.
-
-(defconst reset-key 'reset)
 
 (define-global-state *symbol-timestamps* (make-hash-table :size 1024))
 (declaim (type hash-table *symbol-timestamps*))
