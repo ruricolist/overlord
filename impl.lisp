@@ -1547,7 +1547,10 @@ value and NEW do not match under TEST."
               (:pattern (name input)
                 `(pattern-ref ,name ,input))
               (:module (lang source)
-                `(module-spec ',lang ,source))
+                ;; Is (base) right?
+                `(module-spec ',lang
+                              (resolve-target (ensure-pathname ,source)
+                                              ,(base))))
               (:extension (ext)
                 `(extension ,ext))
               (:run (cmd &rest args)
