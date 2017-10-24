@@ -79,7 +79,7 @@
    :deftask
    :file-target
    :undefine-target
-   :build :unbuild :forget-target
+   :build :unbuild
    :run
 
    :*target*
@@ -195,6 +195,7 @@ on Lisp/OS/filesystem combinations that support it."
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; hashes for its deps.
 (defun redo (&rest args)
+  ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (unless (eql source (target-kind target))
       (let ((build-script
@@ -216,6 +217,8 @@ on Lisp/OS/filesystem combinations that support it."
           (run-script build-script))
         (setf (target-up-to-date? target) t)))))
 
+;;; Should be (target).
+(-> changed? (t) boolean)
 (defun changed? (target)
   (let ((result nil))
     ;; This can't be an or, since we have to check (and possibly
@@ -244,6 +247,7 @@ on Lisp/OS/filesystem combinations that support it."
     result))
 
 (defun redo-ifchange (args)
+  ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
     (when (changed? i)
       (redo i))
@@ -256,7 +260,6 @@ on Lisp/OS/filesystem combinations that support it."
       (error* "Non-existent prerequisite ~a already exists" i))
     (record-prereqne i)))
 
-
 ;;; Auxiliary functions.
 
 (defun check-parent ()
@@ -264,17 +267,19 @@ on Lisp/OS/filesystem combinations that support it."
     (error* "No parent.")))
 
 (defun record-prereq (target &optional (parent *parent*))
+  (check-type target target)
   (when parent
     (pushnew (prereq target)
              (prop parent prereqs)
              :test (op (target= (prereq-target _)
                                 (prereq-target _))))))
 
-(defun prereq (targ) (cons targ (target-stamp targ)))
+(defun prereq (x) (cons x (target-stamp x)))
 (defun prereq-target (p) (car p))
 (defun prereq-stamp (p) (cdr p))
 
 (defun record-prereqne (target &optional (parent *parent*))
+  (check-type target target)
   (when parent
     (pushnew target (prop parent prereqsne) :test #'target=)))
 
@@ -1224,16 +1229,6 @@ distributed."
      (setf (target-table-member *all-targets* target) t)
      (values))))
 
-(defun forget-target (target)
-  (etypecase-of target target
-    (root-target (error* "Cannot forget root target."))
-    ((or bindable-symbol pathname)
-     (unsave-stamp target)
-     (remhash target *tasks*))
-    ((or directory-ref package-ref pattern-ref module-cell module-spec)
-     (unsave-stamp target)
-     (setf (target-table-member *all-targets* target) nil))))
-
 (defun find-saved-task (target)
   (check-not-frozen)
   (etypecase-of target target
@@ -1335,12 +1330,6 @@ Don't know how to build missing prerequisite ~s."
             (task-init task)
             (task-deps task))))
 
-(define-global-state *always-rebuild* nil
-  "Flag to always rebuild.
-When this flag is set, targets are always rebuilt.
-
-Possibly useful for testing.")
-
 (defun build (&optional (target nil target-supplied?)
               &key (errorp t)
                    (force *always-rebuild*)
@@ -1353,7 +1342,6 @@ Possibly useful for testing.")
               (target-task-values target errorp)
             (build-task target thunk deps))
           (build root-target)))))
-
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
@@ -1387,20 +1375,6 @@ Possibly useful for testing.")
       (build (intern (string target) package))
       (values target system-name package))))
 
-(defun build-task (target thunk deps)
-  (check-type thunk function)
-  (check-type deps function)
-  (check-not-frozen)
-  (save-task target thunk deps)
-  (build-recursively target))
-
-(defvar-unbound *already-built*
-  "List of targets that have already been built.")
-(declaim (type target-table *already-built*))
-
-(defun already-built? (target)
-  (target-table-member *already-built* target))
-
 (defun print-target-being-built (target)
   "Print the target being built.
 The idea here (borrowed from Apenwarr redo) is that the user should be
@@ -1433,15 +1407,6 @@ TARGET."
      `(pattern-ref ,(pattern-ref.pattern target)
                    ,(pattern-ref.input target)))))
 
-(defun target-changed? (target)
-  (let ((saved-stamp (saved-stamp target)))
-    (cond ((null saved-stamp)            t)
-          ((eql saved-stamp far-future)  t)
-          ((eql saved-stamp never)       t)
-          (t (not
-              (stamp= (target-stamp target)
-                      saved-stamp))))))
-
 (defun stamp= (s1 s2)
   (dispatch-case ((s1 stamp)
                   (s2 stamp))
@@ -1463,19 +1428,6 @@ TARGET."
 
     (((eql #.deleted) stamp) nil)))
 
-(defvar *custom-stamps*)
-
-(defun custom-stamp (target)
-  (if-let (table (bound-value '*custom-stamps*))
-    (target-table-ref table target)
-    nil))
-
-(defun (setf custom-stamp) (stamp target)
-  (assert (boundp '*custom-stamps*))
-  (setf (target-table-ref *custom-stamps*
-                          target)
-        (assure string stamp)))
-
 (defun target-stamp (target)
   (assure stamp
     (etypecase-of target target
@@ -1495,127 +1447,8 @@ TARGET."
               (target-timestamp target))
              (t deleted))))))
 
-(defconst stamp-prop :stamp)
-
-(defplace saved-stamp (target)
-  (prop target stamp-prop))
-
-(defun unsave-stamp (target)
-  (delete-prop target stamp-prop))
-
-(defun update-saved-stamp (target)
-  (setf (saved-stamp target)
-        (target-stamp target)))
-
-(defun ensure-saved-stamp (target)
-  (ensure2 (saved-stamp target)
-    (target-stamp target)))
-
-(defun save-dependency (dep)
-  ;; Is this right?
-  (when (boundp '*deps*)
-    (push (assure target dep) *deps*)))
-
-(defconst init-deps-prop :init-deps)
-
-(defun init-deps (target)
-  (check-type target target)
-  (assure list
-    (prop target init-deps-prop)))
-
-(defun (setf init-deps) (value target)
-  (check-type target target)
-  (check-type value (list-of target))
-  (setf (prop target init-deps-prop)
-        (deduplicate-targets value)))
-
-(defun call/init-deps (target thunk)
-  (let ((*deps*))
-    (multiple-value-prog1
-        (handler-bind ((dependency #'redo))
-          (funcall thunk))
-      (setf (init-deps target)
-            (deduplicate-targets
-             (reverse *deps*))))))
-
-(defmacro with-init-deps-saved ((target) &body body)
-  (with-thunk (body)
-    `(call/init-deps ,target ,body)))
-
-(defconst saved-prereqs :saved-prereqs)
-
-(defplace saved-prereqs (target)
-  (prop target saved-prepreqs))
-
-(defconst saved-prereqsnonexist :saved-prereqsnonexist)
-
-(defplace saved-prereqsnonexist (target)
-  (prop target saved-prereqsnonexist))
-
-(defplace nonexist (target)
-  (prop target :nonexist))
-
 (defun target-script (target)
   (task-init (target-task target)))
-
-(defun build-recursively (target &aux (force *always-rebuild*))
-  (check-not-frozen)
-  (labels
-      ((deps-list (target deps-thunk)
-         (let ((*deps* (init-deps target)))
-           (funcall deps-thunk)
-           (reverse (deduplicate-targets *deps*))))
-
-       (never-been-built? (target)
-         (not (target-exists? target)))
-
-       (needs-building? (target deps)
-         (let ((timestamp (target-timestamp target)))
-           ;; Wait to check FORCE until after DEPS has been evaluated, in
-           ;; case it has side effects.
-           (or force
-               ;; Checking if the target has *ever* been built also
-               ;; has to wait until after DEPS has been evaluated.
-               ;; Just because it's never been built doesn't mean it
-               ;; has no dependencies.
-               (or (eql timestamp never)
-                   (some #'target-changed? deps)))))
-
-       (rec (target)
-         (assure stamp
-           (if (already-built? target)
-               (target-timestamp target)
-               (let ((*target* target))
-                 (setf (target-table-member *already-built* target) t)
-                 (receive (target thunk deps-thunk)
-                     (target-task-values target)
-                   (flet ((rebuild ()
-                            (with-init-deps-saved (target)
-                              (let ((*depth* (1+ *depth*)))
-                                (print-target-being-built target)
-                                (funcall thunk)
-                                (update-saved-stamp target)))))
-                     (let ((deps (deps-list target deps-thunk)))
-                       (declare (dynamic-extent #'rebuild))
-                       (cond ((never-been-built? target)
-                              (rebuild))
-                             ((needs-building? target deps)
-                              (rebuild))
-                             (t nil))
-                       (ensure-saved-stamp target)))))))))
-    (saving-database
-      (handler-bind ((dependency #'redo))
-        (let ((*already-built*
-                (or (bound-value '*already-built*)
-                    (make-target-table :synchronized t)))
-              (*custom-stamps*
-                (or (bound-value '*custom-stamps*)
-                    (make-target-table :synchronized t))))
-          (rec target))))))
-
-(defun redo (&optional c)
-  (when-let (r (find-restart 'redo c))
-    (invoke-restart r)))
 
 (defun rebuild-symbol (symbol thunk)
   (lambda ()
@@ -1623,45 +1456,21 @@ TARGET."
       (setf (symbol-value symbol)     (funcall thunk)
             (target-timestamp symbol) (now)))))
 
-(defcondition dependency ()
-  ((target :initarg :target
-           ;; Nothing can depend on the root target.
-           :type (and target (not root-target))
-           :reader dependency-target
-           :reader overlord-error-target)))
-
-(defun depends-on/1 (target)
-  (let ((target (resolve-target target (base))))
-    (restart-case
-        (signal 'dependency :target target)
-      (continue ()
-        :report "Ignore the dependency and move on.")
-      (save ()
-        :report "Save the dependency, but don't build it."
-        (pushnew target *deps*))
-      (redo ()
-        :report "Build the dependency."
-        (save-dependency target)
-        (build target)))))
-
 (defun depends-on (&rest deps)
-  "Build DEPS in no particular order.
-If any of DEPS is a list, its elements will also be added in no
-particular order."
+  "Build DEPS in no particular order."
   (depends-on-all deps))
 
 (defun depends-on-all (deps)
-  ;; NB This is where you would add parallelism.
-  (map nil #'depends-on/1 (reshuffle deps))
+  (apply #'redo-ifchange deps)
   (values))
 
 (defun depends-on* (&rest deps)
-  "Build DEPS in the order they are supplied.
-If any of DEPS is a list, it will be descended into."
+  "Build DEPS in the order they are supplied."
   (depends-on-all* deps))
 
 (defun depends-on-all* (deps)
-  (map nil #'depends-on/1 deps)
+  (dolist (dep deps)
+    (redo-ifchange dep))
   (values))
 
 (defun call/temp-file-pathname (dest fn)
@@ -1830,10 +1639,6 @@ the current base."
   ;; TODO How to test equality in the presence of macros?
   ;; Maybe expand with a code walker?
   (similar? x y))
-
-(defmacro undefine-target (name &body body)
-  (declare (ignore body))
-  `(forget-target ',name))
 
 (defmacro var-target (name expr &body deps)
   (with-script-dependency (name expr deps)
