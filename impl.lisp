@@ -79,11 +79,7 @@
    :defvar/deps
    :deftask
    :file-target
-   :undefine-target
-   :build :unbuild
-   :run
 
-   :*target*
    :ensure-absolute
    :extension
    :defpattern
@@ -181,13 +177,13 @@ on Lisp/OS/filesystem combinations that support it."
 
 ;;; Auxiliary functions.
 
-(define-symbol-macro source    :source)
-(define-symbol-macro target    :target)
-(define-symbol-macro nonexist  :nonexist)
-(define-symbol-macro prereqs   :prereqs)
-(define-symbol-macro prereqsne :prereqsne)
-(define-symbol-macro stamp     :stamp)
-(define-symbol-macro uptodate  :uptodate)
+(defconst source    :source)
+(defconst target    :target)
+(defconst nonexist  :nonexist)
+(defconst prereqs   :prereqs)
+(defconst prereqsne :prereqsne)
+(defconst stamp     :stamp)
+(defconst uptodate  :uptodate)
 
 (defun record-prereq (target &optional (parent *parent*))
   (check-type target target)
@@ -539,11 +535,8 @@ it."
     directory-ref
     pattern-ref
     module-spec
-    module-cell))
-
-(defvar-unbound *target*
-  "The target being built.")
-(declaim (type target *target*))
+    module-cell
+    task))
 
 
 ;;; Targets.
@@ -560,7 +553,9 @@ it."
 
 (defun target-exists? (target)
   ;; (not (eql never (target-timestamp target)))
-  (etypecase-of target target
+  ;; XXX
+  (etypecase-of (or null target) target
+    (null nil)
     (root-target t)
     (bindable-symbol (boundp target))
     (pathname (pathname-exists? target))
@@ -580,7 +575,8 @@ it."
          pathname-exists?))
     (module-spec
      (target-exists? (module-spec-cell target)))
-    (module-cell (module-cell.module target))))
+    (module-cell (module-cell.module target))
+    (task (target-exists? (task-script target)))))
 
 (defun target-timestamp (target)
   (etypecase-of target target
@@ -613,10 +609,14 @@ it."
      (target-timestamp (module-spec-cell target)))
     (module-cell
      (with-slots (module timestamp) target
-       (if (null module) never timestamp)))))
+       (if (null module) never timestamp)))
+    (task
+     (if-let (script (task-script target))
+       (target-timestamp script)
+       far-future))))
 
 (defun (setf target-timestamp) (timestamp target)
-  (check-type timestamp (or timestamp time-tuple))
+  (check-type timestamp target-timestamp)
   (check-not-frozen)
   (etypecase-of target target
     (root-target (setf (root-target-timestamp root-target) timestamp))
@@ -644,33 +644,14 @@ it."
      (let ((cell (module-spec-cell target)))
        (setf (target-timestamp cell) timestamp)))
     (module-cell
-     (setf (module-cell.timestamp target) timestamp))))
+     (setf (module-cell.timestamp target) timestamp))
+    (task
+     (if-let ((target (task-script target)))
+       (setf (target-timestamp target) timestamp)
+       (error* "~a does not have a script target." target)))))
 
 (defun touch-target (target &optional (date (now)))
   (setf (target-timestamp target) date))
-
-(defun unbuild (target)
-  "Destroy (\"unbuild\") TARGET.
-E.g. delete a file, unbind a variable."
-  (check-not-frozen)
-  (etypecase-of target target
-    (root-target)
-    (bindable-symbol
-     (makunbound target))
-    (package-ref
-     (delete-package (ref.name target)))
-    (pathname
-     (delete-file-or-directory (ref.name target)))
-    (pattern-ref
-     (delete-file-or-directory (pattern-ref.output target)))
-    (directory-ref
-     (delete-directory-tree (ref.name target)))
-    (module-spec
-     (unbuild (module-spec-cell target)))
-    (module-cell
-     (with-slots (lang source) target
-       (clear-module-cell lang source)
-       (unbuild-lang-deps lang source)))))
 
 (defun delete-file-or-directory (p)
   (if (directory-pathname-p p)
@@ -702,6 +683,11 @@ E.g. delete a file, unbind a variable."
      (with-slots (lang source) target
        (module-cell lang
                     (assure tame-pathname
+                      (merge-pathnames* source base)))))
+    (task
+     (let* ((script (task-script target))
+            (script (resolve-target script base)))
+       (copy-task target :script script)))))
 
 
 ;;; Target table abstract data type.
@@ -716,6 +702,7 @@ E.g. delete a file, unbind a variable."
     (package-ref 'package-ref)
     (directory-ref 'directory-ref)
     (pattern-ref 'pattern-ref)
+    (task 'task)
     ;; Bottom.
     (otherwise nil)))
 
@@ -778,7 +765,11 @@ E.g. delete a file, unbind a variable."
     (pattern-ref
      (dx-sxhash
       (list 'package-ref
-            (ref.name target))))))
+            (ref.name target))))
+    (task
+     (dx-sxhash
+      (multiple-value-list
+       (target-task-values target))))))
 
 (deftype hash-friendly-target ()
   '(or root-target bindable-symbol pathname))
@@ -910,19 +901,19 @@ distributed."
 
 (defparameter *freeze-fmakunbound-hit-list*
   '(unfreeze
-    build
-    unbuild
-    run
-    dynamic-require-as
-    saved-stamp
-    '(setf saved-stamp)))
+    redo
+    redo-ifchange
+    redo-ifcreate
+    redo-always
+    redo-stamp
+    dynamic-require-as))
 
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
-               (build root-target)
+               (redo root-target)
                ;; The DB can still be reloaded, but is not in memory.
                (unload-db)
                (setf *frozen* t))
@@ -972,44 +963,55 @@ distributed."
 
 (defconstructor task
   "A task."
-  (target target)
-  (init function)
-  (deps function))
+  (target (and target (not task)))
+  (thunk function)
+  (script (or null (and target (not task)))))
 
-(defun save-task (target thunk deps)
+(defun target-build-script-target (target)
   (check-not-frozen)
   (etypecase-of target target
-    (root-target)
     ((or bindable-symbol pathname)
-     (let ((task (task target thunk deps)))
-       (setf (gethash target *tasks*) task)))
-    ((or module-spec module-cell))
-    ((or directory-ref package-ref pattern-ref)
-     (setf (target-table-member *all-targets* target) t)
-     (values))))
+     (gethash target *tasks*))
+    (target nil)))
 
-(defun find-saved-task (target)
+(defun target-default-build-script-target (target)
   (check-not-frozen)
+  ;; TODO Alternately, instead of nil for the script, you could
+  ;; actually use define-script-for and depend on those scripts. But:
+  ;; that would create serious bootstrapping issues.
   (etypecase-of target target
+    ((or task pathname bindable-symbol) nil)
     (root-target
      (task target
-           (constantly nil)
            (lambda ()
              (let ((*building-root* t)
                    ;; `depends-on' needs `*base*' to be bound to something.
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
-               (depends-on-all (list-all-targets))))))
-    ((or bindable-symbol pathname)
-     (gethash target *tasks*))
+               (apply #'redo-ifchange (list-all-targets))))
+           ;; XXX
+           root-target))
+    (pattern-ref
+     (let* ((input (pattern-ref.input target))
+            (output (pattern-ref.output target))
+            (pattern (find-pattern (pattern-ref.pattern target)))
+            (class-name (class-name-of target)))
+       (task output
+             (lambda ()
+               (let ((*input* input)
+                     (*output* output))
+                 (let ((*base* (pathname-directory-pathname input)))
+                   (redo-ifchange input))
+                 (pattern-build pattern)))
+             (script-for class-name))))
     (directory-ref
      (let ((dir (ref.name target)))
        (task target
              (lambda ()
                (let ((dir (resolve-target dir (base))))
                  (ensure-directories-exist dir)))
-             (constantly nil))))
+             nil)))
     (package-ref
      (with-slots (name use-list nicknames) target
        (task target
@@ -1018,121 +1020,56 @@ distributed."
                    (make-package name
                                  :use use-list
                                  :nicknames nicknames)))
-             (constantly nil))))
-    (pattern-ref
-     (let* ((input (pattern-ref.input target))
-            (output (pattern-ref.output target))
-            (pattern (find-pattern (pattern-ref.pattern target))))
-       (task output
-             (lambda ()
-               (let ((*input* input)
-                     (*output* output))
-                 (pattern-init pattern)))
-             (lambda ()
-               (let ((*input* input)
-                     (*output* output))
-                 (let ((*base* (pathname-directory-pathname input)))
-                   (depends-on input))
-                 (pattern-depend pattern))))))
+             nil)))
     (module-spec
-     (find-saved-task (module-spec-cell target)))
+     (target-default-build-script-target (module-spec-cell target)))
     (module-cell
      (with-slots (lang source) target
        (task target
              (lambda ()
                (let ((*language* lang))
-                 (load-module-into-cell target)))
-             (lambda ()
-               (let ((*base* (pathname-directory-pathname source))
-                     (*language* lang))
-                 ;; Depend on the source file.
-                 (depends-on source)
-                 ;; Let the language tell you what else to depend on.
-                 (lang-deps lang source))))))))
+                 (load-module-into-cell target)
+                 (let ((*base* (pathname-directory-pathname source)))
+                   ;; Depend on the source file.
+                   (redo-ifchange source)
+                   ;; Let the language tell you what else to depend on.
+                   (lang-deps lang source))))
+             nil)))))
 
-(defcondition no-such-task (overlord-error)
-  ((target :type target :initarg :target :reader overlord-error-target))
-  (:report (lambda (c s)
-             (format s "No such task: ~a"
-                     (overlord-error-target c)))))
-
-(defun no-such-task (target)
-  (error 'no-such-task :target target))
-
-(defcondition missing-file (no-such-task)
-  ((target :type pathname))
-  (:report (lambda (c s)
-             (format s "~
-Don't know how to build missing prerequisite ~s."
-                     (overlord-error-target c)))))
-
-(defun missing-file (target)
-  (error 'missing-file :target target))
-
-(defun target-task (target &optional (errorp t))
+(defun run-script (task)
   (check-not-frozen)
-  (or (find-saved-task target)
-      (cond ((symbolp target)
-             (if (boundp target)
-                 (task target (constantly nil) (constantly nil))
-                 (and errorp (no-such-task target))))
-            ((pathnamep target)
-             (if (pathname-exists? target)
-                 (task target (constantly nil) (constantly nil))
-                 (and errorp (missing-file target))))
-            (errorp (no-such-task target))
-            (t nil))))
+  (funcall (task-thunk task)))
+
+(defun run-task (target thunk &optional (script (script-for target)))
+  (check-not-frozen)
+  (save-task target thunk script)
+  (redo target))
+
+(defun save-task (target thunk &optional (script (script-for target)))
+  (check-not-frozen)
+  (etypecase-of target target
+    (root-target)
+    ((or bindable-symbol pathname)
+     (let ((task (task target thunk script)))
+       (setf (gethash target *tasks*) task)))
+    ((or module-spec module-cell))
+    ((or directory-ref package-ref pattern-ref)
+     (setf (target-table-member *all-targets* target) t)
+     (values))
+    ;; XXX?
+    (task (error* "Cannot save a task as a task."))))
 
 (defun target-task-values (target &optional (errorp t))
   (let ((task (target-task target errorp)))
     (values (task-target task)
-            (task-init task)
-            (task-deps task))))
-
-(defun build (&optional (target nil target-supplied?)
-              &key (errorp t)
-                   (force *always-rebuild*)
-                   (message-handler *message-handler*))
-  (check-not-frozen)
-  (let ((*always-rebuild* force))
-    (handler-bind ((overlord-message message-handler))
-      (if target-supplied?
-          (receive (target thunk deps)
-              (target-task-values target errorp)
-            (build-task target thunk deps))
-          (build root-target)))))
+            (task-thunk task)
+            (task-script task))))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
     (and system
          (asdf:component-loaded-p system)
          system)))
-
-(defun run (target &optional system-name)
-  "Entry point for scripts."
-  (mvlet* ((target package-name
-            (ematch target
-              ((and target (type symbol)) target)
-              ((list (and package-name (type string-designator))
-                     (and symbol-name (type string-designator)))
-               (values symbol-name package-name))))
-           (system-name
-            (string-downcase            ;What ASDF wants.
-             (or system-name package-name))))
-    (unless (system-loaded? system-name)
-      (restart-case
-          (asdf:load-system system-name)
-        (quickload ()
-          :test (lambda () (find-package :ql))
-          :report (lambda (s)
-                    (format s "Load ~a with Quicklisp instead."
-                            system-name))
-          (uiop:symbol-call :ql :quickload system-name))))
-    (let ((package
-            (or (find-package package-name)
-                (error* "No such package: ~s" package-name))))
-      (build (intern (string target) package))
-      (values target system-name package))))
 
 (defun print-target-being-built (target)
   "Print the target being built.
@@ -1141,7 +1078,7 @@ able to simply evaluate the form for a given target to pick up
 building from there."
   (message "~Vt~s"
            (1- *depth*)
-           `(build ,(dump-target/pretty target))))
+           `(redo ,(dump-target/pretty target))))
 
 (defun dump-target/pretty (target)
   "Return a form which, when evaluated, returns a target equivalent to
@@ -1164,7 +1101,8 @@ TARGET."
                    :use-list ,(package-ref.use-list target)))
     (pattern-ref
      `(pattern-ref ,(pattern-ref.pattern target)
-                   ,(pattern-ref.input target)))))
+                   ,(pattern-ref.input target)))
+    (task `(task ,@(multiple-value-list (target-task-values target))))))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
@@ -1181,7 +1119,8 @@ TARGET."
            ;; TODO?
            directory-ref
            module-spec
-           module-cell)
+           module-cell
+           task)
        (target-timestamp target))
       (pathname
        (cond ((file-exists-p target)
@@ -1190,31 +1129,10 @@ TARGET."
               (target-timestamp target))
              (t deleted))))))
 
-(defun target-script (target)
-  (task-init (target-task target)))
-
 (defun rebuild-symbol (symbol thunk)
   (lambda ()
-    (let ((*target* symbol))
-      (setf (symbol-value symbol)     (funcall thunk)
-            (target-timestamp symbol) (now)))))
-
-(defun depends-on (&rest deps)
-  "Build DEPS in no particular order."
-  (depends-on-all deps))
-
-(defun depends-on-all (deps)
-  (apply #'redo-ifchange deps)
-  (values))
-
-(defun depends-on* (&rest deps)
-  "Build DEPS in the order they are supplied."
-  (depends-on-all* deps))
-
-(defun depends-on-all* (deps)
-  (dolist (dep deps)
-    (redo-ifchange dep))
-  (values))
+    (setf (symbol-value symbol)     (funcall thunk)
+          (target-timestamp symbol) (now))))
 
 (defun call/temp-file-pathname (dest fn)
   "Call FN on a freshly allocated temporary pathname; if it completes
@@ -1233,20 +1151,18 @@ safely, overwrite DEST with the contents of the temporary file."
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
     (let* ((file (resolve-target file base))
-           (*target* file)
            (old (target-timestamp file)))
       (funcall thunk)
       ;; Since we depend on the granularity of the timestamps, all we can
       ;; be sure of is that is not older than the old timestamp.
       (assert (not (timestamp-newer? old (target-timestamp file)))))))
 
-(defun save-file-task (file thunk deps)
+(defun save-file-task (file thunk script)
   (check-type file pathname)
   (check-type thunk function)
-  (check-type deps function)
   (save-task file
              (rebuild-file file thunk (base))
-             deps))
+             script))
 
 (defun build-conf (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
@@ -1271,13 +1187,13 @@ value and NEW do not match under TEST."
 
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
-                `(depends-on ,x ,@xs))
+                `(redo-ifchange ,x ,@xs))
               (:depends-on* (x &rest xs)
-                `(depends-on* ,x ,@xs))
+                `(:depends-on-all* (list ,x ,@xs)))
               (:depends-on-all (xs)
-                `(depends-on-all ,xs))
+                `(apply #'redo-ifchange ,xs))
               (:depends-on-all* (xs)
-                `(depends-on-all* ,xs))
+                `(map nil #'redo-ifchange ,xs))
               (:path (path)
                 (assure pathname
                   (path path)))
@@ -1304,8 +1220,9 @@ value and NEW do not match under TEST."
                 `(message ,control-string ,@args))
               (:basename (file)
                 `(basename ,file))
-              (:stamp (stamp)
-                `(setf (custom-stamp *target*) ,stamp)))
+              ;; (:stamp (stamp)
+              ;;   `(setf (custom-stamp *target*) ,stamp))
+              )
      ,@body))
 
 (defun basename (file)
@@ -1327,8 +1244,26 @@ the current base."
      (setf (current-dir!) (pathname-directory-pathname *base*))
      ,form))
 
+;;; `defconfig' is extremely important and rather tricky. It is one of
+;;; the only two types of targets that have inherent timestamps (the
+;;; other being files). Semantically is it closer to `defconstant'
+;;; than `defvar' -- the provided expression is evaluated at compile
+;;; time -- but unlike `defconstant' it can always be redefined.
+
+;;; How does `defconfig' have its own timestamp? When `defconfig' is
+;;; being compiled, the current timestamp is dumped directly into the
+;;; emitted code, so it persists when the fasl is reloaded.
+
+;;; Note that while configuration timestamps persist across loads,
+;;; they do not persist across compilations. If that is the behavior
+;;; you need, you should use `defconfig/deps' and depend on a dummy
+;;; file. If we did it for you, a dummy file would have to be involved
+;;; anyway, and that is probably something it is better to be explicit
+;;; about.
+
 (defmacro defconfig (name init &key (test '#'equal)
                                     documentation)
+  (check-type name symbol)
   (let ((init
           (save-base
            `(with-defaults-from-base
@@ -1345,39 +1280,27 @@ the current base."
                                   (now))))
            ,@(unsplice documentation)))
        (eval-always
-         (save-task ',name (constantly ,init) (constantly nil)))
+         (save-task ',name (constantly ,init)))
        (eval-always
          (build-conf ',name ,init ,test))
        ',name)))
 
-(defmacro deps-thunk (&body body)
+(defmacro script-thunk (&body body)
   `(lambda ()
      ,(save-base
        `(with-defaults-from-base
           (with-keyword-macros
             ,@body)))))
 
-(defmacro init-thunk (&body body)
-  `(lambda ()
-     ,(save-base
-       `(with-defaults-from-base
-          (with-keyword-macros
-            ,@body)))))
-
-(defmacro define-script (name expr)
-  `(defconfig ,name ',expr
+(defmacro define-script (name &body script)
+  `(defconfig ,name '(progn ,@script)
      :test #'source=))
 
-(defmacro with-script-dependency ((name expr deps) &body body)
-  (with-gensyms (sn)
-    `(let* ((,sn (script-name ,name))
-            (,deps (cons (list :depends-on (list 'quote ,sn)) ,deps)))
-       (list
-        'progn
-        (list 'define-script ,sn ,expr)
-        ,@body))))
+(defmacro define-script-for (name &body body)
+  `(define-script ,(script-for name)
+     ,@body))
 
-(defun script-name (name)
+(defun script-for (name)
   (intern (coerce-case (fmt "~a.do" name))
           (symbol-package name)))
 
@@ -1386,15 +1309,14 @@ the current base."
   ;; Maybe expand with a code walker?
   (similar? x y))
 
-(defmacro var-target (name expr &body deps)
-  (with-script-dependency (name expr deps)
-    `(progn
-       (defvar ,name)
-       (save-task ',name
-                  (rebuild-symbol ',name
-                                  (init-thunk ,expr))
-                  (deps-thunk ,@deps))
-       ',name)))
+(defmacro var-target (name &body script)
+  `(progn
+     (define-script-for ,name
+       ,@script)
+     (defvar ,name)
+     (save-task ',name
+                (rebuild-symbol ',name (script-thunk ,@script)))
+     ',name))
 
 (defmacro defvar/deps (name expr &body deps)
   "Define a variable with dependencies.
@@ -1405,7 +1327,7 @@ rebuilt."
   `(progn
      (var-target ,name ,expr
        ,@deps)
-     (build ',name)
+     (redo ',name)
      ',name))
 
 (defmacro defconfig/deps (name expr &body deps)
@@ -1417,23 +1339,19 @@ rebuilt."
   `(progn
      ;; The script must be available at compile time to be depended
      ;; on.
-     (define-script ,(script-name name) ,expr)
+     (define-script-for ,name ,expr)
      (defconfig/deps-aux ,name ,expr
        ,@deps)))
 
-(defmacro defconfig/deps-aux (name expr &body deps)
+(defmacro defconfig/deps-aux (name &body script)
   (mvlet* ((base (base))
            (*base* base)
-           (deps
-            `((:depends-on ',(script-name name))
-              ,@deps))
            (init timestamp
             (progn
               (if (boundp name)
-                  (build name)
-                  (let ((deps-thunk (eval* `(deps-thunk ,@deps)))
-                        (init-thunk (rebuild-symbol name (eval* `(init-thunk ,expr)))))
-                    (build-task name init-thunk deps-thunk)))
+                  (redo name)
+                  (let ((thunk (rebuild-symbol name (eval* `(script-thunk ,@script)))))
+                    (run-task name thunk)))
               (values (symbol-value name)
                       (target-timestamp name)))))
     `(progn
@@ -1442,56 +1360,55 @@ rebuilt."
              (prog1 ',init
                (setf (target-timestamp ',name) ,timestamp))))
        (eval-always
-         (build-task ',name
-                     (rebuild-symbol ',name (init-thunk ,expr))
-                     (deps-thunk ,@deps)))
+         (run-task ',name
+                   (rebuild-symbol ',name (script-thunk ,@script))))
        ',name)))
 
-(defmacro file-target (name pathname (&optional tmp) &body (init . deps))
+(defmacro file-target (name pathname (&optional tmp) &body script)
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (let* ((base (base))
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
-         (init
+         (script
            `(progn
               (setf (current-dir!) ,dir)
-              ,init)))
-    (with-script-dependency (name init deps)
-      `(progn
-         ;; Make the task accessible by name.
-         (def ,name ,pathname)
-         (with-defaults-from-base
-           (save-file-task ,pathname
-                           (init-thunk
-                             ,(if (null tmp)
-                                  ;; No temp file needed.
-                                  init
-                                  ;; Write to a temp file and rename.
-                                  `(call/temp-file-pathname ,pathname
-                                                            (lambda (,tmp)
-                                                              ,init)))
-                             (assert (file-exists-p ,pathname)))
-                           (deps-thunk
-                             (setf (current-dir!) ,dir)
-                             ,@deps)))
-         ',pathname))))
+              ,@script)))
+    `(progn
+       ;; Make the task accessible by name.
+       (def ,name ,pathname)
+       (define-script-for ,name
+         ,@script)
+       (with-defaults-from-base
+         (save-file-task ,pathname
+                         (script-thunk
+                           ,(if (null tmp)
+                                ;; No temp file needed.
+                                `(progn ,@script)
+                                ;; Write to a temp file and rename.
+                                `(call/temp-file-pathname ,pathname
+                                                          (lambda (,tmp)
+                                                            ,@script)))
+                           (assert (file-exists-p ,pathname)))
+                         (script-for name)))
+       ',pathname)))
 
 
 ;;;; Phony targets.
 
-(defmacro deftask (name &body deps)
+(defmacro deftask (name &body script)
   "Define a task -- a target that only has dependencies.
 This is essentially a convenience to let you use keyword macros to
 specify the dependencies you want on build."
   `(progn
+     (define-script-for ,name
+       ,@script)
      (save-task ',name
-                (constantly nil)
                 (lambda ()
                   ;; Phony targets don't *need* to be built.
                   (unless *building-root*
-                    (funcall (deps-thunk ,@deps)))))
+                    (funcall (script-thunk ,@script)))))
      ',name))
 
 
@@ -1508,25 +1425,18 @@ specify the dependencies you want on build."
     :initarg :output-defaults
     :type pathname
     :reader pattern.output-defaults)
-   (init-fn
-    :initarg :init
+   (script-fn
+    :initarg :script
     :type function
-    :reader pattern.init-fn)
-   (deps-fn
-    :initarg :deps
-    :type function
-    :reader pattern.deps-fn))
+    :reader pattern.script-fn))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
-   :deps (constantly nil)
-   :init (constantly nil)))
+   :script-fn (constantly nil)))
 
-(defmethods pattern (self init-fn deps-fn)
-  (:method pattern-init (self)
-    (funcall init-fn))
-  (:method pattern-depend (self)
-    (funcall deps-fn)))
+(defmethods pattern (self script-fn)
+  (:method pattern-build (self)
+    (funcall script-fn)))
 
 (defun extension (ext)
   (assure pathname
@@ -1546,7 +1456,7 @@ specify the dependencies you want on build."
 
 (defmacro defpattern (class-name (in out)
                       (&rest options &key &allow-other-keys)
-                      &body (init . deps))
+                      &body script)
   "Define a file pattern named NAME.
 
 Some build systems let you define file patterns based on extensions or
@@ -1563,28 +1473,22 @@ extension to the file.
 
 Based on the pattern, the output file is calculated, and the result
 depends on that."
-  (let ((script-name (script-name class-name)))
-    `(progn
-       (define-script ,script-name ,(list* in out init))
-       (eval-always
+  `(progn
+     (define-script-for class-name
+       ,in
+       ,out
+       ,@script)
+     (eval-always
+       (with-keyword-macros
+         (defclass ,class-name (pattern)
+           ()
+           (:default-initargs ,@options))))
+     (defmethod pattern-build ((self ,class-name))
+       (let ((,in *input*)
+             (,out *output*))
+         (declare (ignorable ,in ,out))
          (with-keyword-macros
-           (defclass ,class-name (pattern)
-             ()
-             (:default-initargs ,@options))))
-       (defmethod pattern-init ((self ,class-name))
-         (let ((,in *input*)
-               (,out *output*))
-           (declare (ignorable ,in ,out))
-           ,init))
-       (defmethod pattern-depends ((self ,class-name))
-         (let ((,in *input*)
-               (,out *output*))
-           (declare (ignorable ,out))
-           (funcall
-            (deps-thunk
-              (:depends-on ',script-name)
-              (:depends-on ,in)
-              ,@deps)))))))
+           ,@script)))))
 
 
 ;;; Languages
@@ -1620,7 +1524,7 @@ depends on that."
     (dynamic-unrequire-as lang source))
   (assure (not module-cell)
     (let ((spec (module-spec lang source)))
-      (build spec)
+      (redo spec)
       (let ((cell (module-spec-cell spec)))
         (module-cell.module cell)))))
 
@@ -1699,7 +1603,7 @@ interoperation with Emacs."
     (~> lang
         (static-exports-pattern source)
         (pattern-ref source)
-        build)))
+        redo)))
 
 (defun extract-static-exports (lang source)
   (check-type source absolute-pathname)
@@ -1719,11 +1623,9 @@ interoperation with Emacs."
           (ext (extension "static-exports")))
       (merge-pathnames* ext fasl)))
 
-  (:method pattern-init (self)
-    (save-static-exports lang source))
-
-  (:method pattern-depend (self)
-    (depends-on (fasl-lang-pattern-ref lang source))))
+  (:method pattern-build (self)
+    (save-static-exports lang source)
+    (redo-ifchange (fasl-lang-pattern-ref lang source))))
 
 (defun static-exports-pattern (lang source)
   ;; The static export file depends on the fasl.
@@ -1779,7 +1681,7 @@ if it does not exist."
         (assure pathname
           (or (truename* path)
               (or (progn
-                    (build path)
+                    (redo path)
                     (truename* path))
                   (error "Cannot resolve pathname ~a" path)))))
   (mvlet* ((key (cons lang path))
@@ -1832,7 +1734,7 @@ if it does not exist."
         (synchronized (cell)
           (or module
               (progn
-                (build cell)
+                (redo cell)
                 module))))))
 
 ;;; Languages.
@@ -1847,13 +1749,6 @@ if it does not exist."
 
   (:method ((lang symbol) (source t))
     (lang-deps (resolve-lang-package lang) source)))
-
-(defgeneric unbuild-lang-deps (lang source)
-  (:method ((lang t) (source t))
-    nil)
-
-  (:method ((lang symbol) (source t))
-    (unbuild-lang-deps (resolve-lang lang) source)))
 
 (defmethod pattern.input-defaults ((lang symbol))
   (let ((p (resolve-package lang)))
@@ -1900,7 +1795,7 @@ if it does not exist."
              (list ',load ,source))
            (defmethod lang-deps :after ((self (eql ,(make-keyword package-name))) source)
              (declare (ignore source))
-             (depends-on ',script)))))))
+             (redo-ifchange ',script)))))))
 
 (defun load-fasl-lang (lang source)
   (let ((object-file (faslize lang source)))
@@ -1909,13 +1804,13 @@ if it does not exist."
       (recompile-object-file ()
         :report "Recompile the object file."
         (delete-file-if-exists object-file)
-        (build (module-spec lang source))
+        (redo (module-spec lang source))
         (load-fasl-lang lang source)))))
 
 (defmethod lang-deps ((lang package) (source cl:pathname))
   (let* ((pat (fasl-lang-pattern lang source))
          (ref (pattern-ref pat source)))
-    (depends-on ref)))
+    (redo-ifchange ref)))
 
 (defmethod unbuild-lang-deps ((lang package) (source cl:pathname))
   (delete-file-if-exists (faslize lang source)))
@@ -1935,8 +1830,7 @@ if it does not exist."
   (:method pattern.output-defaults (self)
     (faslize lang source))
 
-  (:method pattern-init (self)
-    ;; TODO Should we reset the deps first?
+  (:method pattern-build (self)
     (let* ((*source* *input*)
            (lang (lang-name lang))
            (*language* lang)
@@ -2451,7 +2345,7 @@ actually exported by the module specified by LANG and SOURCE."
       (setf source (merge-pathnames* source (base))))
     (restart-case
         (progn
-          (build (module-spec lang source))
+          (redo (module-spec lang source))
           (let ((exports
                   (module-static-exports lang source))
                 (bindings
@@ -2470,7 +2364,7 @@ actually exported by the module specified by LANG and SOURCE."
         (let ((object-file (faslize lang source))
               (target (module-spec lang source)))
           (delete-file-if-exists object-file)
-          (build target)
+          (redo target)
           (check-static-bindings lang source bindings))))))
 
 (defmacro import-module (module &key as from)
@@ -2484,7 +2378,8 @@ actually exported by the module specified by LANG and SOURCE."
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
-  (save-dependency (module-spec as from))
+  ;; TODO
+  ;; (save-dependency (module-spec as from))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias

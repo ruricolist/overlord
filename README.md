@@ -144,18 +144,18 @@ arbitrary namespaces (more locations); they can be persisted, in fasl
 files and in saved images; and they are each uniquely addressed with a
 path (package name, symbol name).)
 
-The most obvious, but least important, difference between Overlord and
-Redo in practice is that Redo uses shell scripts, while Overlord’s
-“scripts” are written in Lisp. (It is unimportant because, after all,
-you can run shell commands from Lisp, or somehow call Lisp from the
-shell.) On the one hand, embedding shell syntax in Lisp is clumsy; on
-the other hand, Lisp special variables are much superior to any
-shell-based means for passing information between parent and child
-scripts. (See §5.4.2 in [Grosskurth 2007][Grosskurth].)
+The obvious difference between Overlord and Redo in practice is that
+Redo uses shell scripts, while Overlord’s “scripts” are written in
+Lisp. (It is unimportant because, after all, you can run shell
+commands from Lisp, or somehow call Lisp from the shell.) On the one
+hand, embedding shell syntax in Lisp is clumsy; on the other hand,
+Lisp special variables are much superior to any shell-based means for
+passing information between parent and child scripts. (See §5.4.2 in
+[Grosskurth 2007][Grosskurth].)
 
-The *important* difference is that Overlord uses *two* scripts per
-target: one for building the target, and another for computing extra
-dependencies without involving the database.
+That said, Overlord is a faithful implementation of Redo. It differs
+from Redo only in having a very different idea of what can be a
+target.
 
 ## CLI
 
@@ -165,21 +165,6 @@ It is possible to run Overlord using either [cl-launch][]
 or [Roswell][]. The cl-launch script is in `cl-launch/overlord`. The
 Roswell script is in `roswell/overlord.ros`. They each use the same
 syntax.
-
-## Building with signals
-
-One other potentially interesting aspect of Overlord’s implementation
-of the Redo model is that walking the dependencies is done using
-signals and handlers, rather than by recursing directly. That is, when
-a script calls `depends-on`, all it does is *signal* that a dependency
-exists. It is the default handler which is responsible for actually
-building the dependency.
-
-While the dependency graph of Overlord remains fundamentally
-imperative, because of this separation, and because of the distinction
-between build and dependency scripts, it should be possible to write
-handlers that simply traverse the dependency graph (once it has been
-built at least once), without necessarily having to actually build it.
 
 ## A word of warning
 

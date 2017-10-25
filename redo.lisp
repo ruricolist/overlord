@@ -6,7 +6,6 @@
 
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
-  (:import-from #:overlord/specials #:*parent*)
   (:import-from #:overlord/types #:error*)
   (:export
    #:redo
@@ -14,6 +13,7 @@
    #:redo-ifcreate
    #:redo-always
    #:redo-stamp
+   #:*parent*
    ;; Functions to implement.
 
    ;; NB Would it be worthwhile to implement these as generic
@@ -36,6 +36,23 @@
    #:target-up-to-date?))
 (in-package #:overlord/redo)
 
+(declaim (notinline
+          target-stamp
+          stamp=
+          target-exists?
+          target=
+          target-build-script-target
+          target-default-build-script-target
+          run-script
+          record-prereq
+          record-prereqne
+          target-kind
+          target-saved-prereqs
+          target-saved-prereqsne
+          saved-prereq-target
+          saved-prereq-stamp
+          target-up-to-date?))
+
 (defconst source    :source)
 (defconst target    :target)
 (defconst nonexist  :nonexist)
@@ -43,6 +60,8 @@
 (defconst prereqsne :prereqsne)
 (defconst stamp     :stamp)
 (defconst uptodate  :uptodate)
+
+(defvar-unbound *parent* "Parent of the target being built.")
 
 (defun check-parent ()
   (unless (boundp '*parent*)
@@ -54,24 +73,27 @@
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (unless (eql source (target-kind target))
-      (let ((build-script
-              ;; TODO What directory should be current? Or should the script take care of that?
-              (let ((script-target (target-build-script-target target)))
-                ;; TODO Should we support default build scripts?
-                (if (target-exists? script-target)
-                    (let ((*parent* target))
-                      (redo-ifchange script-target)
-                      script-target)
-                    (let ((default (target-default-build-script-target target)))
-                      (if (target-exists? default)
-                          (let ((*parent* target))
-                            (redo-ifchange default) (redo-ifcreate script-target)
-                            default)
-                          (error* "No script found for ~a" target)))))))
+      (let ((build-script (resolve-build-script target)))
         (nix (target-up-to-date? target))
         (let ((*parent* target))
           (run-script build-script))
         (setf (target-up-to-date? target) t)))))
+
+(defun resolve-build-script (target)
+  ;; TODO What directory should be current? Or should the script take care of that?
+  (let ((script-target (target-build-script-target target)))
+    ;; TODO Should we support default build scripts?
+    (if (target-exists? script-target)
+        (let ((*parent* target))
+          (redo-ifchange script-target)
+          script-target)
+        (let ((default (target-default-build-script-target target)))
+          (if (target-exists? default)
+              (let ((*parent* target))
+                (redo-ifchange default)
+                (redo-ifcreate script-target)
+                default)
+              (error* "No script found for ~a" target))))))
 
 ;;; Should be (target).
 (-> changed? (t) boolean)
