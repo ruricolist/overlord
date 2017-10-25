@@ -450,16 +450,12 @@ system that is very likely to change.
 
 - Lots of tests.
 - More portability testing.
-- Leverage UIOP more.
+- Multiple outputs from one target.
 - Source locations for functions in embedded languages.
-- More convenient shell command syntax.
 - Thread safety (and eventually parallelism).
-- Fewer dependencies.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el)).
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
-- Interfaces for modules?
 - Isolate file-system side effects (cf. [Boot][]).
-- Using build directories (cf. [ASDF][]).
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
