@@ -153,9 +153,22 @@ Lisp special variables are much superior to any shell-based means for
 passing information between parent and child scripts. (See §5.4.2 in
 [Grosskurth 2007][Grosskurth].)
 
-That said, Overlord is a faithful implementation of Redo. It differs
-from Redo only in having a very different idea of what can be a
-target.
+The important thing to remember about Overlord is that, because the
+goal of Overlord is to maintain the consistency of the whole Lisp
+system, there is only one project. Targets are resolved (i.e. relative
+pathnames are made absolute) at compile time, not run time, relative
+to the base inferred for the package which is current at the time they
+are defined. And because all targets are absolute, the directory which
+is current at the time the build takes place does not matter.
+
+The fact that there is only one project also changes how patterns are
+handled. Since patterns do not belong to a particular project, they
+need another form of namespacing. Accordingly patterns are given names
+(when they are defined with `defpattern`) and must be invoked by name.
+
+All that said, Overlord is a faithful implementation of Redo. It
+differs from Redo only in having a very different idea of what can be
+a target.
 
 ## CLI
 
