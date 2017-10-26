@@ -1,3 +1,27 @@
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [Overlord](#overlord)
+    - [Advice for users](#advice-for-users)
+        - [About Quicklisp](#about-quicklisp)
+    - [Embedding languages](#embedding-languages)
+    - [Language examples](#language-examples)
+- [Overlord vs. ASDF](#overlord-vs-asdf)
+- [Overlord vs. Redo](#overlord-vs-redo)
+    - [CLI](#cli)
+    - [A word of warning](#a-word-of-warning)
+- [Overlord and Lisp images](#overlord-and-lisp-images)
+- [Overlord vs. Racket](#overlord-vs-racket)
+    - [Modules](#modules)
+    - [Languages](#languages)
+    - [Defining languages](#defining-languages)
+    - [Imports and exports](#imports-and-exports)
+    - [Simple modules](#simple-modules)
+    - [Macro exports](#macro-exports)
+- [Future work](#future-work)
+
+<!-- markdown-toc end -->
+
 # Overlord
 
 Overlord is an experimental build/module system for Common Lisp,
