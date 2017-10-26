@@ -1134,19 +1134,29 @@ TARGET."
     (setf (symbol-value symbol)     (funcall thunk)
           (target-timestamp symbol) (now))))
 
-(defun call/temp-file-pathname (dest fn)
+(defun redo-vars (dest temp &optional suffix)
+  (declare (ignore suffix))
+  (let ((dest (assure pathname dest)))
+    (values dest
+            dest
+            (assure pathname temp))))
+
+(defun call/temp-file-pathname (dest fn &optional ext)
   "Call FN on a freshly allocated temporary pathname; if it completes
 safely, overwrite DEST with the contents of the temporary file."
   (let* ((ok nil)
          (tmp (with-temporary-file (:pathname p :keep t)
-                (funcall fn p)
+                (receive (*1* *2* *3*) (redo-vars dest p ext)
+                  (funcall fn p))
                 (setq ok t)
                 p)))
     (if ok
         ;; Cross-device?
-        #+ () (rename-file-overwriting-target tmp dest)
-        (copy-file tmp dest :if-to-exists :rename-and-delete)
-        (delete-file tmp))))
+        (if (equal (pathname-device tmp)
+                   (pathname-device dest))
+            (rename-file-overwriting-target tmp dest)
+            (copy-file tmp dest :if-to-exists :rename-and-delete))
+        (delete-file-if-exists tmp))))
 
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
@@ -1486,9 +1496,11 @@ depends on that."
      (defmethod pattern-build ((self ,class-name))
        (let ((,in *input*)
              (,out *output*))
-         (declare (ignorable ,in ,out))
-         (with-keyword-macros
-           ,@script)))))
+         (declare (ignorable ,in))
+         (call/temp-file-pathname ,out
+                                  (lambda (,out)
+                                    (with-keyword-macros
+                                      ,@script)))))))
 
 
 ;;; Languages
