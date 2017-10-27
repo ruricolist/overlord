@@ -179,13 +179,15 @@ on Lisp/OS/filesystem combinations that support it."
 
 ;;; Auxiliary functions.
 
-(defconst source    :source)
-(defconst target    :target)
-(defconst nonexist  :nonexist)
-(defconst prereqs   :prereqs)
-(defconst prereqsne :prereqsne)
-(defconst stamp     :stamp)
-(defconst uptodate  :uptodate)
+(defconst source         :source)
+(defconst target         :target)
+(defconst nonexist       :nonexist)
+(defconst prereqs        :prereqs)
+(defconst prereqs-temp   :prereqs-temp)
+(defconst prereqsne      :prereqsne)
+(defconst prereqsne-temp :prereqsne-temp)
+(defconst stamp          :stamp)
+(defconst uptodate       :uptodate)
 
 (defun current-parent ()
   (or (bound-value '*parent*)
@@ -193,10 +195,7 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defun record-prereq (target &optional (parent (current-parent)))
   (check-type target target)
-  (pushnew (saved-prereq target)
-           (prop parent prereqs)
-           :test (op (target= (saved-prereq-target _)
-                              (saved-prereq-target _)))))
+  (push (saved-prereq target) (prop parent prereqs-temp)))
 
 (defun saved-prereq (x) (cons x (target-stamp x)))
 (defun saved-prereq-target (p) (car p))
@@ -204,7 +203,7 @@ on Lisp/OS/filesystem combinations that support it."
 
 (defun record-prereqne (target &optional (parent (current-parent)))
   (check-type target target)
-  (pushnew target (prop parent prereqsne) :test #'target=))
+  (push target (prop parent prereqsne-temp)))
 
 (defun target-kind (x)
   (assure (member #.target #.source)
@@ -212,9 +211,37 @@ on Lisp/OS/filesystem combinations that support it."
             (has-prop? x
                        uptodate
                        prereqs
-                       prereqsne))
+                       prereqs-temp
+                       prereqsne
+                       prereqsne-temp))
         target
         source)))
+
+(defun clear-temp-prereqs (target)
+  (delete-prop target prereqs-temp))
+
+(defun clear-temp-prereqsne (target)
+  (delete-prop target prereqsne-temp))
+
+(flet ((save-temp-prereqs (target temp perm &key (key #'identity))
+         (let ((prereqs (prop target temp)))
+           (delete-prop target temp)
+           (if (no prereqs)
+               (delete-prop target perm)
+               (setf (prop target perm)
+                     (deduplicate-targets prereqs :key key))))))
+
+  (defun save-temp-prereqs (target)
+    (save-temp-prereqs target
+                       prereqs-temp
+                       prereqs
+                       :key #'saved-prereq-target))
+
+  (defun save-temp-prereqsne (target)
+    (save-temp-prereqs target
+                       prereqs-temp
+                       prereqs
+                       :key #'saved-prereq)))
 
 (defun target-up-to-date? (target)
   (prop target uptodate))
@@ -225,8 +252,12 @@ on Lisp/OS/filesystem combinations that support it."
       (setf (prop target uptodate) t)
       (delete-prop target uptodate)))
 
-(defplace target-saved-prereqs (target)
+(defun target-saved-prereqs (target)
   (prop target prereqs))
+
+(defun (setf target-saved-prereqs) (value target)
+  (setf (prop target prereqs)
+        (deduplicate-targets value)))
 
 (defplace target-saved-prereqsne (target)
   (prop target prereqsne))
@@ -2403,8 +2434,8 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import-module/lazy (module &key as from)
   ;; TODO
-  (let ((target (module-spec as from)))
-    (record-prereq target (root-target)))
+  ;; (let ((target (module-spec as from)))
+  ;;   (record-prereq target (root-target)))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias

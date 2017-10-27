@@ -33,7 +33,11 @@
    #:target-saved-prereqsne
    #:saved-prereq-target
    #:saved-prereq-stamp
-   #:target-up-to-date?))
+   #:target-up-to-date?
+   #:save-temp-prereqs
+   #:clear-temp-prereqs
+   #:save-temp-prereqsne
+   #:clear-temp-prereqsne))
 (in-package #:overlord/redo)
 
 (declaim (notinline
@@ -45,32 +49,39 @@
           target-default-build-script-target
           run-script
           record-prereq
+          save-temp-prereqs
           record-prereqne
+          save-temp-prereqsne
           target-kind
           target-saved-prereqs
           target-saved-prereqsne
           saved-prereq-target
           saved-prereq-stamp
-          target-up-to-date?))
+          target-up-to-date?
+          clear-temp-prereqs
+          clear-temp-prereqsne))
 
 (defvar-unbound *parent* "Parent of the target being built.")
 
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; hashes for its deps.
-(defun redo (&rest args &aux (parent? (boundp '*parent*)))
+(defun redo (&rest args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (unless (eql source (target-kind target))
+      (clear-temp-prereqs target)
+      (clear-temp-prereqsne target)
       (let ((build-script (resolve-build-script target)))
         (nix (target-up-to-date? target))
         (let ((*parent* target))
           (run-script build-script))
+        (save-temp-prereqs target)
+        (save-temp-prereqsne target)
         (setf (target-up-to-date? target) t)))))
 
 (defun resolve-build-script (target)
   ;; TODO What directory should be current? Or should the script take care of that?
   (let ((script-target (target-build-script-target target)))
-    ;; TODO Should we support default build scripts?
     (if (target-exists? script-target)
         (let ((*parent* target))
           (redo-ifchange script-target)
