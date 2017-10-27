@@ -122,7 +122,7 @@
   (local
     (def original #.+literal-string+)
     (touch +literal-string-file+)
-    (overlord:build '+literal-string+)
+    (overlord:redo '+literal-string+)
     (is (not (eq original +literal-string+)))))
 
 (test var/deps
@@ -131,7 +131,7 @@
     (is (stringp string1))
 
     (touch +literal-string-file+)
-    (overlord:build '*literal-string*)
+    (overlord:redo '*literal-string*)
     (def string2 *literal-string*)
     (is (stringp string2))
     (is (not (eq string1 string2)))
@@ -139,7 +139,7 @@
     (nap 1)
 
     (touch '+literal-string-file+)
-    (overlord:build '*literal-string*)
+    (overlord:redo '*literal-string*)
     (def string3 *literal-string*)
     (is (stringp string3))
     (is (not (eq string2 string3)))))
