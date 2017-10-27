@@ -1236,7 +1236,7 @@ safely, overwrite DEST with the contents of the temporary file."
              (rebuild-file file thunk (base))
              script))
 
-(defun build-conf (name new test)
+(defun update-config-if-changed (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
   (let ((old (symbol-value name)))
@@ -1354,7 +1354,7 @@ the current base."
        (eval-always
          (save-task ',name (constantly ,init) trivial-target))
        (eval-always
-         (build-conf ',name ,init ,test))
+         (update-config-if-changed ',name ,init ,test))
        ',name)))
 
 (defmacro script-thunk (&body body)
