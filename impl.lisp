@@ -193,17 +193,25 @@ on Lisp/OS/filesystem combinations that support it."
   (or (bound-value '*parent*)
       (root-target)))
 
-(defun record-prereq (target &optional (parent (current-parent)))
-  (check-type target target)
-  (push (saved-prereq target) (prop parent prereqs-temp)))
-
 (defun saved-prereq (x) (cons x (target-stamp x)))
 (defun saved-prereq-target (p) (car p))
 (defun saved-prereq-stamp (p) (cdr p))
 
+(defmethod fset:compare ((x saved-prereq) (y saved-prereq))
+  (fset:compare-slots x y
+                      #'saved-prereq-target
+                      #'saved-prereq-stamp))
+
+(def empty-set (fset:empty-set))
+
+(defun record-prereq (target &optional (parent (current-parent)))
+  (check-type target target)
+  (withf (prop parent prereqs-temp empty-set)
+         (saved-prereq target)))
+
 (defun record-prereqne (target &optional (parent (current-parent)))
   (check-type target target)
-  (push target (prop parent prereqsne-temp)))
+  (withf (prop parent prereqsne-temp empty-set) target))
 
 (defun target-kind (x)
   (assure (member #.target #.source)
@@ -223,25 +231,23 @@ on Lisp/OS/filesystem combinations that support it."
 (defun clear-temp-prereqsne (target)
   (delete-prop target prereqsne-temp))
 
-(flet ((save-temp-prereqs (target temp perm &key (key #'identity))
-         (let ((prereqs (prop target temp)))
+(flet ((save-temp-prereqs (target temp perm)
+         (let ((prereqs (assure fset:set (prop target temp empty-set))))
            (delete-prop target temp)
-           (if (no prereqs)
+           (if (fset:empty? prereqs)
                (delete-prop target perm)
                (setf (prop target perm)
-                     (deduplicate-targets prereqs :key key))))))
+                     (fset:convert 'list prereqs))))))
 
   (defun save-temp-prereqs (target)
     (save-temp-prereqs target
                        prereqs-temp
-                       prereqs
-                       :key #'saved-prereq-target))
+                       prereqs))
 
   (defun save-temp-prereqsne (target)
     (save-temp-prereqs target
                        prereqs-temp
-                       prereqs
-                       :key #'saved-prereq)))
+                       prereqs)))
 
 (defun target-up-to-date? (target)
   (prop target uptodate))
@@ -252,12 +258,8 @@ on Lisp/OS/filesystem combinations that support it."
       (setf (prop target uptodate) t)
       (delete-prop target uptodate)))
 
-(defun target-saved-prereqs (target)
+(defplace target-saved-prereqs (target)
   (prop target prereqs))
-
-(defun (setf target-saved-prereqs) (value target)
-  (setf (prop target prereqs)
-        (deduplicate-targets value)))
 
 (defplace target-saved-prereqsne (target)
   (prop target prereqsne))
