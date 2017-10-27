@@ -959,7 +959,7 @@ distributed."
   (unless (frozen?)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
-               (redo root-target)
+               (redo (root-target))
                ;; The DB can still be reloaded, but is not in memory.
                (unload-db)
                (setf *frozen* t))
@@ -1090,7 +1090,7 @@ distributed."
 (defun run-save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (save-task target thunk script)
-  (redo target))
+  (redo-ifchange target))
 
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
@@ -1382,7 +1382,7 @@ rebuilt."
   `(progn
      (var-target ,name ,expr
        ,@deps)
-     (redo ',name)
+     (redo-ifchange ',name)
      ',name))
 
 (defmacro defconfig/deps (name expr &body deps)
@@ -1406,7 +1406,7 @@ rebuilt."
            (script-thunk (eval* `(script-thunk ,@script)))
            (script-thunk (rebuild-symbol name script-thunk)))
       (save-task name script-thunk))
-    (redo name))
+    (redo-ifchange name))
   (let ((init (symbol-value name))
         (timestamp (target-timestamp name)))
     `(progn
@@ -1416,7 +1416,7 @@ rebuilt."
              ,init))
        (save-task ',name
                   (rebuild-symbol ',name (script-thunk ,@script)))
-       (redo ',name)
+       (redo-ifchange ',name)
        ',name)))
 
 (defmacro file-target (name pathname (&optional tmp) &body script)
@@ -1581,7 +1581,7 @@ depends on that."
     (dynamic-unrequire-as lang source))
   (assure (not module-cell)
     (let ((spec (module-spec lang source)))
-      (redo spec)
+      (redo-ifchange spec)
       (let ((cell (module-spec-cell spec)))
         (module-cell.module cell)))))
 
@@ -1660,7 +1660,7 @@ interoperation with Emacs."
     (~> lang
         (static-exports-pattern source)
         (pattern-ref source)
-        redo)))
+        redo-ifchange)))
 
 (defun extract-static-exports (lang source)
   (check-type source absolute-pathname)
