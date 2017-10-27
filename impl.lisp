@@ -861,16 +861,22 @@ it."
     (setf (target-table.map table)
           (fset:empty-map))))
 
-(defun deduplicate-targets (targets)
+(defun deduplicate-targets (targets &key (key #'identity))
   ;; (test-chamber:with-experiment
   ;;     (:class 'test-chamber:noisy-experiment
   ;;      :test (op (set-equal _ _ :test #'target=))
   ;;      :enabled nil)
   ;;   (remove-duplicates targets :test #'target=))
-  (target-table-keys
-   (lret ((table (make-target-table :size (length targets))))
-     (dolist (target targets)
-       (setf (target-table-member table target) t)))))
+  (collecting
+    (fbind key
+      (let ((table (make-target-table :size (length targets))))
+        (do-each (target targets)
+          (let ((count
+                  (incf
+                   (ensure2 (target-table-ref table (key target))
+                     0))))
+            (when (= count 1)
+              (collect target))))))))
 
 
 ;;; Building.
