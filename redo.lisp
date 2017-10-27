@@ -63,8 +63,6 @@
 
 (defvar-unbound *parent* "Parent of the target being built.")
 
-;;; The only thing special about redo-ifchange is that it writes out
-;;; hashes for its deps.
 (defun redo (&rest args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
@@ -123,6 +121,8 @@
         (setf changed? t)))
     changed?))
 
+;;; The only thing special about redo-ifchange is that it writes out
+;;; stamps for its deps.
 (defun redo-ifchange (&rest args)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
