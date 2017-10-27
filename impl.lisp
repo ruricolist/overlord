@@ -559,6 +559,9 @@ it."
 
 (define-symbol-macro root-target *root-target*)
 
+(define-singleton-type impossible-target)
+(define-singleton-type trivial-target)
+
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In
@@ -569,6 +572,8 @@ it."
   ;; case we want the /oldest/ timestamp).
   '(or
     root-target
+    impossible-target
+    trivial-target
     bindable-symbol
     pathname
     package-ref
@@ -592,11 +597,9 @@ it."
          (directory-exists-p path)))))
 
 (defun target-exists? (target)
-  ;; (not (eql never (target-timestamp target)))
-  ;; XXX
-  (etypecase-of (or null target) target
-    (null nil)
-    (root-target t)
+  (etypecase-of target target
+    ((or root-target trivial-target) t)
+    (impossible-target nil)
     (bindable-symbol (boundp target))
     (pathname (pathname-exists? target))
     (package-ref
@@ -621,6 +624,8 @@ it."
 (defun target-timestamp (target)
   (etypecase-of target target
     (root-target (root-target-timestamp root-target))
+    (impossible-target never)
+    (trivial-target far-future)
     (bindable-symbol
      (if (boundp target)
          (let ((now (now)))
@@ -660,6 +665,8 @@ it."
   (check-not-frozen)
   (etypecase-of target target
     (root-target (setf (root-target-timestamp root-target) timestamp))
+    ((or impossible-target trivial-target)
+     (error* "Cannot set timestamp for ~a" target))
     (bindable-symbol
      ;; Configurations need to set the timestamp while unbound.
      #+ () (unless (boundp target)
@@ -703,7 +710,8 @@ it."
   (when (typep base 'temporary-file)
     (simple-style-warning "Base looks like a temporary file: ~a" base))
   (etypecase-of target target
-    ((or root-target bindable-symbol package-ref) target)
+    ((or root-target impossible-target trivial-target bindable-symbol package-ref)
+     target)
     (pathname
      (let ((path (merge-pathnames* target base)))
        (if (wild-pathname-p path)
@@ -735,6 +743,8 @@ it."
 (defun target-type-of (x)
   (typecase-of target x
     (root-target 'root-target)
+    (trivial-target 'trivial-target)
+    (impossible-target 'impossible-target)
     (bindable-symbol 'bindable-symbol)
     (pathname 'pathname)
     (module-spec 'module-spec)
@@ -784,6 +794,10 @@ it."
   (etypecase-of target target
     (root-target
      (load-time-value (sxhash *root-target*)))
+    (trivial-target
+     (load-time-value (sxhash trivial-target)))
+    (impossible-target
+     (load-time-value (sxhash impossible-target)))
     (bindable-symbol (sxhash target))
     (pathname (sxhash target))
     (module-spec
@@ -1009,22 +1023,23 @@ distributed."
   "A task."
   (target (and target (not task)))
   (thunk function)
-  (script (or null (and target (not task)))))
+  (script (and target (not task))))
 
 (defun target-build-script-target (target)
   (check-not-frozen)
   (etypecase-of target target
     ((or bindable-symbol pathname)
      (gethash target *tasks*))
-    (target nil)))
+    (target impossible-target)))
 
 (defun target-default-build-script-target (target)
   (check-not-frozen)
-  ;; TODO Alternately, instead of nil for the script, you could
-  ;; actually use define-script-for and depend on those scripts. But:
-  ;; that would create serious bootstrapping issues.
+  ;; TODO Alternately, instead of trivial-target for the script, you
+  ;; could actually use define-script-for and depend on those scripts.
+  ;; But: that would create serious bootstrapping issues.
   (etypecase-of target target
-    ((or task pathname bindable-symbol) nil)
+    ((or task pathname bindable-symbol impossible-target trivial-target)
+     nil)
     (root-target
      (task target
            (lambda ()
@@ -1034,8 +1049,7 @@ distributed."
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
                (apply #'redo-ifchange (list-top-level-targets))))
-           ;; XXX
-           root-target))
+           trivial-target))
     (pattern-ref
      (let* ((input (pattern-ref.input target))
             (output (pattern-ref.output target))
@@ -1055,7 +1069,7 @@ distributed."
              (lambda ()
                (let ((dir (resolve-target dir (base))))
                  (ensure-directories-exist dir)))
-             nil)))
+             trivial-target)))
     (package-ref
      (with-slots (name use-list nicknames) target
        (task target
@@ -1064,7 +1078,7 @@ distributed."
                    (make-package name
                                  :use use-list
                                  :nicknames nicknames)))
-             nil)))
+             trivial-target)))
     (module-spec
      (target-default-build-script-target (module-spec-cell target)))
     (module-cell
@@ -1078,8 +1092,7 @@ distributed."
                    (redo-ifchange source)
                    ;; Let the language tell you what else to depend on.
                    (lang-deps lang source))))
-             ;; TODO Is this right?
-             source)))))
+             trivial-target)))))
 
 (defun run-script (task)
   (check-not-frozen)
@@ -1095,7 +1108,8 @@ distributed."
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (etypecase-of target target
-    (root-target (values))
+    ((or root-target trivial-target impossible-target)
+     (values))
     ((or bindable-symbol pathname)
      (let ((task (task target thunk script)))
        (setf (gethash target *tasks*) task)))
@@ -1131,6 +1145,8 @@ TARGET."
     (pathname target)
     (bindable-symbol `(quote ,target))
     (root-target 'root-target)
+    (trivial-target 'trivial-target)
+    (impossible-target 'impossible-target)
     (module-spec
      (let-match1 (module-spec lang path) target
        `(module-spec ,lang ,path)))
@@ -1157,6 +1173,8 @@ TARGET."
   (assure stamp
     (etypecase-of target target
       ((or root-target
+           trivial-target
+           impossible-target
            bindable-symbol
            package-ref
            pattern-ref
@@ -1334,7 +1352,7 @@ the current base."
                                   (now))))
            ,@(unsplice documentation)))
        (eval-always
-         (save-task ',name (constantly ,init) nil))
+         (save-task ',name (constantly ,init) trivial-target))
        (eval-always
          (build-conf ',name ,init ,test))
        ',name)))

@@ -61,9 +61,8 @@
 
 (defmacro define-singleton-type (name)
   `(progn
-     (deftype ,name ()
-       '(eql ,name))
-     (def ,name ',name)))
+     (defconstructor ,name)
+     (def ,name (,name))))
 
 
 ;;; Conditions.
