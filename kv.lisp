@@ -287,8 +287,9 @@ reloaded on demand."
           (eif (eql (symbol-package x)
                     #.(find-package :cl))
               x
-              (cons (package-name (symbol-package x))
-                    (symbol-name x))))
+              (let* ((p (symbol-package x)))
+                (cons (and p (package-name p))
+                      (symbol-name x)))))
       x))
 
 (defun prop-key (obj prop)
