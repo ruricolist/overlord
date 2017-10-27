@@ -296,12 +296,26 @@ reloaded on demand."
   (cons (unqualify-symbol obj)
         (unqualify-symbol prop)))
 
-(defplace prop (obj prop)
+(defplace prop-1 (obj prop)
   (kv.ref (kv) (prop-key obj prop)))
 
+(defun prop (obj prop &optional default)
+  (multiple-value-bind (val val?) (prop-1 obj prop)
+    (if val?
+        (values val t)
+        (values default nil))))
+
+(defun (setf prop) (value obj prop &optional default)
+  (declare (ignore default))
+  (setf (prop-1 obj prop) value))
+
 (defun has-prop? (obj prop &rest props)
-  (some (op (nth-value 1 (prop obj _)))
+  (some (op (nth-value 1 (prop-1 obj _)))
         (cons prop props)))
+
+(defun has-props? (obj prop &rest props)
+  (every (op (nth-value 1 (prop-1 obj _)))
+         (cons prop props)))
 
 (defun delete-prop (obj prop)
   (kv.del (kv) (prop-key obj prop)))
