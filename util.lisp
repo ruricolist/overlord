@@ -1,6 +1,7 @@
 (cl:defpackage #:overlord/util
   (:use :cl :alexandria :serapeum)
   (:import-from :overlord/types :case-mode)
+  (:import-from :fset :with :less)
   (:import-from :uiop
     :pathname-directory-pathname
     :pathname-parent-directory-pathname
@@ -24,8 +25,13 @@
    #:ensure-pathnamef
    #:read-file-form
    #:write-form-as-file
-   #:write-file-if-changed))
+   #:write-file-if-changed
+   #:withf
+   #:lessf))
 (cl:in-package #:overlord/util)
+
+(define-modify-macro withf (&rest item-or-tuple) with)
+(define-modify-macro lessf (&rest item-or-tuple) less)
 
 ;;; TODO This cries out for a compiler macro.
 (-> compare (function function &rest t) t)
