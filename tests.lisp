@@ -23,9 +23,11 @@
 
 (defun nap (&optional (n 1))
   "Sleep until the universal time counter ticks over."
+  (format t "~&zzz...")
   (loop with start = (get-universal-time)
         until (< start (get-universal-time))
-        do (sleep n)))
+        do (sleep n))
+  (format t "~%"))
 
 
 ;;; Suite.
