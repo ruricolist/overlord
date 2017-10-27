@@ -38,6 +38,8 @@
   (:import-from :fset)
   (:import-from :trivia
     :match :ematch :let-match1)
+  (:import-from :trivial-file-size
+    :file-size-in-octets)
   ;; Portability shim for "global" or "static" vars. They  global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
