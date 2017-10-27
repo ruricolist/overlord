@@ -1349,32 +1349,32 @@ A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  `(progn
-     ;; The script must be available at compile time to be depended
-     ;; on.
-     (define-script-for ,name ,expr)
-     (defconfig/deps-aux ,name ,expr
-       ,@deps)))
+  (let ((script (append1 deps expr)))
+    `(progn
+       ;; The script must be available at compile time to be depended
+       ;; on.
+       (define-script-for ,name
+         ,@script)
+       (defconfig/deps-aux ,name
+         ,@script))))
 
 (defmacro defconfig/deps-aux (name &body script)
-  (mvlet* ((base (base))
-           (*base* base)
-           (init timestamp
-            (progn
-              (if (boundp name)
-                  (redo name)
-                  (let ((thunk (rebuild-symbol name (eval* `(script-thunk ,@script)))))
-                    (run-task name thunk)))
-              (values (symbol-value name)
-                      (target-timestamp name)))))
+  (unless (boundp name)
+    (let* ((*base* (base))
+           (script-thunk (eval* `(script-thunk ,@script)))
+           (script-thunk (rebuild-symbol name script-thunk)))
+      (save-task name script-thunk))
+    (redo name))
+  (let ((init (symbol-value name))
+        (timestamp (target-timestamp name)))
     `(progn
-       (eval-always
-         (define-global-var ,name
-             (prog1 ',init
-               (setf (target-timestamp ',name) ,timestamp))))
-       (eval-always
-         (run-task ',name
-                   (rebuild-symbol ',name (script-thunk ,@script))))
+       (define-global-var ,name
+           (progn
+             (setf (target-timestamp ',name) ,timestamp)
+             ,init))
+       (save-task ',name
+                  (rebuild-symbol ',name (script-thunk ,@script)))
+       (redo ',name)
        ',name)))
 
 (defmacro file-target (name pathname (&optional tmp) &body script)
