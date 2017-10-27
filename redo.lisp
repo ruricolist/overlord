@@ -53,16 +53,11 @@
           saved-prereq-stamp
           target-up-to-date?))
 
-
 (defvar-unbound *parent* "Parent of the target being built.")
-
-(defun check-parent ()
-  (unless (boundp '*parent*)
-    (error* "No parent.")))
 
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; hashes for its deps.
-(defun redo (&rest args)
+(defun redo (&rest args &aux (parent? (boundp '*parent*)))
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (unless (eql source (target-kind target))
@@ -117,16 +112,15 @@
         (setf changed? t)))
     changed?))
 
-(defun redo-ifchange (args)
+(defun redo-ifchange (&rest args)
   ;; NB This is where you would add parallelism.
-  ;; TOOD check-parent?
   (do-each (i (reshuffle args))
     (when (changed? i)
       (redo i))
     (record-prereq i)))
 
 (defun redo-ifcreate (&rest targets)
-  (check-parent)
+  ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle targets))
     (when (target-exists? i)
       (error* "Non-existent prerequisite ~a already exists" i))

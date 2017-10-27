@@ -187,22 +187,24 @@ on Lisp/OS/filesystem combinations that support it."
 (defconst stamp     :stamp)
 (defconst uptodate  :uptodate)
 
-(defun record-prereq (target &optional (parent *parent*))
+(defun current-parent ()
+  (or (bound-value '*parent*)
+      (root-target)))
+
+(defun record-prereq (target &optional (parent (current-parent)))
   (check-type target target)
-  (when parent
-    (pushnew (saved-prereq target)
-             (prop parent prereqs)
-             :test (op (target= (saved-prereq-target _)
-                                (saved-prereq-target _))))))
+  (pushnew (saved-prereq target)
+           (prop parent prereqs)
+           :test (op (target= (saved-prereq-target _)
+                              (saved-prereq-target _)))))
 
 (defun saved-prereq (x) (cons x (target-stamp x)))
 (defun saved-prereq-target (p) (car p))
 (defun saved-prereq-stamp (p) (cdr p))
 
-(defun record-prereqne (target &optional (parent *parent*))
+(defun record-prereqne (target &optional (parent (current-parent)))
   (check-type target target)
-  (when parent
-    (pushnew target (prop parent prereqsne) :test #'target=)))
+  (pushnew target (prop parent prereqsne) :test #'target=))
 
 (defun target-kind (x)
   (assure (member #.target #.source)
@@ -520,6 +522,8 @@ it."
   "The one and only root target.")
 (declaim (type root-target *root-target*))
 
+(defun root-target () *root-target*)
+
 (define-symbol-macro root-target *root-target*)
 
 (deftype target ()
@@ -772,7 +776,7 @@ it."
     (task
      (dx-sxhash
       (multiple-value-list
-       (target-task-values target))))))
+       (task-values target))))))
 
 (deftype hash-friendly-target ()
   '(or root-target bindable-symbol pathname))
@@ -925,7 +929,7 @@ distributed."
                (format t "~&Overlord: hard freeze...~%")
                (fmakunbound 'unfreeze)
                ;; Variables aren't defined yet.
-               (clear-target-table (symbol-value '*all-targets*))
+               (clear-target-table (symbol-value '*top-level-targets*))
                (clrhash (symbol-value '*symbol-timestamps*))
                (clrhash (symbol-value '*tasks*))
                ;; The table of module cells needs special handling.
@@ -956,13 +960,11 @@ distributed."
 (define-global-state *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(define-global-state *all-targets* (make-target-table :synchronized t))
-(declaim (type target-table *all-targets*))
+(define-global-state *top-level-targets* (make-target-table :synchronized t))
+(declaim (type target-table *top-level-targets*))
 
-(defun list-all-targets ()
-  (append (hash-table-keys *tasks*)
-          (list-module-cells)
-          (target-table-keys *all-targets*)))
+(defun list-top-level-targets ()
+  (target-table-keys *top-level-targets*))
 
 (defconstructor task
   "A task."
@@ -988,11 +990,11 @@ distributed."
      (task target
            (lambda ()
              (let ((*building-root* t)
-                   ;; `depends-on' needs `*base*' to be bound to something.
+                   ;; `depends-on' needs `*base*' to be bound.
                    (*base*
                      (or (bound-value '*base*)
                          (user-homedir-pathname))))
-               (apply #'redo-ifchange (list-all-targets))))
+               (apply #'redo-ifchange (list-top-level-targets))))
            ;; XXX
            root-target))
     (pattern-ref
@@ -1037,13 +1039,16 @@ distributed."
                    (redo-ifchange source)
                    ;; Let the language tell you what else to depend on.
                    (lang-deps lang source))))
-             nil)))))
+             ;; TODO Is this right?
+             source)))))
 
 (defun run-script (task)
   (check-not-frozen)
-  (funcall (task-thunk task)))
+  (let ((*depth* (1+ *depth*)))
+    (print-target-being-built *parent*)
+    (funcall (task-thunk task))))
 
-(defun run-task (target thunk &optional (script (script-for target)))
+(defun run-save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (save-task target thunk script)
   (redo target))
@@ -1051,22 +1056,19 @@ distributed."
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (etypecase-of target target
-    (root-target)
+    (root-target (values))
     ((or bindable-symbol pathname)
      (let ((task (task target thunk script)))
        (setf (gethash target *tasks*) task)))
     ((or module-spec module-cell))
     ((or directory-ref package-ref pattern-ref)
-     (setf (target-table-member *all-targets* target) t)
      (values))
-    ;; XXX?
     (task (error* "Cannot save a task as a task."))))
 
-(defun target-task-values (target &optional (errorp t))
-  (let ((task (target-task target errorp)))
-    (values (task-target task)
-            (task-thunk task)
-            (task-script task))))
+(defun task-values (task)
+  (values (task-target task)
+          (task-thunk task)
+          (task-script task)))
 
 (defun system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
@@ -1105,7 +1107,7 @@ TARGET."
     (pattern-ref
      `(pattern-ref ,(pattern-ref.pattern target)
                    ,(pattern-ref.input target)))
-    (task `(task ,@(multiple-value-list (target-task-values target))))))
+    (task `(task ,@(multiple-value-list (task-values target))))))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
@@ -1293,7 +1295,7 @@ the current base."
                                   (now))))
            ,@(unsplice documentation)))
        (eval-always
-         (save-task ',name (constantly ,init)))
+         (save-task ',name (constantly ,init) nil))
        (eval-always
          (build-conf ',name ,init ,test))
        ',name)))
@@ -1306,7 +1308,7 @@ the current base."
             ,@body)))))
 
 (defmacro define-script (name &body script)
-  `(defconfig ,name '(progn ,@script)
+  `(defconfig ,name ',script
      :test #'source=))
 
 (defmacro define-script-for (name &body body)
@@ -1322,14 +1324,15 @@ the current base."
   ;; Maybe expand with a code walker?
   (similar? x y))
 
-(defmacro var-target (name &body script)
-  `(progn
-     (define-script-for ,name
-       ,@script)
-     (defvar ,name)
-     (save-task ',name
-                (rebuild-symbol ',name (script-thunk ,@script)))
-     ',name))
+(defmacro var-target (name expr &body deps)
+  (let ((script (append1 deps expr)))
+    `(progn
+       (define-script-for ,name
+         ,@script)
+       (defvar ,name)
+       (save-task ',name
+                  (rebuild-symbol ',name (script-thunk ,@script)))
+       ',name)))
 
 (defmacro defvar/deps (name expr &body deps)
   "Define a variable with dependencies.
@@ -2394,7 +2397,8 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import-module/lazy (module &key as from)
   ;; TODO
-  ;; (save-dependency (module-spec as from))
+  (let ((target (module-spec as from)))
+    (record-prereq target (root-target)))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias
