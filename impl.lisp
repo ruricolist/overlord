@@ -204,14 +204,15 @@ on Lisp/OS/filesystem combinations that support it."
   (when parent
     (pushnew target (prop parent prereqsne) :test #'target=)))
 
-(defun target-kind (target)
-  (if (nor (target-exists? target)
-           (has-prop? target
-                      uptodate
-                      prereqs
-                      prereqsne))
-      source
-      target))
+(defun target-kind (x)
+  (assure (member #.target #.source)
+    (if (or (not (target-exists? x))
+            (has-prop? x
+                       uptodate
+                       prereqs
+                       prereqsne))
+        target
+        source)))
 
 (defun target-up-to-date? (target)
   (prop target uptodate))
