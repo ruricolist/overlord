@@ -53,13 +53,6 @@
           saved-prereq-stamp
           target-up-to-date?))
 
-(defconst source    :source)
-(defconst target    :target)
-(defconst nonexist  :nonexist)
-(defconst prereqs   :prereqs)
-(defconst prereqsne :prereqsne)
-(defconst stamp     :stamp)
-(defconst uptodate  :uptodate)
 
 (defvar-unbound *parent* "Parent of the target being built.")
 
