@@ -34,6 +34,7 @@
     :overlord/cmd
     ;; The database.
     :overlord/kv)
+  #+sbcl (:implement :overlord/redo)
   (:shadowing-import-from :overlord/stamp :now)
   (:import-from :fset)
   (:import-from :trivia

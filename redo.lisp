@@ -7,6 +7,7 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
+  #+sbcl (:lock t)
   (:export
    #:redo
    #:redo-ifchange
