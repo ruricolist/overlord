@@ -60,9 +60,17 @@
 ;;; lexical of the same name.
 
 (defmacro define-singleton-type (name)
-  `(progn
-     (defconstructor ,name)
-     (def ,name (,name))))
+  (let ((place `(get ',name 'singleton))
+        (temp (unique-name 'temp)))
+    `(progn
+       (defconstructor ,name)
+       (def ,name
+         (let ((,temp ,place))
+           ;; It is possible that the saved version could have been
+           ;; invalidated by a redefinition.
+           (if (typep ,temp ',name)
+               ,temp
+               (setf ,place (,name))))))))
 
 
 ;;; Conditions.
