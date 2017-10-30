@@ -192,18 +192,9 @@ on Lisp/OS/filesystem combinations that support it."
 (defconst stamp          :stamp)
 (defconst uptodate       :uptodate)
 
-(defun current-parent ()
-  (or (bound-value '*parent*)
-      (root-target)))
-
 (defun saved-prereq (x) (cons x (target-stamp x)))
 (defun saved-prereq-target (p) (car p))
 (defun saved-prereq-stamp (p) (cdr p))
-
-(defmethod fset:compare ((x saved-prereq) (y saved-prereq))
-  (fset:compare-slots x y
-                      #'saved-prereq-target
-                      #'saved-prereq-stamp))
 
 (def empty-set (fset:empty-set))
 
@@ -535,15 +526,16 @@ resolved at load time."
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
 
-(defstruct root-target
-  "The root target; it depends on everything but nothing depends on
-it."
-  (timestamp never :type target-timestamp))
+(define-singleton-type root-target)
+
+(defun current-parent ()
+  (or (bound-value '*parent*)
+      root-target))
 
 (defmethods root-target (self)
   (:method print-object (self stream)
     (if *print-escape*
-        (format stream "#.~s" '*root-target*)
+        (format stream "#.~s" 'root-target)
         (print-unreadable-object (self stream :type t))))
   (:method fset:compare (self (obj t))
     (if (eq self obj) :equal :unequal))
@@ -551,16 +543,6 @@ it."
     (if (eq self obj) :equal :unequal)))
 
 (fset:define-cross-type-compare-methods root-target)
-
-(defvar *root-target*
-  (prog1 (make-root-target)
-    (fmakunbound 'make-root-target))
-  "The one and only root target.")
-(declaim (type root-target *root-target*))
-
-(defun root-target () *root-target*)
-
-(define-symbol-macro root-target *root-target*)
 
 (define-singleton-type impossible-target)
 (define-singleton-type trivial-target)
@@ -629,8 +611,7 @@ it."
 
 (defun target-timestamp (target)
   (etypecase-of target target
-    (root-target (root-target-timestamp root-target))
-    (impossible-target never)
+    ((or root-target impossible-target) never)
     (trivial-target far-future)
     (bindable-symbol
      (if (boundp target)
@@ -670,11 +651,11 @@ it."
   (check-type timestamp target-timestamp)
   (check-not-frozen)
   (etypecase-of target target
-    (root-target (setf (root-target-timestamp root-target) timestamp))
+    (root-target (error* "Cannot set timestamp of root target."))
     ((or impossible-target trivial-target)
      (error* "Cannot set timestamp for ~a" target))
     (bindable-symbol
-     ;; Configurations need to set the timestamp while unbound.
+     ;; Configurations need to set the timestamp while unbound
      #+ () (unless (boundp target)
              (error* "Trying to set timestamp for unbound symbol ~s"
                      target))
@@ -698,10 +679,7 @@ it."
        (setf (target-timestamp cell) timestamp)))
     (module-cell
      (setf (module-cell.timestamp target) timestamp))
-    (task
-     (if-let ((target (task-script target)))
-       (setf (target-timestamp target) timestamp)
-       (error* "~a does not have a script target." target)))))
+    (task (error* "Cannot set timestamp of a task."))))
 
 (defun touch-target (target &optional (date (now)))
   (setf (target-timestamp target) date))
@@ -799,7 +777,7 @@ it."
                      (compilation-speed 0)))
   (etypecase-of target target
     (root-target
-     (load-time-value (sxhash *root-target*)))
+     (load-time-value (sxhash root-target)))
     (trivial-target
      (load-time-value (sxhash trivial-target)))
     (impossible-target
