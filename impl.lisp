@@ -562,6 +562,9 @@ it."
 (define-singleton-type impossible-target)
 (define-singleton-type trivial-target)
 
+(defun generate-impossible-target ()
+  impossible-target)
+
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In

@@ -37,7 +37,8 @@
    #:save-temp-prereqs
    #:clear-temp-prereqs
    #:save-temp-prereqsne
-   #:clear-temp-prereqsne))
+   #:clear-temp-prereqsne
+   #:generate-impossible-target))
 (in-package #:overlord/redo)
 
 (declaim (notinline
@@ -136,3 +137,7 @@
     (when (target-exists? i)
       (error* "Non-existent prerequisite ~a already exists" i))
     (record-prereqne i)))
+
+(defun redo-always ()
+  (declare (notinline generate-impossible-target))
+  (record-prereq (generate-impossible-target)))
