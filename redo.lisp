@@ -110,8 +110,11 @@
     (let* ((prereqs (target-saved-prereqs target))
            (reqs (map 'list #'saved-prereq-target prereqs)))
       ;; Check regular prerequisites.
-      (let* ((outdated (filter #'changed? (reshuffle reqs)))
-             (outdated (coerce outdated 'list)))
+      (let* ((outdated
+               (~> reqs
+                   reshuffle
+                   (filter #'changed? _)
+                   (coerce 'list))))
         (when outdated
           ;; TODO redo $outdated || result=0
           (apply #'redo outdated))
