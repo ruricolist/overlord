@@ -79,7 +79,6 @@
    :defconfig/deps
    :var-target
    :defvar/deps
-   :deftask
    :file-target
 
    :ensure-absolute
