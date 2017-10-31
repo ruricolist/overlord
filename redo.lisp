@@ -7,7 +7,6 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
-  #+sbcl (:lock t)
   (:export
    #:redo
    #:redo-ifchange
@@ -41,6 +40,10 @@
    #:clear-temp-prereqsne
    #:generate-impossible-target))
 (in-package #:overlord/redo)
+
+;;; ASDF doesn't allow :lock.
+#+sbcl
+(sb-ext:lock-package :overlord/redo)
 
 (declaim (notinline
           target-stamp

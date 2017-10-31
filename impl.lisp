@@ -34,7 +34,6 @@
     :overlord/cmd
     ;; The database.
     :overlord/kv)
-  #+sbcl (:implement :overlord/redo)
   (:shadowing-import-from :overlord/stamp :now)
   (:import-from :fset)
   (:import-from :trivia
@@ -125,6 +124,10 @@
    :file))
 
 (in-package :overlord/impl)
+
+;;; ASDF doesn't allow :implement.
+#+sbcl
+(sb-ext:add-implementation-package :overlord/redo :overlord/impl)
 
 
 ;;; Shadows and preferred alternatives.
