@@ -68,6 +68,8 @@
 
 (defvar-unbound *parent* "Parent of the target being built.")
 
+(defconst source :source)
+
 (defun redo (&rest args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
