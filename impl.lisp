@@ -539,6 +539,15 @@ resolved at load time."
 (define-singleton-type impossible-target)
 (define-singleton-type trivial-target)
 
+(defmethod fset:compare ((x impossible-target) (y impossible-target))
+  :equal)
+
+(defmethod fset:compare ((x trivial-target) (y trivial-target))
+  :equal)
+
+(fset:define-cross-type-compare-methods impossible-target)
+(fset:define-cross-type-compare-methods trivial-target)
+
 (defun generate-impossible-target ()
   impossible-target)
 
