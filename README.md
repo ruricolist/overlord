@@ -19,6 +19,9 @@
     - [Simple modules](#simple-modules)
     - [Macro exports](#macro-exports)
 - [Future work](#future-work)
+- [Appendix: Overlord for Redoers](#appendix-overlord-for-redoers)
+- [Appendix: Overlord for Racketeers](#appendix-overlord-for-racketeers)
+    - [Macro exports](#macro-exports-1)
 
 <!-- markdown-toc end -->
 
@@ -159,55 +162,6 @@ manages the state stored by Lisp itself, in symbols, and provides ways
 to manage other kinds of state. This generalized build system is
 modeled on Redo.
 
-(Build systems manage state in the file system. In Common Lisp, we have
-a bundle of state which, in many ways, resembles a file system: a set
-of persistent, mutable locations with first-class, hierarchical
-addresses. Symbols have value cells and function cells (mutable
-locations); they have property lists; they are used as keys in
-arbitrary namespaces (more locations); they can be persisted, in fasl
-files and in saved images; and they are each uniquely addressed with a
-path (package name, symbol name).)
-
-The obvious difference between Overlord and Redo in practice is that
-Redo uses shell scripts, while Overlord’s “scripts” are written in
-Lisp. (It is unimportant because, after all, you can run shell
-commands from Lisp, or somehow call Lisp from the shell.) On the one
-hand, embedding shell syntax in Lisp is clumsy; on the other hand,
-Lisp special variables are much superior to any shell-based means for
-passing information between parent and child scripts. (See §5.4.2 in
-[Grosskurth 2007][Grosskurth].)
-
-The important thing to remember about Overlord is that, because the
-goal of Overlord is to maintain the consistency of the whole Lisp
-system, there is only one project. Targets are resolved (i.e. relative
-pathnames are made absolute) at compile time, not run time, relative
-to the base inferred for the package which is current at the time they
-are defined. And because all targets are absolute, the directory which
-is current at the time the build takes place does not matter.
-
-The fact that there is only one project also changes how patterns are
-handled. Since patterns do not belong to a particular project, they
-need another form of namespacing. Accordingly patterns are given names
-(when they are defined with `defpattern`) and must be invoked by name.
-
-All that said, Overlord is a mostly faithful implementation of Redo.
-It differs from Redo principally in having a very different idea of
-what can be a target.
-
-Where Overlord deviates from the Redo model is in how it decides what
-is or is not a target. In Redo proper, this depends on the state of
-the file system – a prerequisite is a target under two conditions: it
-does not exist, or it exists and has an entry in the database. In
-Overlord, however, the database is discarded with every time the
-version of Overlord is incremented. The same goes for the Lisp
-implementation. The problem, then, is that you could easily end up in
-a condition where a target is treated as a source file because it
-exists, and has no entry in the newly created database. So instead of
-relying on the database to determine what is or is not a target,
-Overlord treats an existing X as a target if and only if there is a
-build script for X. (If X does not exist, then it is still always
-treated as a target.)
-
 ## CLI
 
 Overlord has basic integration with the command line.
@@ -298,12 +252,22 @@ is fundamentally dynamic.
 
 ## Modules
 
-A Overlord module is a *file* in a *language*. Overlord supports a
-Racket-like hash-lang (`#lang`) syntax, but in Overlord the language
-of a module can also be specified as part of the import syntax. Since
-the language is not an inherent part of the file, the same file can be
-loaded as a module in more than one language. And each language-file
-combination gets its own, completely independent module.
+A Overlord module is a *file* in a *language*. The language can be
+specified in two ways.
+
+The language can be specified as part of the file itself, with a
+special first line. The special first line looks like this:
+
+    #lang my-lang
+    ....
+
+This is called (following Racket) a *hash lang*.
+
+The language of a module can also be specified as part of the import
+syntax. Since the language is not an inherent part of the file, the
+same file can be loaded as a module in more than one language. And
+each language-file combination gets its own, completely independent
+module.
 
 Overlord is very liberal about what can be a module. In Overlord, any
 value can be a module – a string, a function, a hash table, anything –
@@ -315,13 +279,6 @@ is [`simple-module`](#simple-modules).)
 
 ## Languages
 
-In Racket, languages are defined in two steps. In Racket, a language
-is a module. This module defines a reader, which returns syntax, and an
-expander, which gives that syntax meaning.
-
-That can’t work in Common Lisp, where meaning is assigned at read
-time, when a symbol is interned in one or another package.
-
 In Overlord, a language is just a package. The package exports a
 reader and an expander. The symbol named `read-module` is the *package
 reader*. The symbol named `module-progn` is the *package expander*.
@@ -329,8 +286,8 @@ reader*. The symbol named `module-progn` is the *package expander*.
 The important thing: when the package’s reader is called, that same
 package is also bound as the *current* package. It is then the
 responsibility of the reader to make sure any symbols it reads in, or
-inserts into the expansion, are interned in the correct package. (There
-is a shortcut for this, `overlord:reintern`.)
+inserts into the expansion, are interned in the correct package.
+(There is a shortcut for this, `overlord:reintern`.)
 
 (There is one exception to the rule of *language=package*. If another
 package exists, having the same name, but ending in `-user`, and this
@@ -339,46 +296,14 @@ package* is the package that is made current while reading (and
 expanding). E.g. a file beginning with `#lang cl` would actually be
 read in using the `cl-user` package, not the `cl` package itself.)
 
-In Racket the expander is entirely responsible for giving the code
-meaning. In Overlord the expander has less to do, because the code has
-been assigned meaning at read time, but it is still important for
-lexical bindings and whole-program transformations.
-
-Where in Racket you would write
-
-    (module my-module MY-LANG forms ...)
-
-to wrap FORMS with the binding of `#%module-begin` from MY-LANG, in
-Overlord you just write:
-
-    (MY-LANG:module-progn forms....)
-
-Although for convenience you can write
-
-    (overlord:module-progn-in :MY-LANG forms...)
-
-But this just delays resolving `module-progn` from read time to
-macro-expansion time.
-
 Note that the reader is responsible for returning a single form, which
 is the module. That is, the form returned by the package reader should
 already be wrapped in the appropriate `module-progn`. The exported
 binding for `module-progn` is *only* looked up when the language is
 being used as the expander for a meta-language.
 
-Meta-languages are for language authors who want to reuse an existing
-syntax. E.g., if you want to define a language that uses
-s-expressions, in Racket you can write:
-
-    #lang s-exp my-lang
-
-In Overlord you can do something similar:
-
-    #lang overlord/s-exp my-lang
-
-What happens here is simply that the `overlord/s-exp` language finds the
-package `my-lang` and binds it to `*package*` *before* it starts
-reading in forms.
+(Meta-languages are for language authors who want to reuse an existing
+syntax.)
 
 ## Defining languages
 
@@ -418,9 +343,9 @@ namespace. This is in order to keep the notation for imports simple.
 Importing from a language with multiple namespaces into a language
 with multiple namespaces would create a Cartesian product problem.
 
-The one exception is macros. A Racket-style single namespace for
-run-time bindings and macros would not make sense in Overlord where
-modules can be dynamically reloaded.
+The one exception is macros. A single namespace for run-time bindings
+and macros would not make sense in Overlord where modules can be
+dynamically reloaded.
 
 Because Overlord imports bindings rather than values, modules are
 always loaded lazily. A module is never actually loaded until a
@@ -466,19 +391,7 @@ expressions.
 
 ## Macro exports
 
-Overlord’s syntax for import and export supports macros. Unlike in
-Racket, macros must be imported explicitly as macros, because
-implicitly distinguishing functions and macros does not make sense
-when it is possible to reload modules.
-
-I am not sure that support for macros in the module system is useful.
-In Racket, where languages and modules are the same thing, modules
-must export macros as language extensions. In Overlord, modules are
-one thing, and languages are something else – packages.
-
-That said, I could hardly call the module system “Racket-inspired”
-with a straight face if it didn’t support exporting macros from
-modules.
+Overlord’s syntax for import and export supports macros.
 
 The ability to export macros from modules is not useful in itself. It
 only becomes useful in the presence of certain forms of macro hygiene.
@@ -520,6 +433,122 @@ someone else did them.
 - The [Snowball][] language.
 - A unit-aware language (compare [Frink][]).
 - Any language or meta-language you care to implement.
+
+# Appendix: Overlord for Redoers
+
+Build systems manage state in the file system. In Common Lisp, we have
+a bundle of state which, in many ways, resembles a file system: a set
+of persistent, mutable locations with first-class, hierarchical
+addresses. Symbols have value cells and function cells (mutable
+locations); they have property lists; they are used as keys in
+arbitrary namespaces (more locations); they can be persisted, in fasl
+files and in saved images; and they are each uniquely addressed with a
+path (package name, symbol name).
+
+The obvious difference between Overlord and Redo in practice is that
+Redo uses shell scripts, while Overlord’s “scripts” are written in
+Lisp. (It is unimportant because, after all, you can run shell
+commands from Lisp, or somehow call Lisp from the shell.) On the one
+hand, embedding shell syntax in Lisp is clumsy; on the other hand,
+Lisp special variables are much superior to any shell-based means for
+passing information between parent and child scripts. (See §5.4.2 in
+[Grosskurth 2007][Grosskurth].)
+
+The important thing to remember about Overlord is that, because the
+goal of Overlord is to maintain the consistency of the whole Lisp
+system, there is only one project. Targets are resolved (i.e. relative
+pathnames are made absolute) at compile time, not run time, relative
+to the base inferred for the package which is current at the time they
+are defined. And because all targets are absolute, the directory which
+is current at the time the build takes place does not matter.
+
+The fact that there is only one project also changes how patterns are
+handled. Since patterns do not belong to a particular project, they
+need another form of namespacing. Accordingly patterns are given names
+(when they are defined with `defpattern`) and must be invoked by name.
+
+All that said, Overlord is a mostly faithful implementation of Redo.
+It differs from Redo principally in having a very different idea of
+what can be a target.
+
+Where Overlord deviates from the Redo model is in how it decides what
+is or is not a target. In Redo proper, this depends on the state of
+the file system – a prerequisite is a target under two conditions: it
+does not exist, or it exists and has an entry in the database. In
+Overlord, however, the database is discarded with every time the
+version of Overlord is incremented. The same goes for the Lisp
+implementation. The problem, then, is that you could easily end up in
+a condition where a target is treated as a source file because it
+exists, and has no entry in the newly created database. So instead of
+relying on the database to determine what is or is not a target,
+Overlord treats an existing X as a target if and only if there is a
+build script for X. (If X does not exist, then it is still always
+treated as a target.)
+
+# Appendix: Overlord for Racketeers
+
+In Racket, languages are defined in two steps. In Racket, a language
+is a module. This module defines a reader, which returns syntax, and an
+expander, which gives that syntax meaning.
+
+That can’t work in Common Lisp, where meaning is assigned at read
+time, when a symbol is interned in one or another package.
+
+In Racket the expander is entirely responsible for giving the code
+meaning. In Overlord the expander has less to do, because the code has
+been assigned meaning at read time, but it is still important for
+lexical bindings and whole-program transformations.
+
+Where in Racket you would write
+
+    (module my-module MY-LANG forms ...)
+
+to wrap FORMS with the binding of `#%module-begin` from MY-LANG, in
+Overlord you just write:
+
+    (MY-LANG:module-progn forms....)
+
+Although for convenience you can write
+
+    (overlord:module-progn-in :MY-LANG forms...)
+
+But this just delays resolving `module-progn` from read time to
+macro-expansion time.
+
+Note that the reader is responsible for returning a single form, which
+is the module. That is, the form returned by the package reader should
+already be wrapped in the appropriate `module-progn`. The exported
+binding for `module-progn` is *only* looked up when the language is
+being used as the expander for a meta-language.
+
+Meta-languages are for language authors who want to reuse an existing
+syntax. E.g., if you want to define a language that uses
+s-expressions, in Racket you can write:
+
+    #lang s-exp my-lang
+
+In Overlord you can do something similar:
+
+    #lang overlord/s-exp my-lang
+
+What happens here is simply that the `overlord/s-exp` language finds the
+package `my-lang` and binds it to `*package*` *before* it starts
+reading in forms.
+
+## Macro exports
+
+Unlike in Racket, macros must be imported explicitly as macros,
+because implicitly distinguishing functions and macros does not make
+sense when it is possible to reload modules.
+
+I am not sure that support for macros in the module system is useful.
+In Racket, where languages and modules are the same thing, modules
+must export macros as language extensions. In Overlord, modules are
+one thing, and languages are something else – packages.
+
+That said, I could hardly call the module system “Racket-inspired”
+with a straight face if it didn’t support exporting macros from
+modules.
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
