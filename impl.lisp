@@ -1038,72 +1038,75 @@ distributed."
 
 (defun target-build-script-target (target)
   (check-not-frozen)
-  (etypecase-of target target
-    ((or bindable-symbol pathname)
-     (gethash target *tasks*))
-    (target impossible-target)))
+  (assure target
+    (etypecase-of target target
+      ((or bindable-symbol pathname)
+       (or (gethash target *tasks*)
+           impossible-target))
+      (target impossible-target))))
 
 (defun target-default-build-script-target (target)
   (check-not-frozen)
   ;; TODO Alternately, instead of trivial-target for the script, you
   ;; could actually use define-script-for and depend on those scripts.
   ;; But: that would create serious bootstrapping issues.
-  (etypecase-of target target
-    ((or task pathname bindable-symbol impossible-target trivial-target)
-     nil)
-    (root-target
-     (task target
-           (lambda ()
-             (let ((*building-root* t)
-                   ;; `depends-on' needs `*base*' to be bound.
-                   (*base*
-                     (or (bound-value '*base*)
-                         (user-homedir-pathname))))
-               (apply #'redo-ifchange (list-top-level-targets))))
-           trivial-target))
-    (pattern-ref
-     (let* ((input (pattern-ref.input target))
-            (output (pattern-ref.output target))
-            (pattern (find-pattern (pattern-ref.pattern target)))
-            (class-name (class-name-of target)))
-       (task output
-             (lambda ()
-               (let ((*input* input)
-                     (*output* output))
-                 (let ((*base* (pathname-directory-pathname input)))
-                   (redo-ifchange input))
-                 (pattern-build pattern)))
-             (script-for class-name))))
-    (directory-ref
-     (let ((dir (ref.name target)))
+  (assure target
+    (etypecase-of target target
+      ((or task pathname bindable-symbol impossible-target trivial-target)
+       impossible-target)
+      (root-target
        (task target
              (lambda ()
-               (let ((dir (resolve-target dir (base))))
-                 (ensure-directories-exist dir)))
-             trivial-target)))
-    (package-ref
-     (with-slots (name use-list nicknames) target
-       (task target
-             (lambda ()
-               (or (find-package name)
-                   (make-package name
-                                 :use use-list
-                                 :nicknames nicknames)))
-             trivial-target)))
-    (module-spec
-     (target-default-build-script-target (module-spec-cell target)))
-    (module-cell
-     (with-slots (lang source) target
-       (task target
-             (lambda ()
-               (let ((*language* lang))
-                 (load-module-into-cell target)
-                 (let ((*base* (pathname-directory-pathname source)))
-                   ;; Depend on the source file.
-                   (redo-ifchange source)
-                   ;; Let the language tell you what else to depend on.
-                   (lang-deps lang source))))
-             trivial-target)))))
+               (let ((*building-root* t)
+                     ;; `depends-on' needs `*base*' to be bound.
+                     (*base*
+                       (or (bound-value '*base*)
+                           (user-homedir-pathname))))
+                 (apply #'redo-ifchange (list-top-level-targets))))
+             trivial-target))
+      (pattern-ref
+       (let* ((input (pattern-ref.input target))
+              (output (pattern-ref.output target))
+              (pattern (find-pattern (pattern-ref.pattern target)))
+              (class-name (class-name-of target)))
+         (task output
+               (lambda ()
+                 (let ((*input* input)
+                       (*output* output))
+                   (let ((*base* (pathname-directory-pathname input)))
+                     (redo-ifchange input))
+                   (pattern-build pattern)))
+               (script-for class-name))))
+      (directory-ref
+       (let ((dir (ref.name target)))
+         (task target
+               (lambda ()
+                 (let ((dir (resolve-target dir (base))))
+                   (ensure-directories-exist dir)))
+               trivial-target)))
+      (package-ref
+       (with-slots (name use-list nicknames) target
+         (task target
+               (lambda ()
+                 (or (find-package name)
+                     (make-package name
+                                   :use use-list
+                                   :nicknames nicknames)))
+               trivial-target)))
+      (module-spec
+       (target-default-build-script-target (module-spec-cell target)))
+      (module-cell
+       (with-slots (lang source) target
+         (task target
+               (lambda ()
+                 (let ((*language* lang))
+                   (load-module-into-cell target)
+                   (let ((*base* (pathname-directory-pathname source)))
+                     ;; Depend on the source file.
+                     (redo-ifchange source)
+                     ;; Let the language tell you what else to depend on.
+                     (lang-deps lang source))))
+               trivial-target))))))
 
 (defun run-script (task)
   (check-not-frozen)
