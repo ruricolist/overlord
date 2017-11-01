@@ -9,8 +9,11 @@
   (:import-from #:overlord/types #:error*)
   (:export
    #:redo
+   #:redo*
    #:redo-ifchange
+   #:redo-ifchange*
    #:redo-ifcreate
+   #:redo-ifcreate*
    #:redo-always
    #:redo-stamp
    #:*parent*
@@ -82,6 +85,9 @@
       (target-has-build-script? target)))
 
 (defun redo (&rest args)
+  (redo* args))
+
+(defun redo* (args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (when (target? target)
@@ -160,6 +166,9 @@
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; stamps for its deps.
 (defun redo-ifchange (&rest args)
+  (redo-ifchange* args))
+
+(defun redo-ifchange* (args)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
     (let ((*custom-stamp* nil))
@@ -170,6 +179,9 @@
           (record-prereq i)))))
 
 (defun redo-ifcreate (&rest targets)
+  (redo-ifcreate* targets))
+
+(defun redo-ifcreate* (targets)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle targets))
     (when (target-exists? i)

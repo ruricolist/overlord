@@ -1061,7 +1061,7 @@ distributed."
                      (*base*
                        (or (bound-value '*base*)
                            (user-homedir-pathname))))
-                 (apply #'redo-ifchange (list-top-level-targets))))
+                 (redo-ifchange* (list-top-level-targets))))
              trivial-target))
       (pattern-ref
        (let* ((input (pattern-ref.input target))
@@ -1284,7 +1284,7 @@ value and NEW do not match under TEST."
               (:depends-on* (x &rest xs)
                 `(:depends-on-all* (list ,x ,@xs)))
               (:depends-on-all (xs)
-                `(apply #'redo-ifchange ,xs))
+                `(redo-ifchange* ,xs))
               (:depends-on-all* (xs)
                 `(map nil #'redo-ifchange ,xs))
               (:path (path)
