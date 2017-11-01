@@ -811,7 +811,11 @@ resolved at load time."
        (task-values target))))))
 
 (deftype hash-friendly-target ()
-  '(or root-target bindable-symbol pathname))
+  '(or root-target
+    impossible-target
+    trivial-target
+    bindable-symbol
+    pathname))
 
 (defstruct (target-table (:conc-name target-table.)
                          (:constructor %make-target-table))
