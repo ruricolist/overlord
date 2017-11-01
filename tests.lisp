@@ -119,7 +119,7 @@
   (:depends-on '+literal-string-file+)
   (:depends-on +literal-string-file+))
 
-(test const/deps
+(test config/deps
   (nap 1)
   (local
     (def original #.+literal-string+)
