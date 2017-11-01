@@ -222,7 +222,10 @@ on Lisp/OS/filesystem combinations that support it."
   (delete-prop target prereqsne-temp))
 
 (defun save-temp-prereqs (target)
-  (let ((map (assure fset:map (prop target prereqs-temp))))
+  (let ((map
+          (assure fset:map
+            (prop target prereqs-temp
+                  (fset:empty-map)))))
     (if (fset:empty? map)
         (delete-prop target prereqs)
         (setf (prop target prereqs)
@@ -232,8 +235,10 @@ on Lisp/OS/filesystem combinations that support it."
     (clear-temp-prereqs target)))
 
 (defun save-temp-prereqsne (target)
-  (let ((set (assure fset:set
-               (prop target prereqsne-temp))))
+  (let ((set
+          (assure fset:set
+            (prop target prereqsne-temp
+                  (fset:empty-set)))))
     (if (fset:empty? set)
         (delete-prop target prereqsne)
         (setf (prop target prereqsne)
