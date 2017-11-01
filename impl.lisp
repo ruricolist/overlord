@@ -176,7 +176,7 @@ on Lisp/OS/filesystem combinations that support it."
   (cl:file-write-date pathname))
 
 
-;;; Auxiliary functions.
+;;; Auxiliary functions for Redo.
 
 (defconst nonexist       :nonexist)
 (defconst prereqs        :prereqs)
@@ -573,7 +573,7 @@ resolved at load time."
     task))
 
 
-;;; Targets.
+;;; Manipulating targets.
 
 (define-global-state *symbol-timestamps* (make-hash-table :size 1024))
 (declaim (type hash-table *symbol-timestamps*))
@@ -945,7 +945,7 @@ resolved at load time."
               (collect target))))))))
 
 
-;;; Building.
+;;; Freezing.
 
 (deftype freeze-policy ()
   '(member t nil :hard))
@@ -1028,6 +1028,9 @@ distributed."
       (unfreeze ()
         :report "Unfreeze the build system."
         (setf *frozen* nil)))))
+
+
+;;; Building targets (scripts).
 
 (define-global-state *tasks* (dict))
 (declaim (type hash-table *tasks*))
@@ -1275,8 +1278,8 @@ value and NEW do not match under TEST."
           (simple-style-warning "Redefining configuration ~s" name)
           (funcall (rebuild-symbol name (lambda () new)))))))
 
-;
-;;; Keyword macros
+
+;;; Convenient keyword macros
 
 (defun path (path)
   (~> path
@@ -1285,6 +1288,15 @@ value and NEW do not match under TEST."
 
 (defun file (file)
   (assure file-pathname (path file)))
+
+(defun basename (file)
+  (enough-pathname file (pathname-directory-pathname file)))
+
+(defun extension (ext)
+  (assure pathname
+    (etypecase-of (or null string) ext
+      (null *nil-pathname*)
+      (string (make-pathname :type ext)))))
 
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
@@ -1313,32 +1325,20 @@ value and NEW do not match under TEST."
                                               ,(base))))
               (:extension (ext)
                 `(extension ,ext))
-              (:run (cmd &rest args)
-                `(run-cmd ,cmd ,@args))
               (:cmd (&rest args)
                 `(cmd ,@args))
               (:message (control-string &rest args)
                 `(message ,control-string ,@args))
               (:basename (file)
                 `(basename ,file))
-              ;; (:stamp (stamp)
-              ;;   `(setf (custom-stamp *target*) ,stamp))
-              )
+              (:always (bool)
+                `(and ,bool (redo-always)))
+              (:stamp (stamp)
+                `(redo-stamp ,stamp)))
      ,@body))
 
-(defun basename (file)
-  (enough-pathname file (pathname-directory-pathname file)))
-
-(defun run-cmd (cmd &rest args)
-  "Like `uiop:run-program, but defaulting the `:directory' argument to
-the current base."
-  (multiple-value-call #'uiop:run-program
-    cmd
-    (values-list args)
-    :directory (base)))
-
 
-;;; Bindings.
+;;; In-Lisp targets.
 
 (defun save-base (form)
   `(let ((*base* ,(base)))
@@ -1466,6 +1466,26 @@ rebuilt."
        (redo-ifchange ',name)
        ',name)))
 
+
+;;;; Phony targets.
+
+(defmacro deftask (name &body script)
+  "Define a task -- a target that only has dependencies.
+This is essentially a convenience to let you use keyword macros to
+specify the dependencies you want on build."
+  `(progn
+     (define-script-for ,name
+       ,@script)
+     (save-task ',name
+                (lambda ()
+                  ;; Phony targets don't *need* to be built.
+                  (unless *building-root*
+                    (funcall (script-thunk ,@script)))))
+     ',name))
+
+
+;;; File targets.
+
 (defmacro file-target (name pathname (&optional tmp) &body script)
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
@@ -1497,23 +1517,6 @@ rebuilt."
        ',pathname)))
 
 
-;;;; Phony targets.
-
-(defmacro deftask (name &body script)
-  "Define a task -- a target that only has dependencies.
-This is essentially a convenience to let you use keyword macros to
-specify the dependencies you want on build."
-  `(progn
-     (define-script-for ,name
-       ,@script)
-     (save-task ',name
-                (lambda ()
-                  ;; Phony targets don't *need* to be built.
-                  (unless *building-root*
-                    (funcall (script-thunk ,@script)))))
-     ',name))
-
-
 ;;;; File patterns.
 
 ;;; A pattern is an abstract relationship between two files.
@@ -1539,12 +1542,6 @@ specify the dependencies you want on build."
 (defmethods pattern (self script-fn)
   (:method pattern-build (self)
     (funcall script-fn)))
-
-(defun extension (ext)
-  (assure pathname
-    (etypecase-of (or null string) ext
-      (null *nil-pathname*)
-      (string (make-pathname :type ext)))))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
@@ -2214,7 +2211,7 @@ the #lang declaration ends."
        ,@forms)))
 
 
-;;; Imports.
+;;; Importing.
 
 ;;; It might seem like this could be moved into a separate file, but
 ;;; that would requiring exposing too much of the above.
