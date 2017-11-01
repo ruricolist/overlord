@@ -1191,6 +1191,14 @@ TARGET."
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
 
+(defun target-stamper (parent)
+  (let ((map
+          (assure fset:map
+            (prop parent prereqs-temp (fset:empty-map)))))
+    (lambda (target)
+      (or (fset:lookup map target)
+          (target-stamp target)))))
+
 (defun target-stamp (target)
   (assure stamp
     (etypecase-of target target
