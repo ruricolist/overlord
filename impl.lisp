@@ -126,7 +126,8 @@
 
 ;;; ASDF doesn't allow :implement.
 #+sbcl
-(sb-ext:add-implementation-package :overlord/impl :overlord/redo)
+(eval-always
+  (sb-ext:add-implementation-package :overlord/impl :overlord/redo))
 
 
 ;;; Shadows and preferred alternatives.
