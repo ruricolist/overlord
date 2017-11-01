@@ -41,10 +41,6 @@
    #:generate-impossible-target))
 (in-package #:overlord/redo)
 
-;;; ASDF doesn't allow :lock.
-#+sbcl
-(sb-ext:lock-package :overlord/redo)
-
 (declaim (notinline
           target-stamper
           stamp=

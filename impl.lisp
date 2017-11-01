@@ -124,11 +124,6 @@
 
 (in-package :overlord/impl)
 
-;;; ASDF doesn't allow :implement.
-#+sbcl
-(eval-always
-  (sb-ext:add-implementation-package :overlord/impl :overlord/redo))
-
 
 ;;; Shadows and preferred alternatives.
 
@@ -197,15 +192,20 @@ on Lisp/OS/filesystem combinations that support it."
 (defun saved-prereq-target (p) (car p))
 (defun saved-prereq-stamp (p) (cdr p))
 
+(defplace temp-prereqs (target)
+  (prop target prereqs-temp (fset:empty-map)))
+
+(defplace temp-prereqsne (target)
+  (prop target prereqsne-temp (fset:empty-set)))
+
 (defun record-prereq (target &optional (stamp (target-stamp target))
                       &aux (parent (current-parent)))
   (check-type target target)
-  (withf (prop parent prereqs-temp (fset:empty-map))
-         target stamp))
+  (withf (temp-prereqs parent) target stamp))
 
 (defun record-prereqne (target &aux (parent (current-parent)))
   (check-type target target)
-  (withf (prop parent prereqsne-temp (fset:empty-set)) target))
+  (withf (temp-prereqsne parent) target))
 
 (defun target-in-db? (target)
   (has-prop? target
@@ -222,10 +222,7 @@ on Lisp/OS/filesystem combinations that support it."
   (delete-prop target prereqsne-temp))
 
 (defun save-temp-prereqs (target)
-  (let ((map
-          (assure fset:map
-            (prop target prereqs-temp
-                  (fset:empty-map)))))
+  (let ((map (temp-prereqs target)))
     (if (fset:empty? map)
         (delete-prop target prereqs)
         (setf (prop target prereqs)
@@ -235,10 +232,7 @@ on Lisp/OS/filesystem combinations that support it."
     (clear-temp-prereqs target)))
 
 (defun save-temp-prereqsne (target)
-  (let ((set
-          (assure fset:set
-            (prop target prereqsne-temp
-                  (fset:empty-set)))))
+  (let ((set (temp-prereqsne target)))
     (if (fset:empty? set)
         (delete-prop target prereqsne)
         (setf (prop target prereqsne)

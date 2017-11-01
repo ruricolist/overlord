@@ -29,10 +29,6 @@
    #:stamp=))
 (in-package :overlord/stamp)
 
-#+sbcl
-(eval-always
-  (sb-ext:add-implementation-package :overlord/stamp :overlord/redo))
-
 ;;; Timestamps can be exact timestamps (from local-time), universal
 ;;; times, the singleton `never' (which means the target
 ;;; unconditionally needs building) and the singleton `far-future'
