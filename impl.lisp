@@ -853,6 +853,14 @@ resolved at load time."
     (loop for (k . v) in alist
           do (setf (target-table-ref table k) v))))
 
+(defmacro with-target-table-locked ((target-table) &body body)
+  (once-only (target-table)
+    (with-thunk (body)
+      `(if (target-table.synchronized ,target-table)
+           (bt:with-recursive-lock-held ((target-table.lock ,target-table))
+             (funcall ,body))
+           (funcall ,body)))))
+
 (defun target-table-to-alist (table)
   (collecting
     (let ((hash-table (target-table.hash-table table))
@@ -863,14 +871,6 @@ resolved at load time."
           (collect (cons k v))))
       (fset:do-map (k v map)
         (collect (cons k v))))))
-
-(defmacro with-target-table-locked ((target-table) &body body)
-  (once-only (target-table)
-    (with-thunk (body)
-      `(if (target-table.synchronized ,target-table)
-           (bt:with-recursive-lock-held ((target-table.lock ,target-table))
-             (funcall ,body))
-           (funcall ,body)))))
 
 (defun target-table-ref (table key)
   (with-target-table-locked (table)
