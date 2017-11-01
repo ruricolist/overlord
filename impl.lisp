@@ -529,10 +529,6 @@ resolved at load time."
       root-target))
 
 (defmethods root-target (self)
-  (:method print-object (self stream)
-    (if *print-escape*
-        (format stream "#.~s" 'root-target)
-        (print-unreadable-object (self stream :type t))))
   (:method fset:compare (self (obj t))
     (if (eq self obj) :equal :unequal))
   (:method fset:compare ((obj t) self)
