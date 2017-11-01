@@ -75,7 +75,15 @@
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
   (or (not (target-exists? target))
-      (target-in-db? target)))
+      ;; (target-in-db? target)
+
+      ;; NB This is a deviation from the Redo model. We don't want to
+      ;; depend on the database to tell what is or is not a target,
+      ;; because the database is cleared every time Overlord, or the
+      ;; underlying Lisp, is upgraded. Instead, what makes something a
+      ;; target is that it has a build script. (This idea comes from
+      ;; Gup).
+      (target-has-build-script? target)))
 
 (defun redo (&rest args)
   ;; NB This is where you would add parallelism.
@@ -90,6 +98,12 @@
         (save-temp-prereqs target)
         (save-temp-prereqsne target)
         (setf (target-up-to-date? target) t)))))
+
+(defun target-has-build-script? (target)
+  (let ((script-target (target-build-script-target target)))
+    (or (target-exists? script-target)
+        (let ((default (target-default-build-script-target)))
+          (target-exists? default)))))
 
 (defun resolve-build-script (target)
   ;; TODO What directory should be current? Or should the script take care of that?

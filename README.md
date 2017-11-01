@@ -190,9 +190,23 @@ handled. Since patterns do not belong to a particular project, they
 need another form of namespacing. Accordingly patterns are given names
 (when they are defined with `defpattern`) and must be invoked by name.
 
-All that said, Overlord is a faithful implementation of Redo. It
-differs from Redo only in having a very different idea of what can be
-a target.
+All that said, Overlord is a mostly faithful implementation of Redo.
+It differs from Redo principally in having a very different idea of
+what can be a target.
+
+Where Overlord deviates from the Redo model is in how it decides what
+is or is not a target. In Redo proper, this depends on the state of
+the file system – a prerequisite is a target under two conditions: it
+does not exist, or it exists and has an entry in the database. In
+Overlord, however, the database is discarded with every time the
+version of Overlord is incremented. The same goes for the Lisp
+implementation. The problem, then, is that you could easily end up in
+a condition where a target is treated as a source file because it
+exists, and has no entry in the newly created database. So instead of
+relying on the database to determine what is or is not a target,
+Overlord treats an existing X as a target if and only if there is a
+build script for X. (If X does not exist, then it is still always
+treated as a target.)
 
 ## CLI
 
