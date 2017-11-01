@@ -1130,14 +1130,13 @@ distributed."
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (etypecase-of target target
-    ((or root-target trivial-target impossible-target)
-     (values))
+    ((or root-target trivial-target impossible-target
+         module-spec module-cell
+         directory-ref package-ref pattern-ref)
+     (error* "Task for ~a cannot be redefined." target))
     ((or bindable-symbol pathname)
      (let ((task (task target thunk script)))
        (setf (gethash target *tasks*) task)))
-    ((or module-spec module-cell))
-    ((or directory-ref package-ref pattern-ref)
-     (values))
     (task (error* "Cannot save a task as a task."))))
 
 (defun task-values (task)
