@@ -828,10 +828,40 @@ resolved at load time."
   (lock (bt:make-recursive-lock) :read-only t)
   (synchronized nil :type boolean :read-only t))
 
+;;; Ensure target tables can be written.
+
+(defmethod print-object ((self target-table) stream)
+  (when (or (null *print-readably*)
+            (not *read-eval*))
+    (return-from print-object
+      (call-next-method)))
+  (format stream "#.")
+  (format stream "~s"
+          `(alist-to-target-table
+            '(,@(target-table-to-alist self)))))
+
 (defun make-target-table (&key (size 1024) synchronized)
   (%make-target-table
-   :hash-table (make-hash-table :test 'equal :size size)
+   :hash-table (make-hash-table :test 'equal
+                                :size (max 1024 size))
    :synchronized synchronized))
+
+(defun alist-to-target-table (alist)
+  (lret* ((len (length alist))
+          (table (make-target-table :size len)))
+    (loop for (k . v) in alist
+          do (setf (target-table-ref table k) v))))
+
+(defun target-table-to-alist (table)
+  (collecting
+    (let ((hash-table (target-table.hash-table table))
+          map)
+      (with-target-table-locked (table)
+        (setf map (target-table.map table))
+        (do-hash-table (k v hash-table)
+          (collect (cons k v))))
+      (fset:do-map (k v map)
+        (collect (cons k v))))))
 
 (defmacro with-target-table-locked ((target-table) &body body)
   (once-only (target-table)
