@@ -28,7 +28,7 @@
    #:run-script
    #:record-prereq
    #:record-prereqne
-   #:target-kind
+   #:target-in-db?
    #:target-saved-prereqs
    #:target-saved-prereqsne
    #:saved-prereq-target
@@ -57,7 +57,7 @@
           save-temp-prereqs
           record-prereqne
           save-temp-prereqsne
-          target-kind
+          target-in-db?
           target-saved-prereqs
           target-saved-prereqsne
           saved-prereq-target
@@ -72,10 +72,15 @@
 
 (defconst source :source)
 
+(defun target? (target)
+  "Is TARGET actually a target (not a source file)?"
+  (or (not (target-exists? target))
+      (target-in-db? target)))
+
 (defun redo (&rest args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
-    (unless (eql source (target-kind target))
+    (when (target? target)
       (clear-temp-prereqs target)
       (clear-temp-prereqsne target)
       (let ((build-script (resolve-build-script target)))

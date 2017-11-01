@@ -183,11 +183,6 @@ on Lisp/OS/filesystem combinations that support it."
 
 ;;; Auxiliary functions.
 
-;;; If we just say `source', SBCL won't let us use `source' as a slot
-;;; name.
-
-(defconst source-kind    :source)
-(defconst target-kind    :target)
 (defconst nonexist       :nonexist)
 (defconst prereqs        :prereqs)
 (defconst prereqs-temp   :prereqs-temp)
@@ -212,20 +207,13 @@ on Lisp/OS/filesystem combinations that support it."
   (check-type target target)
   (withf (prop parent prereqsne-temp (fset:empty-set)) target))
 
-(defun target-kind (x)
-  (assure (member #.target-kind #.source-kind)
-    ;; It's a target when it doesn't exist, or it has database
-    ;; entries. Conversely, if it does not exist and it has no
-    ;; database entries, it's a source.
-    (if (or (not (target-exists? x))
-            (has-prop? x
-                       uptodate
-                       prereqs
-                       prereqs-temp
-                       prereqsne
-                       prereqsne-temp))
-        target-kind
-        source-kind)))
+(defun target-in-db? (target)
+  (has-prop? target
+             uptodate
+             prereqs
+             prereqs-temp
+             prereqsne
+             prereqsne-temp))
 
 (defun clear-temp-prereqs (target)
   (delete-prop target prereqs-temp))
