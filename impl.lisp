@@ -195,23 +195,27 @@ on Lisp/OS/filesystem combinations that support it."
 (defconst stamp          :stamp)
 (defconst uptodate       :uptodate)
 
-(defun saved-prereq (x) (cons x (target-stamp x)))
+(defun saved-prereq (x &optional (stamp (target-stamp x)))
+  (cons x (assure stamp stamp)))
+
 (defun saved-prereq-target (p) (car p))
 (defun saved-prereq-stamp (p) (cdr p))
 
-(def empty-set (fset:empty-set))
-
-(defun record-prereq (target &optional (parent (current-parent)))
+(defun record-prereq (target &optional (stamp (target-stamp target))
+                      &aux (parent (current-parent)))
   (check-type target target)
-  (withf (prop parent prereqs-temp empty-set)
-         (saved-prereq target)))
+  (withf (prop parent prereqs-temp (fset:empty-map))
+         target stamp))
 
-(defun record-prereqne (target &optional (parent (current-parent)))
+(defun record-prereqne (target &aux (parent (current-parent)))
   (check-type target target)
-  (withf (prop parent prereqsne-temp empty-set) target))
+  (withf (prop parent prereqsne-temp (fset:empty-set)) target))
 
 (defun target-kind (x)
   (assure (member #.target-kind #.source-kind)
+    ;; It's a target when it doesn't exist, or it has database
+    ;; entries. Conversely, if it does not exist and it has no
+    ;; database entries, it's a source.
     (if (or (not (target-exists? x))
             (has-prop? x
                        uptodate
@@ -228,23 +232,24 @@ on Lisp/OS/filesystem combinations that support it."
 (defun clear-temp-prereqsne (target)
   (delete-prop target prereqsne-temp))
 
-(flet ((save-temp-prereqs (target temp perm)
-         (let ((prereqs (assure fset:set (prop target temp empty-set))))
-           (delete-prop target temp)
-           (if (fset:empty? prereqs)
-               (delete-prop target perm)
-               (setf (prop target perm)
-                     (fset:convert 'list prereqs))))))
+(defun save-temp-prereqs (target)
+  (let ((map (assure fset:map (prop target prereqs-temp))))
+    (if (fset:empty? map)
+        (delete-prop target prereqs)
+        (setf (prop target prereqs)
+              (collecting
+                (fset:do-map (k v map)
+                  (collect (saved-prereq k v))))))
+    (clear-temp-prereqs target)))
 
-  (defun save-temp-prereqs (target)
-    (save-temp-prereqs target
-                       prereqs-temp
-                       prereqs))
-
-  (defun save-temp-prereqsne (target)
-    (save-temp-prereqs target
-                       prereqs-temp
-                       prereqs)))
+(defun save-temp-prereqsne (target)
+  (let ((set (assure fset:set
+               (prop target prereqsne-temp))))
+    (if (fset:empty? set)
+        (delete-prop target prereqsne)
+        (setf (prop target prereqsne)
+              (fset:convert 'list set)))
+    (clear-temp-prereqsne target)))
 
 (defun target-up-to-date? (target)
   (prop target uptodate))
