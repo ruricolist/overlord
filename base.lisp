@@ -21,7 +21,6 @@
    :*base* :base
    :set-package-base
    :base-relative-pathname
-   :with-defaults-from-base
    :infer-system
    :ensure-absolute
    :cd))
@@ -72,15 +71,6 @@
       (absolute-pathname pathname)
       (relative-pathname
        (merge-pathnames* pathname (base))))))
-
-(defmacro with-defaults-from-base (&body body)
-  "Wrapper for `call-with-defaults-from-base'."
-  `(progn ,@body)
-  ;; `(let ((*default-pathname-defaults*
-  ;;          (pathname-directory-pathname
-  ;;           *base*)))
-  ;;    ,@body)
-  )
 
 (define-global-state *package-bases* (make-hash-table))
 

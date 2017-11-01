@@ -1367,9 +1367,8 @@ value and NEW do not match under TEST."
   (check-type name symbol)
   (let ((init
           (save-base
-           `(with-defaults-from-base
-              (with-keyword-macros
-                ,init)))))
+           `(with-keyword-macros
+              ,init))))
     `(progn
        (eval-always
          (define-global-var ,name
@@ -1389,9 +1388,8 @@ value and NEW do not match under TEST."
 (defmacro script-thunk (&body body)
   `(lambda ()
      ,(save-base
-       `(with-defaults-from-base
-          (with-keyword-macros
-            ,@body)))))
+       `(with-keyword-macros
+          ,@body))))
 
 (defmacro define-script (name &body script)
   `(defconfig ,name ',script
@@ -1502,18 +1500,17 @@ specify the dependencies you want on build."
        (def ,name ,pathname)
        (define-script-for ,name
          ,@script)
-       (with-defaults-from-base
-         (save-file-task ,pathname
-                         (script-thunk
-                           ,(if (null tmp)
-                                ;; No temp file needed.
-                                `(progn ,@script)
-                                ;; Write to a temp file and rename.
-                                `(call/temp-file-pathname ,pathname
-                                                          (lambda (,tmp)
-                                                            ,@script)))
-                           (assert (file-exists-p ,pathname)))
-                         (script-for name)))
+       (save-file-task ,pathname
+                       (script-thunk
+                         ,(if (null tmp)
+                              ;; No temp file needed.
+                              `(progn ,@script)
+                              ;; Write to a temp file and rename.
+                              `(call/temp-file-pathname ,pathname
+                                                        (lambda (,tmp)
+                                                          ,@script)))
+                         (assert (file-exists-p ,pathname)))
+                       (script-for name))
        ',pathname)))
 
 
@@ -1611,11 +1608,10 @@ depends on that."
 
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
-  (with-defaults-from-base
-    (apply #'dynamic-require-as
-           lang
-           (merge-pathnames* source *base*)
-           args)))
+  (apply #'dynamic-require-as
+         lang
+         (merge-pathnames* source *base*)
+         args))
 
 (defun dynamic-require-as (lang source &key force)
   (check-type source (and absolute-pathname file-pathname))
@@ -1630,9 +1626,8 @@ depends on that."
         (module-cell.module cell)))))
 
 (defun %unrequire-as (lang source *base*)
-  (with-defaults-from-base
-    (dynamic-unrequire-as lang
-                          (merge-pathnames* source *base*))))
+  (dynamic-unrequire-as lang
+                        (merge-pathnames* source *base*)))
 
 (defun dynamic-unrequire-as (lang source)
   (check-type source (and absolute-pathname file-pathname))
@@ -1691,8 +1686,7 @@ interoperation with Emacs."
 (defun load-module (lang source)
   (ensure-pathnamef source)
   (let ((*base* (pathname-directory-pathname source)))
-    (with-defaults-from-base
-      (load-fasl-lang lang source))))
+    (load-fasl-lang lang source)))
 
 (defun module-static-exports (lang source)
   (ensure-static-exports lang source)
@@ -2227,7 +2221,7 @@ the #lang declaration ends."
 ;;; have a full implementation of import sets.
 
 (define-global-state *always-import-values* nil
-  "Flag to control importing behavior.
+                     "Flag to control importing behavior.
 When this is T, imports should always be values, never bindings.
 
 This is intended to be used when saving an image, where you don't care
