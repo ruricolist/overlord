@@ -42,7 +42,8 @@
          (fiveam:*on-error* :debug)
          ;; Use a ridiculous fasl version so we can be reasonably sure
          ;; everything is being compiled clean.
-         (overlord/specials:*db-version* most-positive-fixnum)
+         (version most-positive-fixnum)
+         (overlord/specials:*db-version* version)
          (overlord/db::*kv* (overlord/db::reload-kv)))
     (unwind-protect
          (progn
@@ -53,7 +54,8 @@
            (format t "~&Second run (2/2)~%")
            (overlord/global-state:reset-global-state)
            (run! 'overlord))
-      (overlord/target::delete-versioned-fasls))))
+      (when (equal overlord/specials:*db-version* version)
+        (overlord/db:delete-versioned-db)))))
 
 ;;; Internal use.
 (defun debug-test (test)
