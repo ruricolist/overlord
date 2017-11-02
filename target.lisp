@@ -840,11 +840,7 @@ Works for SBCL, at least."
       (root-target
        (task target
              (lambda ()
-               (let ((*building-root* t)
-                     ;; `depends-on' needs `*base*' to be bound.
-                     (*base*
-                       (or (bound-value '*base*)
-                           (user-homedir-pathname))))
+               (let ((*building-root* t))
                  (redo-ifchange* (list-top-level-targets))))
              trivial-target))
       (pattern-ref
