@@ -104,7 +104,7 @@
 (defun target-has-build-script? (target)
   (let ((script-target (target-build-script-target target)))
     (or (target-exists? script-target)
-        (let ((default (target-default-build-script-target)))
+        (let ((default (target-default-build-script-target target)))
           (target-exists? default)))))
 
 (defun resolve-build-script (target)
