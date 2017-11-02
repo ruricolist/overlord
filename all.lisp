@@ -27,6 +27,7 @@
   (:use-reexport
    :overlord/base
    :overlord/target
+   :overlord/freeze
    :overlord/parsers
    :overlord/message))
 
