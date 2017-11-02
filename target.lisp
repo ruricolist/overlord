@@ -1686,9 +1686,8 @@ interoperation with Emacs."
 (defmethods static-exports-pattern (self lang source)
   (:method pattern.output-defaults (self)
     ;; Bear in mind *input* may have been resolved.
-    (let ((fasl (faslize lang source))
-          (ext (extension "static-exports")))
-      (merge-pathnames* ext fasl)))
+    (path-join (faslize lang source)
+               (extension "static-exports")))
 
   (:method pattern-build (self)
     (save-static-exports lang source)
