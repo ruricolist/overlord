@@ -1371,6 +1371,15 @@ depends on that."
 ;;; itself uses to allow functions to be redefined at runtime without
 ;;; having to recompile all their callers.
 
+(define-global-state *module-cells* (dict)
+  "The global table of all module cells.")
+
+(defun list-module-cells ()
+  (hash-table-values *module-cells*))
+
+;;; TODO Should this be a structure? But using a class gets us slot
+;;; type checking on both SBCL and Clozure. A future optimization, but
+;;; we can leave it for now.
 (defclass module-cell ()
   ((timestamp
     :type target-timestamp
@@ -1403,6 +1412,18 @@ unique identity.
 The module itself may be reloaded, but the module cell is interned
 forever."))
 
+(defun clear-module-cells ()
+  "Delete information not needed at runtime from module cells."
+  ;; We don't actually clear the table because there may be cases
+  ;; where expansion of compiler macros has been suppressed by
+  ;; optimization settings and there is no reference to the module
+  ;; cell to keep it from being garbage-collected.
+  (maphash (lambda (k mc) (declare (ignore k))
+             (with-slots (source timestamp) mc
+               (setf source *nil-pathname*
+                     timestamp never)))
+           *module-cells*))
+
 ;;; Compiler macro needs to appear as soon as possible to satisfy
 ;;; SBCL.
 (define-compiler-macro module-cell (&whole call lang path)
@@ -1414,7 +1435,13 @@ forever."))
            (pathname
             (let ((path (resolve-target path (base)))) ;Resolve now, while `*base*' is bound.
               `(load-time-value
-                (%module-cell ,lang ,path))))
+                (locally
+                    ;; Prevent recursive expansion.
+                    (declare (notinline module-cell))
+                  ;; We can't use %ensure-module-cell directly,
+                  ;; because it doesn't apply the defaults for the
+                  ;; language.
+                  (module-cell ,lang ,path)))))
            (otherwise call)))
         ((constantp lang)
          (let ((val (eval lang)))
@@ -1481,6 +1508,64 @@ resolved at load time."
      (module-cell.module cell) module
      (module-cell.timestamp cell) (now))))
 
+(defun unload-module (lang source)
+  (declare (notinline module-cell))
+  (lret ((m (module-cell lang source)))
+    (with-slots (timestamp module) m
+      (setf timestamp never)
+      (nix module))))
+
+(defun %ensure-module-cell (lang path)
+  "Get the module cell for LANG and PATH, creating and interning one
+if it does not exist."
+  (check-type path absolute-pathname)
+  (setf path
+        (assure pathname
+          (or (truename* path)
+              (or (progn
+                    (redo path)
+                    (truename* path))
+                  (error "Cannot resolve pathname ~a" path)))))
+  (mvlet* ((key (cons lang path))
+           (cell cell?
+            (gethash key *module-cells*)))
+    (if cell? (assure module-cell cell)
+        (let ((cell (make 'module-cell :lang lang :source path)))
+          (setf (gethash key *module-cells*) cell)))))
+
+(defun module-cell (lang path)
+  (let ((path
+          (assure absolute-pathname
+            (merge-input-defaults lang (ensure-pathname path :want-pathname t))))
+        (lang (lang-name lang)))
+    (%ensure-module-cell lang path)))
+
+(defun find-module (lang source)
+  (module-cell.module (module-cell lang source)))
+
+(define-compiler-macro find-module (lang source)
+  `(module-cell.module (module-cell ,lang ,source)))
+
+
+;;; Lazy-loading modules.
+
+(defun load-module/lazy (lang source)
+  (load-module-into-cell/lazy
+   (module-cell lang source)))
+
+(define-compiler-macro load-module/lazy (lang path)
+  `(load-module-into-cell/lazy (module-cell ,lang ,path)))
+
+(defun load-module-into-cell/lazy (cell)
+  (with-slots (module lang source) cell
+    ;; "Double-checked locking."
+    (or module
+        (synchronized (cell)
+          (or module
+              (progn
+                (redo cell)
+                module))))))
+
 
 ;;; Languages
 
@@ -1514,7 +1599,7 @@ resolved at load time."
 
 (defun dynamic-unrequire-as (lang source)
   (check-type source (and absolute-pathname file-pathname))
-  (clear-module-cell lang source)
+  (unload-module lang source)
   (values))
 
 (defmacro require-as (lang source)
@@ -1561,8 +1646,9 @@ interoperation with Emacs."
                                :type fasl-ext)))))
 
 (defun fasl? (pathname)
-  (string= (pathname-type pathname)
-           fasl-ext))
+  (let ((type (pathname-type pathname)))
+    (and (stringp type)
+         (string= type fasl-ext))))
 
 (defun load-module (lang source)
   (ensure-pathnamef source)
@@ -1627,92 +1713,7 @@ interoperation with Emacs."
 (defun module-dynamic-exports (lang source)
   (module-exports (dynamic-require-as lang source)))
 
-;;; Module cells.
-
-;;; The idea here is to avoid runtime lookups of modules by interning
-;;; mutable cells instead.
-
-(define-global-state *module-cells* (dict))
-
-(defun list-module-cells ()
-  (hash-table-values *module-cells*))
-
-(defun clear-module-cells ()
-  "Delete information not needed at runtime from module cells."
-  ;; We don't actually clear the table because there may be cases
-  ;; where expansion of compiler macros has been suppressed by
-  ;; optimization settings and there is no reference to the module
-  ;; cell.
-  (maphash (lambda (k mc) (declare (ignore k))
-             (with-slots (source timestamp) mc
-               (setf source *nil-pathname*
-                     timestamp never)))
-           *module-cells*))
-
-(defun %ensure-module-cell (lang path)
-  "Get the module cell for LANG and PATH, creating and interning one
-if it does not exist."
-  (check-type path absolute-pathname)
-  (setf path
-        (assure pathname
-          (or (truename* path)
-              (or (progn
-                    (redo path)
-                    (truename* path))
-                  (error "Cannot resolve pathname ~a" path)))))
-  (mvlet* ((key (cons lang path))
-           (cell cell?
-            (gethash key *module-cells*)))
-    (if cell? (assure module-cell cell)
-        (let ((cell (make 'module-cell :lang lang :source path)))
-          (setf (gethash key *module-cells*) cell)))))
-
-(defun module-cell (lang path)
-  (let ((path
-          (assure absolute-pathname
-            (merge-input-defaults lang (ensure-pathname path :want-pathname t))))
-        (lang (lang-name lang)))
-    (%ensure-module-cell lang path)))
-
-(defun find-module (lang source)
-  (module-cell.module (module-cell lang source)))
-
-(define-compiler-macro find-module (lang source)
-  `(module-cell.module (module-cell ,lang ,source)))
-
-;;; Hack to stop recursion. We can't use %ensure-module-cell directly,
-;;; because it doesn't apply the defaults for the language.
-(declaim (notinline %module-cell))
-(defun %module-cell (lang path)
-  (declare (notinline module-cell))
-  (module-cell lang path))
-
-(defun clear-module-cell (lang source)
-  (declare (notinline module-cell))
-  (lret ((m (module-cell lang source)))
-    (with-slots (timestamp module) m
-      (setf timestamp never)
-      (nix module))))
-
-;;; Lazy-loading modules.
-
-(defun load-module/lazy (lang source)
-  (load-module-into-cell/lazy
-   (module-cell lang source)))
-
-(define-compiler-macro load-module/lazy (lang path)
-  `(load-module-into-cell/lazy (module-cell ,lang ,path)))
-
-(defun load-module-into-cell/lazy (cell)
-  (with-slots (module lang source) cell
-    ;; "Double-checked locking."
-    (or module
-        (synchronized (cell)
-          (or module
-              (progn
-                (redo cell)
-                module))))))
-
+
 ;;; Languages.
 
 ;;; This is a generic function so individual langs can define their
@@ -2102,7 +2103,7 @@ the #lang declaration ends."
 ;;; have a full implementation of import sets.
 
 (define-global-state *always-import-values* nil
-                     "Flag to control importing behavior.
+  "Flag to control importing behavior.
 When this is T, imports should always be values, never bindings.
 
 This is intended to be used when saving an image, where you don't care
