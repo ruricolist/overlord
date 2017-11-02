@@ -1046,6 +1046,22 @@ value and NEW do not match under TEST."
           (funcall (rebuild-symbol name (lambda () new)))))))
 
 
+;;; Freezing the build system.
+
+(defun hard-freeze-targets ()
+  "Freeze targets."
+  ;; The table of module cells needs special handling.
+  ;; Variables aren't defined yet.
+  (clear-target-table (symbol-value '*top-level-targets*))
+  (clrhash (symbol-value '*symbol-timestamps*))
+  (clrhash (symbol-value '*tasks*))
+  ;; The table of module cells needs special handling.
+  (clear-module-cells)
+  (clrhash (symbol-value '*claimed-module-names*)))
+
+(add-hook '*hard-freeze-hook* 'hard-freeze-targets)
+
+
 ;;; Convenient keyword macros
 
 (defun path (path)

@@ -22,6 +22,7 @@
    ;; NB Would it be worthwhile to implement these as generic
    ;; functions, so in the future we could drive different kinds of
    ;; build systems?
+   #:root-target
    #:target-stamper
    #:stamp=
    #:target-exists?
@@ -45,6 +46,7 @@
 (in-package #:overlord/redo)
 
 (declaim (notinline
+          root-target
           target-stamper
           stamp=
           target-exists?
@@ -85,7 +87,7 @@
       (target-has-build-script? target)))
 
 (defun redo (&rest args)
-  (redo* args))
+  (redo* (or args (list (root-target)))))
 
 (defun redo* (args)
   ;; NB This is where you would add parallelism.

@@ -1,12 +1,16 @@
 ;; Freezing the state of the Lisp image.
 (defpackage :overlord/freeze
-  (:use :cl :alexandria :serapeum)
+  (:use :cl :alexandria :serapeum
+    :overlord/redo
+    :overlord/db
+    :overlord/types)
   (:export
    :freeze :freeze-policy
    :unfreeze
    :file
    :check-not-frozen
-   :frozen?))
+   :frozen?
+   :hard-freeze-targets))
 (in-package :overlord/freeze)
 
 (deftype freeze-policy ()
@@ -54,21 +58,16 @@ distributed."
   (unless (frozen?)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
-               (redo (root-target))
+               (redo)
                ;; The DB can still be reloaded, but is not in memory.
                (unload-db)
                (setf *frozen* t))
              (hard-freeze ()
+               (declare (notinline hard-freeze-targets))
                (freeze)
                (format t "~&Overlord: hard freeze...~%")
                (fmakunbound 'unfreeze)
-               ;; Variables aren't defined yet.
-               (clear-target-table (symbol-value '*top-level-targets*))
-               (clrhash (symbol-value '*symbol-timestamps*))
-               (clrhash (symbol-value '*tasks*))
-               ;; The table of module cells needs special handling.
-               (clear-module-cells)
-               (clrhash (symbol-value '*claimed-module-names*))
+               (hard-freeze-targets)
                ;; The DB will not be reloaded.
                (deactivate-db)
                (dolist (fn *freeze-fmakunbound-hit-list*)
