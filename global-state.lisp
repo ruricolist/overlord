@@ -18,7 +18,7 @@
    (cons '*read-base* (constantly 10))
    (cons '*read-default-float-format* (constantly 'double-float))))
 
-(defmacro define-global-state (name &body (init &optional docstring))
+(defmacro define-global-state (name init &body (&optional docstring))
   `(progn
      (pushnew (cons ',name
                     (lambda ()
