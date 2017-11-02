@@ -27,7 +27,10 @@
    #:write-form-as-file
    #:write-file-if-changed
    #:withf
-   #:lessf))
+   #:lessf
+   #:with-absolute-package-names
+   #:resolve-package
+   #:file-mtime))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with)
@@ -174,3 +177,21 @@ then we set its value inside a critical section."
                             always (eql char (read1 in))))))
           (with-output-to-file (out file :if-exists :rename-and-delete)
             (write-sequence data out))))))
+
+(defmacro with-absolute-package-names ((&key) &body body)
+  `(let ((*package* (find-package :keyword)))
+     ,@body))
+
+;; Maybe this should shadow `find-package'; I'm not sure.
+(defun resolve-package (package-designator)
+  "Like `find-package', but make sure the package is resolved in
+absolute terms even if the Lisp implementation supports local package
+nicknames."
+  (with-absolute-package-names ()
+    (find-package package-designator)))
+
+(defun file-mtime (pathname)
+  "Same as `file-write-date'.
+This is provided in case we ever want to offer more precise timestamps
+on Lisp/OS/filesystem combinations that support it."
+  (cl:file-write-date pathname))

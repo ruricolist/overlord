@@ -157,24 +157,6 @@ Works for SBCL, at least."
 ;;; Make sure that we treat package names consistently, whether or not
 ;;; the Lisp implementation uses package-relative nicknames.
 
-(defmacro with-absolute-package-names ((&key) &body body)
-  `(let ((*package* (find-package :keyword)))
-     ,@body))
-
-;; Maybe this should shadow `find-package'; I'm not sure.
-(defun resolve-package (package-designator)
-  "Like `find-package', but make sure the package is resolved in
-absolute terms even if the Lisp implementation supports local package
-nicknames."
-  (with-absolute-package-names ()
-    (find-package package-designator)))
-
-(defun file-mtime (pathname)
-  "Same as `file-write-date'.
-This is provided in case we ever want to offer more precise timestamps
-on Lisp/OS/filesystem combinations that support it."
-  (cl:file-write-date pathname))
-
 
 ;;; Auxiliary functions for Redo.
 
