@@ -1605,6 +1605,7 @@ if it does not exist."
   (values))
 
 (defmacro require-as (lang source)
+  "Wrap `%require-as`, resolving the base at macro-expansion time."
   `(%require-as ,lang ,source ,(base)))
 
 (defun require-for-emacs (lang source)
@@ -1619,6 +1620,7 @@ interoperation with Emacs."
     (values)))
 
 (defmacro unrequire-as (lang source)
+  "Wrap `%unrequire-as', resolving the base at macro-expansion time."
   `(%unrequire-as ,lang ,source ,(base)))
 
 (defun escape-lang-name (lang-name)
@@ -1676,12 +1678,17 @@ interoperation with Emacs."
   (check-type source absolute-pathname)
   (let ((lang (resolve-lang-package lang)))
     (if-let (sym (find-external-symbol 'static-exports lang))
+      ;; If the language exports a function to parse static exports,
+      ;; use it.
       (funcall sym source)
+      ;; Otherwise, get the list of exports by loading the module at
+      ;; compile time.
       (module-exports (dynamic-require-as lang source)))))
 
 (defclass static-exports-pattern (pattern)
   ((lang :initarg :lang)
-   (source :initarg :source)))
+   (source :initarg :source))
+  (:documentation "Pattern to extract static exports from a file."))
 
 (defmethods static-exports-pattern (self lang source)
   (:method pattern.output-defaults (self)
