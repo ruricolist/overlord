@@ -43,7 +43,7 @@
          ;; Use a ridiculous fasl version so we can be reasonably sure
          ;; everything is being compiled clean.
          (overlord/specials:*db-version* most-positive-fixnum)
-         (overlord/kv::*kv* (overlord/kv::reload-kv)))
+         (overlord/db::*kv* (overlord/db::reload-kv)))
     (unwind-protect
          (progn
            (format t "~&First run (1/2)~%")

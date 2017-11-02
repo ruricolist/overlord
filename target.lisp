@@ -33,7 +33,7 @@
     ;; Running shell commands.
     :overlord/cmd
     ;; The database.
-    :overlord/kv
+    :overlord/db
     ;; Freezing the state of the Lisp image.
     :overlord/freeze)
   (:shadowing-import-from :overlord/stamp :now)

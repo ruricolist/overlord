@@ -1,4 +1,4 @@
-(defpackage :overlord/kv
+(defpackage :overlord/db
   (:use :cl :alexandria :serapeum
     :overlord/specials
     :overlord/types
@@ -24,7 +24,7 @@
    :deactivate-db
    :delete-versioned-db
    :db-version-dir))
-(in-package :overlord/kv)
+(in-package :overlord/db)
 
 (deftype kv-key ()
   '(not null))
