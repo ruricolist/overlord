@@ -850,8 +850,7 @@ Works for SBCL, at least."
       (pattern-ref
        (let* ((input (pattern-ref.input target))
               (output (pattern-ref.output target))
-              (pattern (find-pattern (pattern-ref.pattern target)))
-              (class-name (class-name-of target)))
+              (pattern (find-pattern (pattern-ref.pattern target))))
          (task output
                (lambda ()
                  (let ((*input* input)
@@ -859,7 +858,7 @@ Works for SBCL, at least."
                    (let ((*base* (pathname-directory-pathname input)))
                      (redo-ifchange input))
                    (pattern-build pattern)))
-               (script-for class-name))))
+               (pattern.script pattern))))
       (directory-ref
        (let ((dir (ref.name target)))
          (task target
@@ -1295,18 +1294,14 @@ specify the dependencies you want on build."
     :initarg :output-defaults
     :type pathname
     :reader pattern.output-defaults)
-   (script-fn
+   (script
     :initarg :script
-    :type function
-    :reader pattern.script-fn))
+    :type target
+    :reader pattern.script))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
-   :script-fn (constantly nil)))
-
-(defmethods pattern (self script-fn)
-  (:method pattern-build (self)
-    (funcall script-fn)))
+   :script trivial-target))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
@@ -1346,7 +1341,9 @@ depends on that."
        (with-keyword-macros
          (defclass ,class-name (pattern)
            ()
-           (:default-initargs ,@options))))
+           (:default-initargs
+            :script ',(script-for class-name)
+            ,@options))))
      (defmethod pattern-build ((self ,class-name))
        (let ((,in *input*)
              (,out *output*))
