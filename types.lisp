@@ -48,7 +48,7 @@
    #:binding-designator
    #:canonical-binding
    #:non-keyword
-   #:fasl-version
+   #:db-version
    #:qualified-symbol))
 
 (in-package :overlord/types)
@@ -296,4 +296,4 @@ If the value of `*default-pathname-defaults*' and a call to
     macro-spec
     (tuple symbol :as import-alias)))
 
-(deftype fasl-version () '(integer 1 *))
+(deftype db-version () '(integer 1 *))

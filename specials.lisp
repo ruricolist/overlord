@@ -15,7 +15,7 @@
            #:*phase*
            #:*source*
            #:*depth*
-           #:*fasl-version*
+           #:*db-version*
            #:*1* #:*2* #:*3*))
 (in-package #:overlord/specials)
 
@@ -54,7 +54,7 @@ has to see before the other forms.")
 (defvar *depth* 0)
 (declaim (type (integer 0 #.most-positive-fixnum) *depth*))
 
-(defparameter *fasl-version* 17
+(defparameter *db-version* 17
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
-(declaim (type fasl-version *fasl-version*))
+(declaim (type db-version *db-version*))

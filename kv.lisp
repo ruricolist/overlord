@@ -9,6 +9,8 @@
     :rename-file-overwriting-target
     :file-exists-p
     :xdg-cache-home
+    :subpathp
+    :ensure-directory-pathname
     :merge-pathnames*
     :pathname-directory-pathname)
   (:import-from :fset)
@@ -19,7 +21,9 @@
    :compact-database
    :saving-database
    :unload-db
-   :deactivate-db))
+   :deactivate-db
+   :delete-versioned-db
+   :db-version-dir))
 (in-package :overlord/kv)
 
 (deftype kv-key ()
@@ -40,9 +44,21 @@
   (timestamp (get-universal-time) :type (integer 0 *))
   (data :type fset:map))
 
+(defun delete-versioned-db (&optional (version *db-version*))
+  (uiop:delete-directory-tree
+   (db-version-dir version)
+   :validate (op (subpathp _ (xdg-cache-home)))))
+
+(defun db-version-dir (&optional (version *db-version*))
+  (check-type version db-version)
+  (ensure-directory-pathname
+   (xdg-cache-home "overlord"
+                   (fmt "v~a" version)
+                   :implementation)))
+
 (defclass kv ()
   ((version
-    :initform *fasl-version*
+    :initform *db-version*
     :reader kv.version)
    (current-map
     :initarg :current-map
@@ -231,12 +247,11 @@
           :log log)))
 
 (defun log-file-path ()
-  (merge-pathnames*
-   #p"overlord.log"
-   (xdg-cache-home "overlord"
-                   (fmt "v~a" *fasl-version*)
-                   :implementation
-                   "log")))
+  (assure absolute-pathname
+    (path-join
+     (db-version-dir)
+     #p"log/"
+     #p"log")))
 
 (defun reload-kv ()
   (message "Reloading database")
@@ -270,7 +285,7 @@ reloaded on demand."
 
 (defun check-version ()
   (unless (= (kv.version *kv*)
-             *fasl-version*)
+             *db-version*)
     (cerror "Load the correct database"
             "Database version mismatch")
     (setq *kv* (reload-kv))))

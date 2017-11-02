@@ -55,8 +55,7 @@
   (:import-from :uiop
     :implementation-identifier
     :with-temporary-file
-    :rename-file-overwriting-target
-    :xdg-cache-home)
+    :rename-file-overwriting-target)
   ;; How to escape names for use in pathnames.
   (:import-from :quri :url-encode)
   (:shadow :defconfig :import)
@@ -1491,16 +1490,6 @@ depends on that."
 ;;; language is an abstract relationship between a file and Lisp
 ;;; binding.
 
-(defun delete-versioned-fasls (&optional (version *fasl-version*))
-  (uiop:delete-directory-tree
-   (fasl-version-dir version)
-   :validate (op (subpathp _ (xdg-cache-home)))))
-
-(defun fasl-version-dir (&optional (version *fasl-version*))
-  (check-type version fasl-version)
-  (ensure-directory-pathname
-   (xdg-cache-home "overlord" (fmt "v~a" version))))
-
 (defun %require-as (lang source *base* &rest args)
   (ensure-pathnamef source)
   (apply #'dynamic-require-as
@@ -1551,28 +1540,26 @@ interoperation with Emacs."
   (url-encode (string lang-name) :encoding :utf-8))
 
 (defun lang-fasl-dir (lang current-dir)
-  (let ((version-string (fmt "v~a" *fasl-version*))
-        (lang-string (escape-lang-name lang))
-        (suffix
-          (make-pathname :directory
-                         (cons :relative
-                               (drop-while #'keywordp
-                                           (pathname-directory current-dir))))))
-    (xdg-cache-home "overlord"
-                    version-string
-                    :implementation
-                    "fasls"
-                    lang-string
-                    suffix)))
+  (assure (and absolute-pathname directory-pathname)
+    (let ((lang-string (escape-lang-name lang))
+          (suffix
+            (make-pathname :directory
+                           (cons :relative
+                                 (drop-while #'keywordp
+                                             (pathname-directory current-dir))))))
+      (path-join
+       (db-version-dir)
+       #p"fasls/"
+       (make-pathname :directory `(:relative ,lang-string))
+       suffix))))
 
 (defun faslize (lang pathname)
   (etypecase-of lang lang
     (package (faslize (package-name-keyword lang) pathname))
     (lang-name
-     (merge-pathnames*
-      (make-pathname :name (pathname-name pathname)
-                     :type fasl-ext)
-      (lang-fasl-dir lang pathname)))))
+     (path-join (lang-fasl-dir lang pathname)
+                (make-pathname :name (pathname-name pathname)
+                               :type fasl-ext)))))
 
 (defun fasl? (pathname)
   (equal (pathname-type pathname)
