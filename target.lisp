@@ -1808,6 +1808,8 @@ interoperation with Emacs."
       (lang-name (make-keyword lang))
       (package (package-name-keyword lang)))))
 
+;;; This can't use `defpattern', for bootstrapping reasons.
+
 (defclass fasl-lang-pattern (pattern)
   ((lang :initarg :lang)
    (source :initarg :source)))
