@@ -355,7 +355,10 @@ Works for SBCL, at least."
         (format stream "#.~s"
                 (make-load-form self))
         (print-unreadable-object (self stream :type t)
-          (format stream "~a -> ~a" input output))))
+          (format stream "~a (~a -> ~a)"
+                  (class-name-of pattern)
+                  input
+                  output))))
 
   (:method make-load-form (self &optional env)
     (make-load-form-saving-slots self
