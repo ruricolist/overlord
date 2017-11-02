@@ -387,116 +387,6 @@ Works for SBCL, at least."
 
 (fset:define-cross-type-compare-methods module-spec)
 
-(defclass module-cell ()
-  ((timestamp
-    :type target-timestamp
-    :initform never
-    :accessor module-cell.timestamp)
-   (lang
-    :initarg :lang
-    :type lang-name
-    :reader module-cell.lang)
-   (source
-    :initarg :source
-    :type (and file-pathname tame-pathname)
-    :accessor module-cell.source)
-   (meta
-    :initform nil
-    :type plist
-    :accessor module-cell.meta
-    :documentation "Metadata about the module. This persists even when
-the module is reloaded.")
-   (module
-    :initform nil
-    :accessor module-cell.module)
-   (lock
-    :reader monitor))
-  (:documentation "Storage for a module.
-
-Each lang+source combination gets its own module cell with its own
-unique identity.
-
-The module itself may be reloaded, but the module cell is interned
-forever."))
-
-;;; Compiler macro needs to appear as soon as possible to satisfy
-;;; SBCL.
-(define-compiler-macro module-cell (&whole call lang path)
-  (cond ((packagep lang)
-         `(module-cell ,(lang-name lang) ,path))
-        ((or (quoted-symbol? lang) (keywordp lang))
-         (typecase-of (or string pathname) path
-           (string `(module-cell ,lang ,(ensure-pathname path :want-pathname t)))
-           (pathname
-            (let ((path (resolve-target path (base)))) ;Resolve now, while `*base*' is bound.
-              `(load-time-value
-                (%module-cell ,lang ,path))))
-           (otherwise call)))
-        ((constantp lang)
-         (let ((val (eval lang)))
-           (if (eql val lang) call
-               `(module-cell ,val ,path))))
-        (t call)))
-
-(defun module-spec-cell (spec)
-  (let-match1 (module-spec lang path) spec
-    (module-cell lang path)))
-
-(defun module-cell-meta (cell key)
-  (synchronized (cell)
-    (getf (module-cell.meta cell) key)))
-
-(defun (setf module-cell-meta) (value cell key)
-  (synchronized (cell)
-    (setf (getf (module-cell.meta cell) key)
-          value)))
-
-(defplace module-meta (lang path key)
-  (module-cell-meta (module-cell lang path) key))
-
-(define-compiler-macro module-meta (lang path key)
-  "Expand the call to module-cell at compile time so it can be
-resolved at load time."
-  `(module-cell-meta (module-cell ,lang ,path) ,key))
-
-(define-compiler-macro (setf module-meta) (value lang path key)
-  `(setf (module-cell-meta (module-cell ,lang ,path) ,key) ,value))
-
-(defmethods module-cell (self lock source lang module)
-  (:method initialize-instance :after (self &key)
-    ;; Give the lock a name.
-    (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
-
-  (:method module-ref (self name)
-    (module-ref* module name))
-
-  (:method module-exports (self)
-    (module-exports module))
-
-  ;; NB When you print a module cell readably, or generate a load
-  ;; form, what you get is not a module cell but a module spec.
-
-  (:method print-object (self stream)
-    (if *print-escape*
-        (print-object (module-spec lang source) stream)
-        (print-unreadable-object (self stream :type t)
-          (format stream "~a (~a) (~:[not loaded~;loaded~])"
-                  source
-                  lang
-                  module))))
-
-  (:method make-load-form (self &optional env)
-    (make-load-form (module-spec lang source) env)))
-
-(defun load-module-into-cell (cell)
-  (lret ((module
-          (assure (not null)
-            (load-module (module-cell.lang cell)
-                         (module-cell.source cell)))))
-    (setf
-     (module-cell.module cell) module
-     (module-cell.timestamp cell) (now))))
-
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
 
@@ -547,7 +437,6 @@ resolved at load time."
     directory-ref
     pattern-ref
     module-spec
-    module-cell
     task))
 
 
@@ -564,29 +453,30 @@ resolved at load time."
          (directory-exists-p path)))))
 
 (defun target-exists? (target)
-  (etypecase-of target target
-    ((or root-target trivial-target) t)
-    (impossible-target nil)
-    (bindable-symbol (boundp target))
-    (pathname (pathname-exists? target))
-    (package-ref
-     (~> target
-         ref.name
-         string
-         find-package))
-    (directory-ref
-     (~> target
-         ref.name
-         (resolve-target (base))
-         directory-exists-p))
-    (pattern-ref
-     (~> target
-         pattern-ref.output
-         pathname-exists?))
-    (module-spec
-     (target-exists? (module-spec-cell target)))
-    (module-cell (module-cell.module target))
-    (task (target-exists? (task-script target)))))
+  (true
+   (etypecase-of target target
+     ((or root-target trivial-target) t)
+     (impossible-target nil)
+     (bindable-symbol (boundp target))
+     (pathname (pathname-exists? target))
+     (package-ref
+      (~> target
+          ref.name
+          string
+          find-package))
+     (directory-ref
+      (~> target
+          ref.name
+          (resolve-target (base))
+          directory-exists-p))
+     (pattern-ref
+      (~> target
+          pattern-ref.output
+          pathname-exists?))
+     (module-spec
+      (let ((cell (module-spec-cell target)))
+        (module-cell.module cell)))
+     (task (target-exists? (task-script target))))))
 
 (defun target-timestamp (target)
   (etypecase-of target target
@@ -617,10 +507,9 @@ resolved at load time."
            (file-mtime output)
            never)))
     (module-spec
-     (target-timestamp (module-spec-cell target)))
-    (module-cell
-     (with-slots (module timestamp) target
-       (if (null module) never timestamp)))
+     (let* ((cell (module-spec-cell target)))
+       (with-slots (module timestamp) cell
+         (if (null module) never timestamp))))
     (task
      (if-let (script (task-script target))
        (target-timestamp script)
@@ -655,9 +544,7 @@ resolved at load time."
      (error* "Setting the timestamp of ~s does not make sense."))
     (module-spec
      (let ((cell (module-spec-cell target)))
-       (setf (target-timestamp cell) timestamp)))
-    (module-cell
-     (setf (module-cell.timestamp target) timestamp))
+       (setf (module-cell.timestamp cell) timestamp)))
     (task (error* "Cannot set timestamp of a task."))))
 
 (defun touch-target (target &optional (date (now)))
@@ -689,10 +576,8 @@ resolved at load time."
       (assure tame-pathname
         (merge-pathnames* (ref.name target) base))))
     (module-spec
-     (resolve-target (module-spec-cell target) base))
-    (module-cell
-     (with-slots (lang source) target
-       (module-cell lang
+     (let-match1 (module-spec lang source) target
+       (module-spec lang
                     (assure tame-pathname
                       (merge-pathnames* source base)))))
     (task
@@ -712,7 +597,6 @@ resolved at load time."
     (bindable-symbol 'bindable-symbol)
     (pathname 'pathname)
     (module-spec 'module-spec)
-    (module-cell 'module-cell)
     (package-ref 'package-ref)
     (directory-ref 'directory-ref)
     (pattern-ref 'pattern-ref)
@@ -738,8 +622,6 @@ resolved at load time."
       (let-match1 (module-spec lang2 path2) y)
       (and (eql lang1 lang2)
            (pathname-equal path1 path2))))
-    ((module-cell module-cell)
-     (eql x y))
     ((package-ref package-ref)
      (compare #'string= #'ref.name x y))
     ((directory-ref directory-ref)
@@ -767,11 +649,6 @@ resolved at load time."
     (module-spec
      (let-match1 (module-spec lang path) target
        (dx-sxhash (list 'module-spec lang path))))
-    (module-cell
-     (dx-sxhash
-      (list 'module-cell
-            (module-cell.lang target)
-            (module-cell.source target))))
     (directory-ref
      (dx-sxhash
       (list 'directory-ref
@@ -999,19 +876,18 @@ resolved at load time."
                                    :nicknames nicknames)))
                trivial-target)))
       (module-spec
-       (target-default-build-script-target (module-spec-cell target)))
-      (module-cell
-       (with-slots (lang source) target
-         (task target
-               (lambda ()
-                 (let ((*language* lang))
-                   (load-module-into-cell target)
-                   (let ((*base* (pathname-directory-pathname source)))
-                     ;; Depend on the source file.
-                     (redo-ifchange source)
-                     ;; Let the language tell you what else to depend on.
-                     (lang-deps lang source))))
-               trivial-target))))))
+       (let ((cell (module-spec-cell target)))
+         (with-slots (lang source) cell
+           (task target
+                 (lambda ()
+                   (let ((*language* lang))
+                     (load-module-into-cell cell)
+                     (let ((*base* (pathname-directory-pathname source)))
+                       ;; Depend on the source file.
+                       (redo-ifchange source)
+                       ;; Let the language tell you what else to depend on.
+                       (lang-deps lang source))))
+                 trivial-target)))))))
 
 (defun run-script (task)
   (check-not-frozen)
@@ -1028,7 +904,7 @@ resolved at load time."
   (check-not-frozen)
   (etypecase-of target target
     ((or root-target trivial-target impossible-target
-         module-spec module-cell
+         module-spec
          directory-ref package-ref pattern-ref)
      (error* "Task for ~a cannot be redefined." target))
     ((or bindable-symbol pathname)
@@ -1068,9 +944,6 @@ TARGET."
     (module-spec
      (let-match1 (module-spec lang path) target
        `(module-spec ,lang ,path)))
-    (module-cell
-     (with-slots (lang source) target
-       (dump-target/pretty (module-spec lang source))))
     (directory-ref
      `(directory-ref ,(ref.name target)))
     (package-ref
@@ -1107,7 +980,6 @@ TARGET."
            ;; TODO?
            directory-ref
            module-spec
-           module-cell
            task)
        (target-timestamp target))
       (pathname
@@ -1481,6 +1353,133 @@ depends on that."
                                   (lambda (,out)
                                     (with-keyword-macros
                                       ,@script)))))))
+
+
+;;; Module cells.
+
+;;; What's a module cell? What we want is a namespace for modules,
+;;; indexed by language and source file. The obvious thing would be to
+;;; declare a table (with `defvar') store modules there. Basically,
+;;; that is what we do. But instead of simply storing the module in
+;;; the table, we store an indirection -- a "module cell", a mutable
+;;; cell which contains the actual module. Then, using compiler macros
+;;; and `load-time-value', we can inject direct references to module
+;;; cells into the compiled code. The result is that, for inline
+;;; references to modules, no run-time lookup is necessary. This is
+;;; key to keeping modules fast while also allowing for modules to be
+;;; redefined. And ultimately it is similar to the strategy that Lisp
+;;; itself uses to allow functions to be redefined at runtime without
+;;; having to recompile all their callers.
+
+(defclass module-cell ()
+  ((timestamp
+    :type target-timestamp
+    :initform never
+    :accessor module-cell.timestamp)
+   (lang
+    :initarg :lang
+    :type lang-name
+    :reader module-cell.lang)
+   (source
+    :initarg :source
+    :type (and file-pathname tame-pathname)
+    :accessor module-cell.source)
+   (meta
+    :initform nil
+    :type plist
+    :accessor module-cell.meta
+    :documentation "Metadata about the module. This persists even when
+the module is reloaded.")
+   (module
+    :initform nil
+    :accessor module-cell.module)
+   (lock
+    :reader monitor))
+  (:documentation "Storage for a module.
+
+Each lang+source combination gets its own module cell with its own
+unique identity.
+
+The module itself may be reloaded, but the module cell is interned
+forever."))
+
+;;; Compiler macro needs to appear as soon as possible to satisfy
+;;; SBCL.
+(define-compiler-macro module-cell (&whole call lang path)
+  (cond ((packagep lang)
+         `(module-cell ,(lang-name lang) ,path))
+        ((or (quoted-symbol? lang) (keywordp lang))
+         (typecase-of (or string pathname) path
+           (string `(module-cell ,lang ,(ensure-pathname path :want-pathname t)))
+           (pathname
+            (let ((path (resolve-target path (base)))) ;Resolve now, while `*base*' is bound.
+              `(load-time-value
+                (%module-cell ,lang ,path))))
+           (otherwise call)))
+        ((constantp lang)
+         (let ((val (eval lang)))
+           (if (eql val lang) call
+               `(module-cell ,val ,path))))
+        (t call)))
+
+(defun module-spec-cell (spec)
+  (let-match1 (module-spec lang path) spec
+    (module-cell lang path)))
+
+(defun module-cell-meta (cell key)
+  (synchronized (cell)
+    (getf (module-cell.meta cell) key)))
+
+(defun (setf module-cell-meta) (value cell key)
+  (synchronized (cell)
+    (setf (getf (module-cell.meta cell) key)
+          value)))
+
+(defplace module-meta (lang path key)
+  (module-cell-meta (module-cell lang path) key))
+
+(define-compiler-macro module-meta (lang path key)
+  "Expand the call to module-cell at compile time so it can be
+resolved at load time."
+  `(module-cell-meta (module-cell ,lang ,path) ,key))
+
+(define-compiler-macro (setf module-meta) (value lang path key)
+  `(setf (module-cell-meta (module-cell ,lang ,path) ,key) ,value))
+
+(defmethods module-cell (self lock source lang module)
+  (:method initialize-instance :after (self &key)
+    ;; Give the lock a name.
+    (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
+
+  (:method module-ref (self name)
+    (module-ref* module name))
+
+  (:method module-exports (self)
+    (module-exports module))
+
+  ;; NB When you print a module cell readably, or generate a load
+  ;; form, what you get is not a module cell but a module spec.
+
+  (:method print-object (self stream)
+    (if *print-escape*
+        (print-object (module-spec lang source) stream)
+        (print-unreadable-object (self stream :type t)
+          (format stream "~a (~a) (~:[not loaded~;loaded~])"
+                  source
+                  lang
+                  module))))
+
+  (:method make-load-form (self &optional env)
+    (make-load-form (module-spec lang source) env)))
+
+(defun load-module-into-cell (cell)
+  (lret ((module
+          (assure (not null)
+            (load-module (module-cell.lang cell)
+                         (module-cell.source cell)))))
+    (setf
+     (module-cell.module cell) module
+     (module-cell.timestamp cell) (now))))
 
 
 ;;; Languages
