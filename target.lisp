@@ -718,9 +718,10 @@ resolved at load time."
                     (assure tame-pathname
                       (merge-pathnames* source base)))))
     (task
-     (let* ((script (task-script target))
-            (script (resolve-target script base)))
-       (copy-task target :script script)))))
+     (locally (declare (notinline task-script copy-task))
+       (let* ((script (task-script target))
+              (script (resolve-target script base)))
+         (copy-task target :script script))))))
 
 
 ;;; Target table abstract data type.
