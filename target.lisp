@@ -881,13 +881,14 @@ Works for SBCL, at least."
          (with-slots (lang source) cell
            (task target
                  (lambda ()
+                   (let ((*base* (pathname-directory-pathname source)))
+                     ;; Depend on the source file.
+                     (redo-ifchange source)
+                     ;; Let the language tell you what to depend on.
+                     (lang-deps lang source))
+
                    (let ((*language* lang))
-                     (load-module-into-cell cell)
-                     (let ((*base* (pathname-directory-pathname source)))
-                       ;; Depend on the source file.
-                       (redo-ifchange source)
-                       ;; Let the language tell you what else to depend on.
-                       (lang-deps lang source))))
+                     (load-module-into-cell cell)))
                  trivial-target)))))))
 
 (defun run-script (task)
