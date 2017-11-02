@@ -585,7 +585,8 @@ Works for SBCL, at least."
                     (assure tame-pathname
                       (merge-pathnames* source base)))))
     (task
-     (locally (declare (notinline task-script copy-task))
+     (locally
+         (declare #+sbcl (notinline copy-task task-script))
        (let* ((script (task-script target))
               (script (resolve-target script base)))
          (copy-task target :script script))))))
