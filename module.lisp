@@ -15,7 +15,7 @@
 
 (in-package #:overlord/module)
 
-;;; Actually defined in impl.lisp.
+;;; Actually defined in target.lisp.
 (declaim (notinline module-static-exports))
 
 ;;; Generic functions.

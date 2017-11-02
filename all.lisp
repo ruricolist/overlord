@@ -26,10 +26,10 @@
    :redo :redo-ifchange :redo-ifcreate :redo-always :redo-stamp)
   (:use-reexport
    :overlord/base
-   :overlord/impl
+   :overlord/target
    :overlord/parsers
    :overlord/message))
 
 (defpackage :overlord-user
-  (:use :cl :alexandria :serapeum :overlord/impl)
-  (:shadowing-import-from :overlord/impl :import :define-constant))
+  (:use :cl :alexandria :serapeum :overlord/target)
+  (:shadowing-import-from :overlord/target :import :define-constant))

@@ -50,7 +50,7 @@ concepts behind Overlord. If you’re looking for the current syntax,
 consult the [test suite](tests.lisp) and the [files it uses](tests/).
 
 (If you are interested in reading the code, the substance is
-in [impl.lisp](impl.lisp); the rest is support.)
+in [target.lisp](target.lisp); the rest is support.)
 
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].

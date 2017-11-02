@@ -2,7 +2,7 @@
     (:use :fiveam :overlord/import-set)
   (:mix :overlord/shadows :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as)
-  (:import-from :overlord/impl :target-timestamp)
+  (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :local-time :now)
   (:import-from :uiop
@@ -53,7 +53,7 @@
            (format t "~&Second run (2/2)~%")
            (overlord/global-state:reset-global-state)
            (run! 'overlord))
-      (overlord/impl::delete-versioned-fasls))))
+      (overlord/target::delete-versioned-fasls))))
 
 ;;; Internal use.
 (defun debug-test (test)

@@ -5,7 +5,7 @@
   (:import-from :serapeum :op :car-safe :keep)
   (:import-from :overlord/module :module-ref :module-ref* :module-exports)
   (:import-from :overlord/parsers :slurp-stream :slurp-file)
-  (:import-from :overlord/impl :with-imports)
+  (:import-from :overlord/target :with-imports)
   (:export
    :read-module :module-progn
    :simple-module

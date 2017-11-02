@@ -1,6 +1,6 @@
 ;;; High-level build system implementation. This package exports the
-;;; functions that are implemented in overlord/impl. The idea is that
-;;; this should be written at a high enough level that, with a
+;;; functions that are implemented in overlord/target. The idea is
+;;; that this should be written at a high enough level that, with a
 ;;; different set of definitions, it could drive an ordinary
 ;;; file-based Redo build system.
 

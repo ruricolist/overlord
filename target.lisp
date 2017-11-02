@@ -1,4 +1,4 @@
-(defpackage :overlord/impl
+(defpackage :overlord/target
   (:use
     :cl
     :alexandria
@@ -122,7 +122,7 @@
    :unfreeze
    :file))
 
-(in-package :overlord/impl)
+(in-package :overlord/target)
 
 
 ;;; Shadows and preferred alternatives.
