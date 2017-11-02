@@ -1452,6 +1452,10 @@ forever."))
   (let-match1 (module-spec lang path) spec
     (module-cell lang path)))
 
+(defun module-cell-spec (cell)
+  (with-slots (lang source) cell
+    (module-spec lang source)))
+
 (defun module-cell-meta (cell key)
   (synchronized (cell)
     (getf (module-cell.meta cell) key)))
@@ -1562,7 +1566,7 @@ if it does not exist."
         (synchronized (cell)
           (or module
               (progn
-                (redo cell)
+                (redo (module-cell-spec cell))
                 module))))))
 
 
