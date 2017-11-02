@@ -1059,8 +1059,6 @@ value and NEW do not match under TEST."
   (clear-module-cells)
   (clrhash (symbol-value '*claimed-module-names*)))
 
-(add-hook '*hard-freeze-hook* 'hard-freeze-targets)
-
 
 ;;; Convenient keyword macros
 
