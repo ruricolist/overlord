@@ -1487,20 +1487,12 @@ resolved at load time."
   (:method module-exports (self)
     (module-exports module))
 
-  ;; NB When you print a module cell readably, or generate a load
-  ;; form, what you get is not a module cell but a module spec.
-
   (:method print-object (self stream)
-    (if *print-escape*
-        (print-object (module-spec lang source) stream)
-        (print-unreadable-object (self stream :type t)
-          (format stream "~a (~a) (~:[not loaded~;loaded~])"
-                  source
-                  lang
-                  module))))
-
-  (:method make-load-form (self &optional env)
-    (make-load-form (module-spec lang source) env)))
+    (print-unreadable-object (self stream :type t)
+      (format stream "~a (~a) (~:[not loaded~;loaded~])"
+              source
+              lang
+              module))))
 
 (defun load-module-into-cell (cell)
   (lret ((module
