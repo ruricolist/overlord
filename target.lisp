@@ -474,8 +474,9 @@ Works for SBCL, at least."
           pattern-ref.output
           pathname-exists?))
      (module-spec
-      (let ((cell (module-spec-cell target)))
-        (module-cell.module cell)))
+      (~> target
+          module-spec-cell
+          module-cell.module))
      (task (target-exists? (task-script target))))))
 
 (defun target-timestamp (target)
@@ -1590,8 +1591,9 @@ if it does not exist."
   (assure (not module-cell)
     (let ((spec (module-spec lang source)))
       (redo-ifchange spec)
-      (let ((cell (module-spec-cell spec)))
-        (module-cell.module cell)))))
+      (~> spec
+          module-spec-cell
+          module-cell.module))))
 
 (defun %unrequire-as (lang source *base*)
   (dynamic-unrequire-as lang
@@ -1639,7 +1641,10 @@ interoperation with Emacs."
 
 (defun faslize (lang pathname)
   (etypecase-of lang lang
-    (package (faslize (package-name-keyword lang) pathname))
+    (package
+     (~> lang
+         package-name-keyword
+         (faslize pathname)))
     (lang-name
      (path-join (lang-fasl-dir lang pathname)
                 (make-pathname :name (pathname-name pathname)
