@@ -7,6 +7,7 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
+  (:nicknames :redo)
   (:export
    #:redo
    #:redo*
