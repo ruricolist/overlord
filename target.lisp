@@ -966,8 +966,11 @@ TARGET."
                    :nicknames ,(package-ref.nicknames target)
                    :use-list ,(package-ref.use-list target)))
     (pattern-ref
-     `(pattern-ref ,(pattern-ref.pattern target)
-                   ,(pattern-ref.input target)))
+     (let* ((pattern (pattern-ref.pattern target))
+            (input (pattern-ref.input target))
+            (pattern-name (class-name-of pattern)))
+       `(pattern-ref (find-pattern ',pattern-name)
+                     ,input)))
     (task `(task ,@(multiple-value-list (task-values target))))))
 
 (defun file-stamp (file)
