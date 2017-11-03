@@ -1272,7 +1272,7 @@ specify the dependencies you want on build."
   (let* ((base (base))
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
-         (script
+         (script-form
            `(progn
               (setf (current-dir!) ,dir)
               ,@script)))
@@ -1280,18 +1280,18 @@ specify the dependencies you want on build."
        ;; Make the task accessible by name.
        (def ,name ,pathname)
        (define-script-for ,name
-         ,@script)
+         ,script-form)
        (save-file-task ,pathname
                        (script-thunk
                          ,(if (null tmp)
                               ;; No temp file needed.
-                              `(progn ,@script)
+                              script-form
                               ;; Write to a temp file and rename.
                               `(call/temp-file-pathname ,pathname
                                                         (lambda (,tmp)
-                                                          ,@script)))
+                                                          ,script-form)))
                          (assert (file-exists-p ,pathname)))
-                       (script-for name))
+                       (script-for ',name))
        ',pathname)))
 
 
