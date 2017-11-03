@@ -471,6 +471,12 @@ All that said, Overlord is a mostly faithful implementation of Redo.
 It differs from Redo principally in having a very different idea of
 what can be a target.
 
+Like most practical Redo implementations, Overlord does not (by
+default) hash files to determine if they have changed. The timestamp
+of the file, however, is treated as a hash-like value: the file is
+rebuilt whenever it changes. This avoids both the problems of hashing
+(slow) and the problems of timestamp ordering (unreliable clocks).
+
 One way Overlord deviates from the Redo model is in how it decides
 what is or is not a target. In Redo, this depends on the state of the
 file system – a prerequisite is a target under two conditions: it does
