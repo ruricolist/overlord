@@ -943,7 +943,7 @@ The idea here (borrowed from Apenwarr redo) is that the user should be
 able to simply evaluate the form for a given target to pick up
 building from there."
   (message "~Vt~s"
-           (1- *depth*)
+           (min 0 (1- *depth*))
            `(redo ,(dump-target/pretty target))))
 
 (defun dump-target/pretty (target)
