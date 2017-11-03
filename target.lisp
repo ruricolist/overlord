@@ -1773,21 +1773,22 @@ interoperation with Emacs."
   "The part that gets expanded once PACKAGE-NAME exists."
   (let* ((p (find-package package-name))
          (syms (mapcar (op (find-symbol (string _) p))
-                       (loader-language-exports))))
+                       (loader-language-exports)))
+         (keyword (package-name-keyword package-name)))
     (destructuring-bind (load read ext script) syms
       `(progn
          (declaim (notinline ,load ,read))
          (eval-always
-           (define-script ,script ,reader)
-           (defparameter ,ext (extension ,extension))
-           (defun ,load (,source)
-             ,reader)
-           (defun ,read (,source _stream)
-             (declare (ignore _stream))
-             (list ',load ,source))
-           (defmethod lang-deps :after ((self (eql ,(make-keyword package-name))) source)
-             (declare (ignore source))
-             (redo-ifchange ',script)))))))
+          (define-script ,script ,reader)
+          (defparameter ,ext (extension ,extension))
+          (defun ,load (,source)
+            ,reader)
+          (defun ,read (,source _stream)
+            (declare (ignore _stream))
+            (list ',load ,source))
+          (defmethod lang-deps :after ((self (eql ,keyword)) source)
+                     (declare (ignore source))
+                     (redo-ifchange ',script)))))))
 
 (defun load-fasl-lang (lang source)
   (let ((object-file (faslize lang source)))
