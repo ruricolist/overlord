@@ -1105,7 +1105,7 @@ value and NEW do not match under TEST."
                 `(message ,control-string ,@args))
               (:basename (file)
                 `(basename ,file))
-              (:phony (bool)
+              (:always (bool)
                 `(and ,bool (redo-always)))
               (:stamp (stamp)
                 `(redo-stamp ,stamp)))
