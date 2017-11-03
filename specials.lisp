@@ -14,7 +14,6 @@
            #:*language*
            #:*phase*
            #:*source*
-           #:*depth*
            #:*db-version*))
 (in-package #:overlord/specials)
 
@@ -42,9 +41,6 @@ has to see before the other forms.")
 
 (defvar-unbound *language* "The name (symbol) of the current language.")
 (declaim (type symbol *language*))
-
-(defvar *depth* 0)
-(declaim (type (integer 0 #.most-positive-fixnum) *depth*))
 
 (defparameter *db-version* 18
   "Versioning for fasls.

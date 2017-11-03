@@ -399,7 +399,7 @@ Works for SBCL, at least."
 (define-singleton-type root-target)
 
 (defun current-parent ()
-  (or (bound-value '*parent*)
+  (or (first *parents*)
       root-target))
 
 (defmethods root-target (self)
@@ -943,7 +943,7 @@ The idea here (borrowed from Apenwarr redo) is that the user should be
 able to simply evaluate the form for a given target to pick up
 building from there."
   (message "~Vt~s"
-           (min 0 (1- *depth*))
+           (max 0 (1- (length *parents*)))
            `(redo ,(dump-target/pretty target))))
 
 (defun dump-target/pretty (target)
@@ -2377,7 +2377,7 @@ actually exported by the module specified by LANG and SOURCE."
 (defmacro import-module/lazy (module &key as from)
   ;; TODO
   (let ((target (module-spec as from))
-        (*parent* (root-target)))
+        (*parents* (or *parents* (list (root-target)))))
     (record-prereq target))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module

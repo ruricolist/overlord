@@ -7,7 +7,6 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
-  (:import-from #:overlord/specials #:*depth*)
   (:nicknames :redo)
   (:export
    #:redo
@@ -17,7 +16,7 @@
    #:redo-ifcreate
    #:redo-ifcreate*
    #:redo-always
-   #:*parent*
+   #:*parents*
    ;; Functions to implement.
 
    ;; NB Would it be worthwhile to implement these as generic
@@ -68,7 +67,8 @@
           clear-temp-prereqs
           clear-temp-prereqsne))
 
-(defvar-unbound *parent* "Parent of the target being built.")
+(defvar *parents* '()
+  "The chain of parents being built.")
 
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
@@ -94,8 +94,7 @@
       (clear-temp-prereqsne target)
       (let ((build-script (resolve-build-script target)))
         (nix (target-up-to-date? target))
-        (let ((*parent* target)
-              (*depth* (1+ *depth*)))
+        (let ((*parents* (cons target *parents*)))
           (run-script build-script))
         (save-temp-prereqs target)
         (save-temp-prereqsne target)
@@ -111,14 +110,12 @@
   ;; TODO What directory should be current? Or should the script take care of that?
   (let ((script-target (target-build-script-target target)))
     (if (target-exists? script-target)
-        (let ((*parent* target)
-              (*depth* (1+ *depth*)))
+        (let ((*parents* (cons target *parents*)))
           (redo-ifchange script-target)
           script-target)
         (let ((default (target-default-build-script-target target)))
           (if (target-exists? default)
-              (let ((*parent* target)
-                    (*depth* (1+ *depth*)))
+              (let ((*parents* (cons target *parents*)))
                 (redo-ifchange default)
                 (redo-ifcreate script-target)
                 default)
