@@ -2376,8 +2376,9 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import-module/lazy (module &key as from)
   ;; TODO
-  ;; (let ((target (module-spec as from)))
-  ;;   (record-prereq target (root-target)))
+  (let ((target (module-spec as from))
+        (*parent* (root-target)))
+    (record-prereq target))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     (etypecase-of import-alias module
       (var-alias
