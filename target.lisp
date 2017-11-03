@@ -901,14 +901,13 @@ Works for SBCL, at least."
                      (load-module-into-cell cell)))
                  trivial-target)))))))
 
-(defun run-script (task)
+(defun run-script (task &aux (parent (current-parent)))
   (check-not-frozen)
-  (let ((*depth* (1+ *depth*)))
-    ;; XXX exhaustive?
-    (unless (typep *parent*
-                   '(or impossible-target trivial-target))
-      (print-target-being-built *parent*))
-    (funcall (task-thunk task))))
+  ;; XXX exhaustive?
+  (unless (typep parent
+                 '(or impossible-target trivial-target))
+    (print-target-being-built parent))
+  (funcall (task-thunk task)))
 
 (defun run-save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)

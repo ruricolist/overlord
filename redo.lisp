@@ -7,6 +7,7 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
+  (:import-from #:overlord/specials #:*depth*)
   (:nicknames :redo)
   (:export
    #:redo
@@ -93,7 +94,8 @@
       (clear-temp-prereqsne target)
       (let ((build-script (resolve-build-script target)))
         (nix (target-up-to-date? target))
-        (let ((*parent* target))
+        (let ((*parent* target)
+              (*depth* (1+ *depth*)))
           (run-script build-script))
         (save-temp-prereqs target)
         (save-temp-prereqsne target)
@@ -109,12 +111,14 @@
   ;; TODO What directory should be current? Or should the script take care of that?
   (let ((script-target (target-build-script-target target)))
     (if (target-exists? script-target)
-        (let ((*parent* target))
+        (let ((*parent* target)
+              (*depth* (1+ *depth*)))
           (redo-ifchange script-target)
           script-target)
         (let ((default (target-default-build-script-target target)))
           (if (target-exists? default)
-              (let ((*parent* target))
+              (let ((*parent* target)
+                    (*depth* (1+ *depth*)))
                 (redo-ifchange default)
                 (redo-ifcreate script-target)
                 default)
