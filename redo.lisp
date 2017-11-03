@@ -136,6 +136,9 @@
            (reqs (map 'list #'saved-prereq-target prereqs)))
       ;; Check regular prerequisites.
       (let* ((outdated
+               ;; Although they will be reshuffled by `redo', we still
+               ;; want to shuffle them here so the prereqs are built
+               ;; unpredictably.
                (~> reqs
                    reshuffle
                    (filter #'changed? _)
