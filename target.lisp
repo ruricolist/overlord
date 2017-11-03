@@ -37,6 +37,7 @@
     ;; Freezing the state of the Lisp image.
     :overlord/freeze)
   (:shadowing-import-from :overlord/stamp :now)
+  (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
   (:import-from :trivia
     :match :ematch :let-match1)
@@ -119,6 +120,7 @@
    :expand-module-for-emacs))
 
 (in-package :overlord/target)
+(in-readtable :standard)
 
 
 ;;; Shadows and preferred alternatives.
@@ -176,10 +178,11 @@ Works for SBCL, at least."
 (defplace temp-prereqsne (target)
   (prop target prereqsne-temp (fset:empty-set)))
 
-(defun record-prereq (target &optional (stamp (target-stamp target))
-                      &aux (parent (current-parent)))
+(defun record-prereq (target &aux (parent (current-parent)))
   (check-type target target)
-  (withf (temp-prereqs parent) target stamp))
+  (withf (temp-prereqs parent)
+         target
+         (target-stamp target)))
 
 (defun record-prereqne (target &aux (parent (current-parent)))
   (check-type target target)
@@ -483,6 +486,7 @@ Works for SBCL, at least."
      (task (target-exists? (task-script target))))))
 
 (defun target-timestamp (target)
+  (declare (optimize (debug 3)))        ;No tail recursion.
   (etypecase-of target target
     ((or root-target impossible-target) never)
     (trivial-target far-future)
@@ -832,6 +836,11 @@ Works for SBCL, at least."
            impossible-target))
       (target impossible-target))))
 
+(defun trivial-task (target)
+  (task target
+        (constantly nil)
+        trivial-target))
+
 (defun target-default-build-script-target (target)
   (check-not-frozen)
   ;; TODO Alternately, instead of trivial-target for the script, you
@@ -839,8 +848,10 @@ Works for SBCL, at least."
   ;; But: that would create serious bootstrapping issues.
   (assure target
     (etypecase-of target target
-      ((or task pathname bindable-symbol impossible-target trivial-target)
+      ((or task pathname bindable-symbol)
        impossible-target)
+      ((or impossible-target trivial-target)
+       (trivial-task target))
       (root-target
        (task target
              (lambda ()
@@ -893,7 +904,10 @@ Works for SBCL, at least."
 (defun run-script (task)
   (check-not-frozen)
   (let ((*depth* (1+ *depth*)))
-    (print-target-being-built *parent*)
+    ;; XXX exhaustive?
+    (unless (typep *parent*
+                   '(or impossible-target trivial-target))
+      (print-target-being-built *parent*))
     (funcall (task-thunk task))))
 
 (defun run-save-task (target thunk &optional (script (script-for target)))
@@ -995,30 +1009,6 @@ TARGET."
     (setf (symbol-value symbol)     (funcall thunk)
           (target-timestamp symbol) (now))))
 
-(defun redo-vars (dest temp &optional suffix)
-  (declare (ignore suffix))
-  (let ((dest (assure pathname dest)))
-    (values dest
-            dest
-            (assure pathname temp))))
-
-(defun call/temp-file-pathname (dest fn &optional ext)
-  "Call FN on a freshly allocated temporary pathname; if it completes
-safely, overwrite DEST with the contents of the temporary file."
-  (let* ((ok nil)
-         (tmp (with-temporary-file (:pathname p :keep t)
-                (receive (*1* *2* *3*) (redo-vars dest p ext)
-                  (funcall fn p))
-                (setq ok t)
-                p)))
-    (if ok
-        ;; Cross-device?
-        (if (equal (pathname-device tmp)
-                   (pathname-device dest))
-            (rename-file-overwriting-target tmp dest)
-            (copy-file tmp dest :if-to-exists :rename-and-delete))
-        (delete-file-if-exists tmp))))
-
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
     (let* ((file (resolve-target file base))
@@ -1112,7 +1102,7 @@ value and NEW do not match under TEST."
                 `(message ,control-string ,@args))
               (:basename (file)
                 `(basename ,file))
-              (:always (bool)
+              (:phony (bool)
                 `(and ,bool (redo-always)))
               (:stamp (stamp)
                 `(redo-stamp ,stamp)))
@@ -1265,7 +1255,20 @@ specify the dependencies you want on build."
 
 ;;; File targets.
 
-(defmacro file-target (name pathname (&optional tmp) &body script)
+(defun file-target-form (pathname script-form args)
+  (ematch args
+    (() script-form)
+    ((list $1)
+     `(let ((,$1 ,pathname))
+        ,script-form))
+    ((list $1 $3)
+     `(call/temp-file-pathname
+       ,pathname
+       (lambda (,$3)
+         (let ((,$1 ,pathname))
+           ,script-form))))))
+
+(defmacro file-target (name pathname (&rest args) &body script)
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
@@ -1283,14 +1286,7 @@ specify the dependencies you want on build."
          ,script-form)
        (save-file-task ,pathname
                        (script-thunk
-                         ,(if (null tmp)
-                              ;; No temp file needed.
-                              script-form
-                              ;; Write to a temp file and rename.
-                              `(call/temp-file-pathname ,pathname
-                                                        (lambda (,tmp)
-                                                          ,script-form)))
-                         (assert (file-exists-p ,pathname)))
+                         ,(file-target-form pathname script-form args))
                        (script-for ',name))
        ',pathname)))
 

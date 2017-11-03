@@ -18,11 +18,15 @@
     :*message-stream*)
   (:import-from :overlord/redo
     :redo :redo-ifchange :redo-ifcreate :redo-always :redo-stamp)
+  (:import-from :overlord/util
+    :write-file-if-changed
+    :copy-file-if-changed)
   (:export
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
    :ensure-file-package :reset-file-package
    :message :*message-handler*
+   :write-file-if-changed :copy-file-if-changed
    :redo :redo-ifchange :redo-ifcreate :redo-always :redo-stamp)
   (:use-reexport
    :overlord/base

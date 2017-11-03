@@ -16,7 +16,6 @@
    #:redo-ifcreate
    #:redo-ifcreate*
    #:redo-always
-   #:redo-stamp
    #:*parent*
    ;; Functions to implement.
 
@@ -24,7 +23,7 @@
    ;; functions, so in the future we could drive different kinds of
    ;; build systems?
    #:root-target
-   #:target-stamper
+   #:target-stamp
    #:stamp=
    #:target-exists?
    #:target=
@@ -48,7 +47,7 @@
 
 (declaim (notinline
           root-target
-          target-stamper
+          target-stamp
           stamp=
           target-exists?
           target=
@@ -69,10 +68,6 @@
           clear-temp-prereqsne))
 
 (defvar-unbound *parent* "Parent of the target being built.")
-
-(defvar-unbound *custom-stamp* "Custom stamp.")
-
-(defconst source :source)
 
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
@@ -147,19 +142,10 @@
         (when outdated
           ;; TODO redo $outdated || result=0
           (apply #'redo outdated))
-        (fbind* ((target-stamp (target-stamper target))
-                 ;; NB The idea with target-stamper is that it should
-                 ;; be a function that looks up the stamp that was
-                 ;; saved in the temporary list of prerequisites
-                 ;; (which has not yet been saved). This is more
-                 ;; efficient, since it avoids stamping the same file
-                 ;; twice, and also necessary for `redo-stamp' to
-                 ;; work.
-                 (unchanged?
-                  (lambda (prereq)
-                    (let ((req   (saved-prereq-target prereq))
-                          (stamp (saved-prereq-stamp prereq)))
-                      (stamp= stamp (target-stamp req))))))
+        (flet ((unchanged? (prereq)
+                 (let ((req   (saved-prereq-target prereq))
+                       (stamp (saved-prereq-stamp prereq)))
+                   (stamp= stamp (target-stamp req)))))
           ;; Check regular prerequisitves.
           (unless (every #'unchanged? (reshuffle prereqs))
             (setf changed? t)))))
@@ -177,12 +163,9 @@
 (defun redo-ifchange* (args)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
-    (let ((*custom-stamp* nil))
-      (when (changed? i)
-        (redo i))
-      (if *custom-stamp*
-          (record-prereq i *custom-stamp*)
-          (record-prereq i)))))
+    (when (changed? i)
+      (redo i))
+    (record-prereq i)))
 
 (defun redo-ifcreate (&rest targets)
   (redo-ifcreate* targets))
@@ -197,7 +180,3 @@
 (defun redo-always ()
   (declare (notinline generate-impossible-target))
   (record-prereq (generate-impossible-target)))
-
-(defun redo-stamp (string)
-  (setf (bound-value '*custom-stamp*)
-        (assure string string)))

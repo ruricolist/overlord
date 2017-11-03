@@ -15,8 +15,7 @@
            #:*phase*
            #:*source*
            #:*depth*
-           #:*db-version*
-           #:*1* #:*2* #:*3*))
+           #:*db-version*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -24,13 +23,6 @@
 (defvar-unbound *output* "Output of a pattern.")
 (defvar-unbound *deps* "Dependencies being collected.")
 (defvar-unbound *source* "Source file being compiled.")
-
-(defvar-unbound *1* "For a file, the target being built.")
-
-(defvar-unbound *2* "For a file, the target being built.
-If the file is being built from a pattern, this is bound to the name of the file less the extension associated with that pattern.")
-
-(defvar-unbound *3* "The temporary file that will be renamed to the target file.")
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
 

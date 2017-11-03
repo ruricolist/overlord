@@ -1,6 +1,7 @@
 (cl:defpackage #:overlord/util
-  (:use :cl :alexandria :serapeum)
-  (:import-from :overlord/types :case-mode)
+  (:use :cl :alexandria :serapeum :trivial-file-size)
+  (:import-from :overlord/types
+    :case-mode :file-pathname :tame-pathname)
   (:import-from :fset :with :less)
   (:import-from :uiop
     :pathname-directory-pathname
@@ -8,7 +9,11 @@
     :file-exists-p
     :run-program
     :native-namestring
-    :ensure-pathname)
+    :ensure-pathname
+    :with-temporary-file
+    :rename-file-overwriting-target
+    :delete-file-if-exists)
+  (:import-from :babel :string-to-octets)
   (:export
    #:compare
    #:package-exports
@@ -26,6 +31,8 @@
    #:read-file-form
    #:write-form-as-file
    #:write-file-if-changed
+   #:copy-file-if-changed
+   #:call/temp-file-pathname
    #:withf
    #:lessf
    #:with-absolute-package-names
@@ -163,20 +170,85 @@ then we set its value inside a critical section."
       (write form :stream out
                   :readably t))))
 
-(defun write-file-if-changed (data file)
-  (receive (read1 element-type)
-      (etypecase data
-        (string (values #'read-char 'character))
-        (octet-vector (values #'read-byte 'octet)))
-    (fbind read1
-      (or (and (file-exists-p file)
-               (with-input-from-file (in file :element-type element-type)
-                 (and (= (length data)
-                         (file-length file))
-                      (loop for char across data
-                            always (eql char (read1 in))))))
-          (with-output-to-file (out file :if-exists :rename-and-delete)
-            (write-sequence data out))))))
+(defun existing-file-unchanged? (data file &key (buffer-size 4096))
+  (labels ((make-buffer (size)
+             (make-array (assure array-length size)
+                         :element-type 'octet)))
+    (let ((buffer (make-buffer buffer-size)))
+      (with-input-from-file (stream file :element-type 'octet)
+        (let ((len (file-length stream)))
+          (and (= (length data) len)
+               (loop for offset from 0 by buffer-size below len
+                     for end1 = (read-sequence buffer stream)
+                     always (vector= buffer data
+                                     :start2 offset
+                                     :end1 end1))))))))
+
+(defun call/temp-file-pathname (dest fn)
+  "Call FN on a freshly allocated temporary pathname; if it completes
+safely, overwrite DEST with the contents of the temporary file."
+  (let* ((ok nil)
+         (tmp (with-temporary-file (:pathname p :keep t)
+                (funcall fn p)
+                (setq ok t)
+                p)))
+    (if ok
+        ;; Cross-device?
+        (if (equal (pathname-device tmp)
+                   (pathname-device dest))
+            (rename-file-overwriting-target tmp dest)
+            (copy-file tmp dest :if-to-exists :rename-and-delete))
+        (delete-file-if-exists tmp))))
+
+(defun replace-file-atomically (data dest)
+  "Write DATA into DEST"
+  (check-type data octet-vector)
+  (check-type dest (and file-pathname tame-pathname))
+  (let (temp)
+    (with-temporary-file (:stream out
+                          :direction :output
+                          :element-type 'octet
+                          :pathname p
+                          :keep t
+                          ;; Use the same directory so the overwrite is atomic.
+                          :directory (pathname-directory-pathname dest))
+      (write-sequence data out)
+      (setf temp p))
+    (rename-file-overwriting-target temp dest)))
+
+(defun write-file-if-changed (data file &key (encoding :utf-8)
+                                             (buffer-size 4096))
+  "Write DATA into FILE only if FILE would change.
+DATA may be a string or a byte vector.
+
+Cf. Shake."
+  (check-type file pathname)
+  (etypecase (assure vector data)
+    (string
+     (write-file-if-changed
+      (string-to-octets data :encoding encoding)
+      file))
+    ((and vector (not octet-vector))
+     (write-file-if-changed
+      (coerce data 'octet-vector) file))
+    (octet-vector
+     (cond ((not (file-exists-p file))
+            (replace-file-atomically data file))
+           ((existing-file-unchanged? data file :buffer-size buffer-size)
+            (values))
+           (t
+            (replace-file-atomically data file))))))
+
+(defun copy-file-if-changed (from to)
+  (if (not (file-exists-p to))
+      (copy-file from to)
+      (let ((from.len (file-size-in-octets from))
+            (to.len (file-size-in-octets to)))
+        (if (not (= from.len to.len))
+            (copy-file from to)
+            (unless (file= from to)
+              (copy-file from to
+                         :if-to-exists :rename-and-delete))))))
 
 (defmacro with-absolute-package-names ((&key) &body body)
   `(let ((*package* (find-package :keyword)))

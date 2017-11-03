@@ -176,7 +176,9 @@
     ((time-tuple timestamp)
      (timestamp= (time-tuple->timestamp ts1) ts2))
 
-    ((never never) t)
+    ;; This might seem weird, but it's necessary for impossible
+    ;; targets to always show up as changed.
+    ((never never) nil)
     ((far-future far-future) t)
     ((target-timestamp target-timestamp) nil)))
 

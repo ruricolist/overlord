@@ -471,19 +471,27 @@ All that said, Overlord is a mostly faithful implementation of Redo.
 It differs from Redo principally in having a very different idea of
 what can be a target.
 
-Where Overlord deviates from the Redo model is in how it decides what
-is or is not a target. In Redo proper, this depends on the state of
-the file system – a prerequisite is a target under two conditions: it
-does not exist, or it exists and has an entry in the database. In
-Overlord, however, the database is discarded with every time the
-version of Overlord is incremented. The same goes for the Lisp
-implementation. The problem, then, is that you could easily end up in
-a condition where a target is treated as a source file because it
-exists, and has no entry in the newly created database. So instead of
-relying on the database to determine what is or is not a target,
-Overlord treats an existing X as a target if and only if there is a
-build script for X. (If X does not exist, then it is still always
-treated as a target.)
+One way Overlord deviates from the Redo model is in how it decides
+what is or is not a target. In Redo, this depends on the state of the
+file system – a prerequisite is a target under two conditions: it does
+not exist, or it exists and has an entry in the database. In Overlord,
+however, the database is discarded with every time the version of
+Overlord is incremented. The same goes for the Lisp implementation.
+You could easily end up in a condition where a target is treated as a
+source file because it exists, and has no entry in the newly created
+database. So, instead of relying on the database to determine what is
+or is not a target, Overlord treats an existing X as a target if and
+only if there is a build script for X. (If X does not exist, then it
+is still always treated as a target.)
+
+Another way Overlord deviates from the Redo model is in how it builds
+file targets. While it is possible to opt in to Redo-like behavior –
+writing to a temp file that is atomically renamed to replace the
+target – scripts can also overwrite the target directly. This allows
+the script to choose *not* to write to the file if its output has not
+changed (e.g. using `overlord:write-file-if-changed`). In this way we
+achieve the same results as `redo-stamp` – the ability of a target to
+declare itself unchanged – without complicating the underlying model.
 
 # Appendix: Overlord for Racketeers
 
