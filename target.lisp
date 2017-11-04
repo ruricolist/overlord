@@ -1231,7 +1231,7 @@ rebuilt."
        (define-global-var ,name
            (progn
              (setf (target-timestamp ',name) ,timestamp)
-             ,init))
+             ',init))
        (save-task ',name
                   (rebuild-symbol ',name (script-thunk ,@script)))
        (redo-ifchange ',name)
@@ -1781,16 +1781,16 @@ interoperation with Emacs."
       `(progn
          (declaim (notinline ,load ,read))
          (eval-always
-          (define-script ,script ,reader)
-          (defparameter ,ext (extension ,extension))
-          (defun ,load (,source)
-            ,reader)
-          (defun ,read (,source _stream)
-            (declare (ignore _stream))
-            (list ',load ,source))
-          (defmethod lang-deps :after ((self (eql ,keyword)) source)
-                     (declare (ignore source))
-                     (redo-ifchange ',script)))))))
+           (define-script ,script ,reader)
+           (defparameter ,ext (extension ,extension))
+           (defun ,load (,source)
+             ,reader)
+           (defun ,read (,source _stream)
+             (declare (ignore _stream))
+             (list ',load ,source))
+           (defmethod lang-deps :after ((self (eql ,keyword)) source)
+             (declare (ignore source))
+             (redo-ifchange ',script)))))))
 
 (defun load-fasl-lang (lang source)
   (let ((object-file (faslize lang source)))
