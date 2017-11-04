@@ -242,13 +242,8 @@ Cf. Shake."
 (defun copy-file-if-changed (from to)
   (if (not (file-exists-p to))
       (copy-file from to)
-      (let ((from.len (file-size-in-octets from))
-            (to.len (file-size-in-octets to)))
-        (if (not (= from.len to.len))
-            (copy-file from to)
-            (unless (file= from to)
-              (copy-file from to
-                         :if-to-exists :rename-and-delete))))))
+      (unless (file= from to)
+        (copy-file from to :if-to-exists :rename-and-delete))))
 
 (defmacro with-absolute-package-names ((&key) &body body)
   `(let ((*package* (find-package :keyword)))
