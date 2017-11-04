@@ -77,6 +77,7 @@
    )
   (:export
    ;; Defining and building targets.
+   :deftask
    :defconfig
    :defconfig/deps
    :var-target
@@ -117,7 +118,8 @@
 
    ;; Emacs integration.
    :require-for-emacs
-   :expand-module-for-emacs))
+   :expand-module-for-emacs
+   :find-pattern))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -425,6 +427,14 @@ Works for SBCL, at least."
 (defun generate-impossible-target ()
   impossible-target)
 
+(defconstructor phony-target
+  (name symbol))
+
+(defmethod fset:compare ((x phony-target) (y phony-target))
+  (fset:compare-slots x y #'phony-target-name))
+
+(fset:define-cross-type-compare-methods phony-target)
+
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In
@@ -437,6 +447,7 @@ Works for SBCL, at least."
     root-target
     impossible-target
     trivial-target
+    phony-target
     bindable-symbol
     pathname
     package-ref
@@ -462,7 +473,7 @@ Works for SBCL, at least."
   (true
    (etypecase-of target target
      ((or root-target trivial-target) t)
-     (impossible-target nil)
+     ((or impossible-target phony-target) nil)
      (bindable-symbol (boundp target))
      (pathname (pathname-exists? target))
      (package-ref
@@ -486,9 +497,9 @@ Works for SBCL, at least."
      (task (target-exists? (task-script target))))))
 
 (defun target-timestamp (target)
-  (declare (optimize (debug 3)))        ;No tail recursion.
   (etypecase-of target target
-    ((or root-target impossible-target) never)
+    ((or root-target impossible-target phony-target)
+     never)
     (trivial-target far-future)
     (bindable-symbol
      (if (boundp target)
@@ -528,7 +539,7 @@ Works for SBCL, at least."
   (check-not-frozen)
   (etypecase-of target target
     (root-target (error* "Cannot set timestamp of root target."))
-    ((or impossible-target trivial-target)
+    ((or impossible-target trivial-target phony-target)
      (error* "Cannot set timestamp for ~a" target))
     (bindable-symbol
      ;; Configurations need to set the timestamp while unbound
@@ -568,7 +579,9 @@ Works for SBCL, at least."
   (when (typep base 'temporary-file)
     (simple-style-warning "Base looks like a temporary file: ~a" base))
   (etypecase-of target target
-    ((or root-target impossible-target trivial-target bindable-symbol package-ref)
+    ((or root-target impossible-target trivial-target
+         bindable-symbol package-ref
+         phony-target)
      target)
     (pathname
      (let ((path (merge-pathnames* target base)))
@@ -599,6 +612,11 @@ Works for SBCL, at least."
 ;;; Target table abstract data type.
 
 (defun target-type-of (x)
+  (let ((type (target-type-of x)))
+    (assert (subtypep type 'target-type))
+    type))
+
+(defun target-type-of-1 (x)
   (typecase-of target x
     (root-target 'root-target)
     (trivial-target 'trivial-target)
@@ -610,6 +628,7 @@ Works for SBCL, at least."
     (directory-ref 'directory-ref)
     (pattern-ref 'pattern-ref)
     (task 'task)
+    (phony-target 'phony-target)
     ;; Bottom.
     (otherwise nil)))
 
@@ -673,7 +692,10 @@ Works for SBCL, at least."
     (task
      (dx-sxhash
       (multiple-value-list
-       (task-values target))))))
+       (task-values target))))
+    (phony-target
+     (let ((name (phony-target-name target)))
+       (dx-sxhash `(phony ,name))))))
 
 (deftype hash-friendly-target ()
   '(or root-target
@@ -834,6 +856,11 @@ Works for SBCL, at least."
       ((or bindable-symbol pathname)
        (or (gethash target *tasks*)
            impossible-target))
+      (phony-target
+       (let* ((name (phony-target-name target))
+              (key `(phony ,name)))
+         (or (gethash key *tasks*)
+             impossible-target)))
       (target impossible-target))))
 
 (defun trivial-task (target)
@@ -848,7 +875,7 @@ Works for SBCL, at least."
   ;; But: that would create serious bootstrapping issues.
   (assure target
     (etypecase-of target target
-      ((or task pathname bindable-symbol)
+      ((or task pathname bindable-symbol phony-target)
        impossible-target)
       ((or impossible-target trivial-target)
        (trivial-task target))
@@ -924,6 +951,11 @@ Works for SBCL, at least."
     ((or bindable-symbol pathname)
      (let ((task (task target thunk script)))
        (setf (gethash target *tasks*) task)))
+    (phony-target
+     (let* ((name (phony-target-name target))
+            (task (task target thunk script))
+            (key `(phony ,name)))
+       (setf (gethash key *tasks*) task)))
     (task (error* "Cannot save a task as a task."))))
 
 (defun task-values (task)
@@ -942,9 +974,11 @@ Works for SBCL, at least."
 The idea here (borrowed from Apenwarr redo) is that the user should be
 able to simply evaluate the form for a given target to pick up
 building from there."
-  (message "~Vt~s"
-           (max 0 (1- (length *parents*)))
-           `(redo ,(dump-target/pretty target))))
+  (let* ((depth (max 0 (1- (length *parents*))))
+         (spaces (make-string depth :initial-element #\Space)))
+    (message "~a~s"
+             spaces
+             `(redo ,(dump-target/pretty target)))))
 
 (defun dump-target/pretty (target)
   "Return a form which, when evaluated, returns a target equivalent to
@@ -970,7 +1004,9 @@ TARGET."
             (pattern-name (class-name-of pattern)))
        `(pattern-ref (find-pattern ',pattern-name)
                      ,input)))
-    (task `(task ,@(multiple-value-list (task-values target))))))
+    (task `(task ,@(multiple-value-list (task-values target))))
+    (phony-target
+     `(phony-target ,@(multiple-value-list (deconstruct target))))))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
@@ -997,6 +1033,7 @@ TARGET."
            ;; TODO?
            directory-ref
            module-spec
+           phony-target
            task)
        (target-timestamp target))
       (pathname
@@ -1245,13 +1282,16 @@ rebuilt."
 This is essentially a convenience to let you use keyword macros to
 specify the dependencies you want on build."
   `(progn
+     (eval-always
+       (assert (not (boundp ',name))))
      (define-script-for ,name
        ,@script)
-     (save-task ',name
+     (save-task (phony-target ',name)
                 (lambda ()
                   ;; Phony targets don't *need* to be built.
                   (unless *building-root*
-                    (funcall (script-thunk ,@script)))))
+                    (funcall (script-thunk ,@script))))
+                (script-for ',name))
      ',name))
 
 
