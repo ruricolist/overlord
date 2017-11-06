@@ -420,6 +420,7 @@ system that is very likely to change.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el)).
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
 - Isolate file-system side effects (cf. [Boot][]).
+- Use sub-second timestamps on file systems that support them.
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
