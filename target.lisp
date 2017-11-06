@@ -40,7 +40,8 @@
   (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
   (:import-from :trivia
-    :match :ematch :let-match1)
+    :match :ematch :let-match1
+    :multiple-value-match)
   (:import-from :trivial-file-size
     :file-size-in-octets)
   ;; Portability shim for "global" or "static" vars. They  global
@@ -634,31 +635,43 @@ Works for SBCL, at least."
 
 (defun target= (x y)
   "Are two targets the same?"
-  (when (eql x y)
-    (return-from target= t))
-  (dispatch-case ((x target) (y target))
-    ((root-target root-target)
-     ;; There's only one.
-     t)
-    ((bindable-symbol bindable-symbol)
+  (etypecase-of target x
+    (root-target
+     (typep y 'root-target))
+    (trivial-target
+     (typep y 'trivial-target))
+    (impossible-target
+     (typep y 'impossible-target))
+    (phony-target
+     (and (typep y 'phony-target)
+          (eql (phony-target-name x)
+               (phony-target-name y))))
+    (task
+     (and (typep y 'task)
+          (target= (task-target x)
+                   (task-target y))))
+    (bindable-symbol
      (eql x y))
-    ((pathname pathname)
-     (pathname-equal x y))
-    ((module-spec module-spec)
-     (nest
-      (let-match1 (module-spec lang1 path1) x)
-      (let-match1 (module-spec lang2 path2) y)
-      (and (eql lang1 lang2)
-           (pathname-equal path1 path2))))
-    ((package-ref package-ref)
-     (compare #'string= #'ref.name x y))
-    ((directory-ref directory-ref)
-     (compare #'pathname-equal #'ref.name x y))
-    ((pattern-ref pattern-ref)
-     (and (compare #'equal #'pattern-ref.input    x y)
-          (compare #'eql   #'pattern-ref.pattern  x y)
-          (compare #'equal #'pattern-ref.output   x y)))
-    ((target target) nil)))
+    (pathname
+     (and (pathnamep y)
+          (pathname-equal x y)))
+    (module-spec
+     (multiple-value-match (values x y)
+       (((module-spec lang1 path1)
+         (module-spec lang2 path2))
+        (and (eql lang1 lang2)
+             (pathname-equal path1 path2)))))
+    (package-ref
+     (and (typep y 'package-ref)
+          (compare #'string= #'ref.name x y)))
+    (directory-ref
+     (and (typep y 'directory-ref)
+          (compare #'pathname-equal #'ref.name x y)))
+    (pattern-ref
+     (and (typep y 'pattern-ref)
+          (and (compare #'equal #'pattern-ref.input    x y)
+               (compare #'eql   #'pattern-ref.pattern  x y)
+               (compare #'equal #'pattern-ref.output   x y))))))
 
 (defun hash-target (target)
   (declare (optimize (speed 3)
