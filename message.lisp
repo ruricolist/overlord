@@ -9,7 +9,7 @@
 (in-package :overlord/message)
 
 (define-global-state *message-stream*
-  (make-synonym-stream '*standard-output*)
+    (make-synonym-stream '*error-output*)
   "The stream printed to by the default message handler.")
 
 (defun message (control &rest args)
