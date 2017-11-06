@@ -93,8 +93,6 @@
    :lang :lang-name :hash-lang-name
    :load-module
    :expand-module
-   :depends-on :depends-on*
-   :depends-on-all :depends-on-all*
    :package-expander :package-reader :module-progn-in
    :with-meta-language
    :load-same-name-system
@@ -120,7 +118,10 @@
    ;; Emacs integration.
    :require-for-emacs
    :expand-module-for-emacs
-   :find-pattern))
+   :find-pattern
+   :build
+   :depends-on
+   :depends-not))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -614,6 +615,7 @@ Works for SBCL, at least."
 
 (defun target-type-of (x)
   (let ((type (target-type-of x)))
+    ;; Remember that `nil' is a subtype of everything.
     (assert (subtypep type 'target-type))
     type))
 
@@ -1102,7 +1104,7 @@ value and NEW do not match under TEST."
   (clrhash (symbol-value '*claimed-module-names*)))
 
 
-;;; Convenient keyword macros
+;;; API and keyword macros
 
 (defun path (path)
   (~> path
@@ -1121,6 +1123,15 @@ value and NEW do not match under TEST."
       (null *nil-pathname*)
       (string (make-pathname :type ext)))))
 
+(defun build (&rest targets)
+  (apply #'redo targets))
+
+(defun depends-on (&rest targets)
+  (apply #'redo-ifchange targets))
+
+(defun depends-not (&rest targets)
+  (apply #'redo-ifcreate targets))
+
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
                 `(redo-ifchange ,x ,@xs))
@@ -1130,6 +1141,10 @@ value and NEW do not match under TEST."
                 `(redo-ifchange* ,xs))
               (:depends-on-all* (xs)
                 `(map nil #'redo-ifchange ,xs))
+              (:depends-not (x &rest xs)
+                `(redo-ifcreate ,x ,@xs))
+              (:depends-not* (xs)
+                `(redo-ifcreate* ,x ,@xs))
               (:path (path)
                 (assure pathname
                   (path path)))

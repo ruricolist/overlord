@@ -436,6 +436,12 @@ someone else did them.
 
 # Appendix: Overlord for Redoers
 
+| Redo          | Overlord      |
+| ------------- | ------------- |
+| redo          | build         |
+| redo-ifchange | depends-on    |
+| redo-ifcreate | depends-not   |
+
 Build systems manage state in the file system. In Common Lisp, we have
 a bundle of state which, in many ways, resembles a file system: a set
 of persistent, mutable locations with first-class, hierarchical
@@ -467,9 +473,9 @@ handled. Since patterns do not belong to a particular project, they
 need another form of namespacing. Accordingly patterns are given names
 (when they are defined with `defpattern`) and must be invoked by name.
 
-All that said, Overlord is a mostly faithful implementation of Redo.
-It differs from Redo principally in having a very different idea of
-what can be a target.
+All that said, Overlord is a surprisingly faithful implementation of
+Redo. It differs from Redo principally in having a very different idea
+of what can be a target.
 
 Like most practical Redo implementations, Overlord does not (by
 default) hash files to determine if they have changed. The timestamp

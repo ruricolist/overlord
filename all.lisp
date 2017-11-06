@@ -16,8 +16,6 @@
     :message
     :*message-handler*
     :*message-stream*)
-  (:import-from :overlord/redo
-    :redo :redo-ifchange :redo-ifcreate :redo-always :redo-stamp)
   (:import-from :overlord/util
     :write-file-if-changed
     :copy-file-if-changed)
@@ -26,8 +24,7 @@
    :simple-module :hash-table-module
    :ensure-file-package :reset-file-package
    :message :*message-handler*
-   :write-file-if-changed :copy-file-if-changed
-   :redo :redo-ifchange :redo-ifcreate :redo-always :redo-stamp)
+   :write-file-if-changed :copy-file-if-changed)
   (:use-reexport
    :overlord/base
    :overlord/target
