@@ -1326,7 +1326,6 @@ specify the dependencies you want on build."
 
 (defun file-target-form (pathname script-form args)
   (ematch args
-    (() script-form)
     ((list $1)
      `(let ((,$1 ,pathname))
         ,script-form))
@@ -1337,11 +1336,12 @@ specify the dependencies you want on build."
          (let ((,$1 ,pathname))
            ,script-form))))))
 
-(defmacro file-target (name pathname (&rest args) &body script)
+(defmacro file-target (name pathname (in &optional (temp nil temp?)) &body script)
   "If TMP is null, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
-  (let* ((base (base))
+  (let* ((args (if temp? (list in temp) (list in)))
+         (base (base))
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
          (script-form
