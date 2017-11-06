@@ -1314,6 +1314,7 @@ specify the dependencies you want on build."
        ,@script)
      (save-task (phony-target ',name)
                 (lambda ()
+                  (redo-always)
                   ;; Phony targets don't *need* to be built.
                   (unless *building-root*
                     (funcall (script-thunk ,@script))))
