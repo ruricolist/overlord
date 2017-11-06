@@ -1155,9 +1155,7 @@ value and NEW do not match under TEST."
               (:basename (file)
                 `(basename ,file))
               (:always (bool)
-                `(and ,bool (redo-always)))
-              (:stamp (stamp)
-                `(redo-stamp ,stamp)))
+                `(and ,bool (redo-always))))
      ,@body))
 
 
