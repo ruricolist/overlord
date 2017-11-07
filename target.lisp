@@ -1144,7 +1144,7 @@ value and NEW do not match under TEST."
               (:depends-not (x &rest xs)
                 `(redo-ifcreate ,x ,@xs))
               (:depends-not* (xs)
-                `(redo-ifcreate* ,x ,@xs))
+                `(redo-ifcreate* ,xs))
               (:path (path)
                 (assure pathname
                   (path path)))
