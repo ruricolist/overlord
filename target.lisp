@@ -1412,7 +1412,7 @@ extension to the file.
 Based on the pattern, the output file is calculated, and the result
 depends on that."
   `(progn
-     (define-script-for class-name
+     (define-script-for ,class-name
        ,in
        ,out
        ,@script)
