@@ -34,10 +34,10 @@ Overlord addresses three problems which might seem unrelated, but
 which, on closer examination, turn out to the same problem:
 
 1. It provides a module system for implementing *languages as
-   libraries* (similar to [Racket][]).
+   libraries* (inspired by [Racket][]).
 
-2. It provides a powerful general-purpose build system (a superset
-   of [Make][], similar to [Redo][]).
+2. It provides a general-purpose build system (a superset of [Make][],
+   inspired by [Redo][]).
 
 3. It lets you reproducibly specify the desired state of a Lisp system
    which is to be saved as an image.
@@ -149,12 +149,13 @@ unlikely to change.)
 # Overlord vs. Redo
 
 [Redo][] is a build system. Actually, Redo is a family of build
-systems, sharing a [design][djb-redo] due
-to [Daniel J. Bernstein][djb] (although he has never released an
-implementation). In the space of build systems, Redo is a remarkable
-local optimum: it is both very powerful and very simple. It is not the
-most powerful build system possible, or the very simplest, but it
-certainly provides the most leverage.
+systems, sharing a [design][djb-redo] due to [Daniel J.
+Bernstein][djb].
+
+In the design space of build systems, Redo is a remarkable local
+optimum: it is both very powerful and very simple. It is not the most
+powerful build system possible, or the very simplest, but it certainly
+provides the most leverage.
 
 Overlord generalizes the idea of a build system so that its dependency
 graph can include both files on disk and state in the Lisp system. It
@@ -246,9 +247,7 @@ abstract relationship between a file and a Lisp binding? The
 relationship is a *language*; the Lisp object is a *module*.
 
 Overlord models its support for making languages on Racket. It is not
-a direct imitation of Racket, however. It also draws on subsequent and
-related work in Scheme module systems to create a module system that
-is fundamentally dynamic.
+a direct imitation of Racket, however. In particular, the goal of Overlord is to provide a module system that is fundamentally dynamic at the level of modules: it should always be possible to redefine a module, just as it is always possible (in Lisp itself) to redefine a function.
 
 ## Modules
 
