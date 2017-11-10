@@ -47,7 +47,8 @@ Inlinable, and skips generic dispatch for some common types."
   of static exports.")
 (declaim (type hash-table *static-exports-cache*))
 
-(def static-exports-lock (bt:make-lock "Static exports lock"))
+(def static-exports-lock
+  (bt:make-recursive-lock "Static exports lock"))
 
 (defun module-static-exports/cache (lang source)
   (check-type lang symbol)

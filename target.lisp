@@ -1558,7 +1558,8 @@ resolved at load time."
 (defmethods module-cell (self lock source lang module)
   (:method initialize-instance :after (self &key)
     ;; Give the lock a name.
-    (setf lock (bt:make-recursive-lock (fmt "Lock for module ~a" self))))
+    (setf lock
+          (bt:make-recursive-lock (fmt "Lock for module ~a" self))))
 
   (:method module-ref (self name)
     (module-ref* module name))
@@ -2262,7 +2263,7 @@ about ease of development or debugging, only speed.")
   "Table to track claimed modules, so we can warn if they are
   redefined.")
 
-(def module-name-lock (bt:make-lock "Module name lock"))
+(def module-name-lock (bt:make-recursive-lock "Module name lock"))
 
 (defun claim-module-name (module lang source)
   "Warn if MODULE is already in use with a different LANG and SOURCE."
