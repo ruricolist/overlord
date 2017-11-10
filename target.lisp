@@ -1558,7 +1558,7 @@ resolved at load time."
 (defmethods module-cell (self lock source lang module)
   (:method initialize-instance :after (self &key)
     ;; Give the lock a name.
-    (setf lock (bt:make-lock (fmt "Lock for module ~a" self))))
+    (setf lock (bt:make-recursive-lock (fmt "Lock for module ~a" self))))
 
   (:method module-ref (self name)
     (module-ref* module name))
