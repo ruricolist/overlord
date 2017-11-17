@@ -1,5 +1,5 @@
-;;; http.lisp -- update a downloaded file
-(defpackage #:overlord/http
+;;; net.lisp -- update a downloaded file
+(defpackage #:overlord/net
   (:use #:cl #:alexandria #:serapeum
     #:overlord/types
     #:overlord/global-state)
@@ -21,7 +21,7 @@
 ;;; If the resource at the URL is newer than FILE, then we download
 ;;; the resource and replace FILE with it.
 
-(in-package #:overlord/http)
+(in-package #:overlord/net)
 
 (define-global-state *offline* nil
   "Are we offline?")
