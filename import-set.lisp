@@ -77,9 +77,7 @@
   (reduce (lambda (import-set id)
             (if-let (import (find id import-set :test #'named?))
               (remove import import-set)
-              (missing-id id import-set))
-            (remove-if (op (named? id _))
-                       import-set))
+              (missing-id id import-set)))
           ids
           :initial-value import-set))
 
