@@ -147,6 +147,5 @@
 
 (defun import-set= (set1 set2)
   (set-equal set1 set2
-             :test (lambda (x y)
-                     (public-name= (public-name x)
-                                   (public-name y)))))
+             :key #'public-name
+             :test #'public-name=))
