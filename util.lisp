@@ -245,6 +245,9 @@ Cf. Shake."
       (unless (file= from to)
         (copy-file from to :if-to-exists :rename-and-delete))))
 
+;;; Make sure that we treat package names consistently, whether or not
+;;; the Lisp implementation uses package-relative nicknames.
+
 (defmacro with-absolute-package-names ((&key) &body body)
   `(let ((*package* (find-package :keyword)))
      ,@body))

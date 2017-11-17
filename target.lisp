@@ -156,9 +156,6 @@ Works for SBCL, at least."
        ,slots
        ,@options)))
 
-;;; Make sure that we treat package names consistently, whether or not
-;;; the Lisp implementation uses package-relative nicknames.
-
 
 ;;; Auxiliary functions for Redo.
 
