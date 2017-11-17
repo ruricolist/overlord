@@ -1,3 +1,20 @@
+# Overlord
+
+Overlord is an experimental build/module system for Common Lisp,
+inspired by [Redo][] and [Racket][].
+
+Overlord addresses three problems which might seem unrelated, but
+which, on closer examination, turn out to the same problem:
+
+1. It provides a module system for implementing *languages as
+   libraries* (inspired by [Racket][]).
+
+2. It provides a general-purpose build system (a superset of [Make][],
+   inspired by [Redo][]).
+
+3. It lets you reproducibly specify the desired state of a Lisp system
+   which is to be saved as an image.
+
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
@@ -25,22 +42,6 @@
 
 <!-- markdown-toc end -->
 
-# Overlord
-
-Overlord is an experimental build/module system for Common Lisp,
-inspired by [Redo][] and [Racket][].
-
-Overlord addresses three problems which might seem unrelated, but
-which, on closer examination, turn out to the same problem:
-
-1. It provides a module system for implementing *languages as
-   libraries* (inspired by [Racket][]).
-
-2. It provides a general-purpose build system (a superset of [Make][],
-   inspired by [Redo][]).
-
-3. It lets you reproducibly specify the desired state of a Lisp system
-   which is to be saved as an image.
 
 ## Advice for users
 
