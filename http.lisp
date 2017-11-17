@@ -3,6 +3,7 @@
   (:use #:cl #:alexandria #:serapeum
     #:overlord/types
     #:overlord/global-state)
+  (:import-from #:overlord/util #:file-mtime)
   (:import-from #:cl-strftime #:format-time)
   (:import-from #:drakma #:http-request)
   (:import-from #:overlord/base #:ensure-absolute)
@@ -64,7 +65,7 @@
               (when (= status 200)
                 (write-byte-vector-into-file body file))))
         (online-only ()
-                     (let ((fwd (file-write-date file)))
+                     (let ((fwd (file-mtime file)))
                        (multiple-value-bind (body status)
                            (http-request/binary
                             url
