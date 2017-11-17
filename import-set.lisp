@@ -39,30 +39,31 @@
 
 (defun expand-import-set (import-set get-exports
                           &optional (package *package*))
-  (fbind (get-exports)
-    (labels ((rec (import-set)
-               (ematch import-set
-                 (:all
-                  (loop for export in (get-exports)
-                        for sym = (intern (string export) package)
-                        collect `(,export :as ,sym)))
-                 (:all-as-functions
-                  (loop for export in (get-exports)
-                        for sym = (intern (string export) package)
-                        collect `(,export :as #',sym)))
-                 ((list* :only import-set ids)
-                  (only (rec import-set) ids))
-                 ((list* :except import-set ids)
-                  (except (rec import-set) ids))
-                 ((list* :rename import-set renames)
-                  (rename (rec import-set) renames))
-                 ((list :prefix import-set prefix)
-                  (prefix (rec import-set) prefix))
-                 ((list :drop-prefix import-set prefix)
-                  (drop-prefix (rec import-set) prefix))
-                 ((list* :alias import-set renames)
-                  (alias (rec import-set) renames)))))
-      (rec import-set))))
+  (fbindrec (get-exports
+             (rec
+              (lambda (import-set)
+                (ematch import-set
+                  (:all
+                   (loop for export in (get-exports)
+                         for sym = (intern (string export) package)
+                         collect `(,export :as ,sym)))
+                  (:all-as-functions
+                   (loop for export in (get-exports)
+                         for sym = (intern (string export) package)
+                         collect `(,export :as #',sym)))
+                  ((list* :only import-set ids)
+                   (only (rec import-set) ids))
+                  ((list* :except import-set ids)
+                   (except (rec import-set) ids))
+                  ((list* :rename import-set renames)
+                   (rename (rec import-set) renames))
+                  ((list :prefix import-set prefix)
+                   (prefix (rec import-set) prefix))
+                  ((list :drop-prefix import-set prefix)
+                   (drop-prefix (rec import-set) prefix))
+                  ((list* :alias import-set renames)
+                   (alias (rec import-set) renames))))))
+    (rec import-set)))
 
 (defun only (import-set ids)
   (reduce (lambda (out id)
