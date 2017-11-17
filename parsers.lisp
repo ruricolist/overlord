@@ -2,7 +2,7 @@
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:named-readtables
     #:find-readtable)
-  (:import-from :overlord/hash-lang :skip-hash-lang)
+  (:import-from :overlord/hash-lang-syntax :skip-hash-lang)
   (:export #:slurp-stream #:slurp-file)
   (:documentation "Trivial parsers."))
 (in-package #:overlord/parsers)

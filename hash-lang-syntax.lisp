@@ -1,4 +1,4 @@
-(defpackage :overlord/hash-lang
+(defpackage :overlord/hash-lang-syntax
   (:use :cl :alexandria :serapeum :overlord/types)
   (:export
    :file-hash-lang
@@ -7,7 +7,7 @@
    :read-lang-name
    :valid-lang-name?))
 
-(in-package :overlord/hash-lang)
+(in-package :overlord/hash-lang-syntax)
 
 (defun file-hash-lang (file &key (external-format :utf-8))
   "Return two values: the name of the lang (as a form) and the position to start reading from."

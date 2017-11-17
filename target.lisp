@@ -25,7 +25,7 @@
     ;; How to infer the base for the current package.
     :overlord/base
     ;; The #lang syntax.
-    :overlord/hash-lang
+    :overlord/hash-lang-syntax
     ;; Import sets.
     :overlord/import-set
     ;; Logging.
