@@ -895,7 +895,7 @@ Works for SBCL, at least."
        (task target
              (lambda ()
                (let ((*building-root* t))
-                 (redo-ifchange* (list-top-level-targets))))
+                 (redo-ifchange-all (list-top-level-targets))))
              trivial-target))
       (pattern-ref
        (let* ((input (pattern-ref.input target))
@@ -1121,7 +1121,7 @@ value and NEW do not match under TEST."
       (string (make-pathname :type ext)))))
 
 (defun build (&rest targets)
-  (apply #'redo targets))
+  (redo-all targets))
 
 (defun depends-on (&rest targets)
   (apply #'redo-ifchange targets))
@@ -1135,13 +1135,13 @@ value and NEW do not match under TEST."
               (:depends-on* (x &rest xs)
                 `(:depends-on-all* (list ,x ,@xs)))
               (:depends-on-all (xs)
-                `(redo-ifchange* ,xs))
+                `(redo-ifchange-all ,xs))
               (:depends-on-all* (xs)
                 `(map nil #'redo-ifchange ,xs))
               (:depends-not (x &rest xs)
                 `(redo-ifcreate ,x ,@xs))
               (:depends-not* (xs)
-                `(redo-ifcreate* ,xs))
+                `(redo-ifcreate-all ,xs))
               (:path (path)
                 (assure pathname
                   (path path)))

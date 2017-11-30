@@ -10,11 +10,11 @@
   (:nicknames :redo)
   (:export
    #:redo
-   #:redo*
+   #:redo-all
    #:redo-ifchange
-   #:redo-ifchange*
+   #:redo-ifchange-all
    #:redo-ifcreate
-   #:redo-ifcreate*
+   #:redo-ifcreate-all
    #:redo-always
    #:*parents*
    ;; Functions to implement.
@@ -84,9 +84,9 @@
       (target-has-build-script? target)))
 
 (defun redo (&rest args)
-  (redo* (or args (list (root-target)))))
+  (redo-all (or args (list (root-target)))))
 
-(defun redo* (args)
+(defun redo-all (args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
     (when (target? target)
@@ -159,9 +159,9 @@
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; stamps for its deps.
 (defun redo-ifchange (&rest args)
-  (redo-ifchange* args))
+  (redo-ifchange-all args))
 
-(defun redo-ifchange* (args)
+(defun redo-ifchange-all (args)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
     (when (changed? i)
@@ -169,9 +169,9 @@
     (record-prereq i)))
 
 (defun redo-ifcreate (&rest targets)
-  (redo-ifcreate* targets))
+  (redo-ifcreate-all targets))
 
-(defun redo-ifcreate* (targets)
+(defun redo-ifcreate-all (targets)
   ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle targets))
     (when (target-exists? i)
