@@ -118,8 +118,10 @@
    ;; Emacs integration.
    :require-for-emacs
    :expand-module-for-emacs
+
    :find-pattern
    :build
+   :run
    :depends-on
    :depends-not))
 
@@ -1119,6 +1121,34 @@ value and NEW do not match under TEST."
     (etypecase-of (or null string) ext
       (null *nil-pathname*)
       (string (make-pathname :type ext)))))
+
+(defun run (target &optional system-name)
+  "Entry point for scripts."
+  (mvlet* ((target package-name
+            (ematch target
+              ((and target (type symbol))
+               (values target
+                       (package-name (symbol-package target))))
+              ((list (and package-name (type string-designator))
+                     (and symbol-name (type string-designator)))
+               (values symbol-name package-name))))
+           (system-name
+            (string-downcase            ;What ASDF wants.
+             (or system-name package-name))))
+    (unless (system-loaded? system-name)
+      (restart-case
+          (asdf:load-system system-name)
+        (quickload ()
+          :test (lambda () (find-package :ql))
+          :report (lambda (s)
+                    (format s "Load ~a with Quicklisp instead."
+                            system-name))
+          (uiop:symbol-call :ql :quickload system-name))))
+    (let ((package
+            (or (find-package package-name)
+                (error* "No such package: ~s" package-name))))
+      (build (intern (string target) package))
+      (values target system-name package))))
 
 (defun build (&rest targets)
   (redo-all targets))
