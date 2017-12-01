@@ -868,9 +868,15 @@ Works for SBCL, at least."
   (check-not-frozen)
   (assure target
     (etypecase-of target target
-      ((or bindable-symbol pathname)
+      (pathname
        (or (gethash target *tasks*)
            impossible-target))
+      (bindable-symbol
+       (or (gethash target *tasks*)
+           ;; If there is no real target by that name, look for a
+           ;; phony target.
+           (target-build-script-target
+            (phony-target target))))
       (phony-target
        (let* ((name (phony-target-name target))
               (key `(phony ,name)))
