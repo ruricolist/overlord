@@ -194,10 +194,15 @@ safely, overwrite DEST with the contents of the temporary file."
                 p)))
     (if ok
         ;; Cross-device?
-        (if (equal (pathname-device tmp)
-                   (pathname-device dest))
-            (rename-file-overwriting-target tmp dest)
-            (copy-file tmp dest :if-to-exists :rename-and-delete))
+        (flet ((rename-by-copying ()
+                 (copy-file tmp dest :if-to-exists :rename-and-delete)))
+          (if (equal (pathname-device tmp)
+                     (pathname-device dest))
+              (handler-case
+                  (rename-file-overwriting-target tmp dest)
+                (error ()
+                  (rename-by-copying)))
+              (rename-by-copying)))
         (delete-file-if-exists tmp))))
 
 (defun replace-file-atomically (data dest)
