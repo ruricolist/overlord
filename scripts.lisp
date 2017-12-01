@@ -40,13 +40,19 @@
   (asdf:system-relative-pathname :overlord "version.sexp"))
 
 (defun main (argv)
-  (handle-command-line
-   cli-spec
-   'handle-args
-   :command-line argv
-   :name "Overlord"
-   :positional-arity 2
-   :rest-arity nil))
+  (handler-case
+      (progn
+        (handle-command-line
+         cli-spec
+         'handle-args
+         :command-line argv
+         :name "Overlord"
+         :positional-arity 2
+         :rest-arity nil)
+        (quit 0))
+    (error (e)
+      (print e)
+      (quit -1))))
 
 (defun handle-args (cmd target &key ((:verbose *verbose*) nil)
                                     help version
