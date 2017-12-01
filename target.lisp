@@ -123,7 +123,8 @@
    :build
    :run
    :depends-on
-   :depends-not))
+   :depends-not
+   :with-script))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -1158,6 +1159,10 @@ value and NEW do not match under TEST."
 
 (defun depends-not (&rest targets)
   (apply #'redo-ifcreate targets))
+
+(defmacro with-script ((&key) &body body)
+  `(with-keyword-macros
+     ,@body))
 
 (defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
