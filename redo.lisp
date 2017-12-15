@@ -65,7 +65,8 @@
           saved-prereq-stamp
           target-up-to-date?
           clear-temp-prereqs
-          clear-temp-prereqsne))
+          clear-temp-prereqsne
+          generate-impossible-target))
 
 (defvar *parents* '()
   "The chain of parents being built.")
@@ -179,5 +180,4 @@
     (record-prereqne i)))
 
 (defun redo-always ()
-  (declare (notinline generate-impossible-target))
   (record-prereq (generate-impossible-target)))

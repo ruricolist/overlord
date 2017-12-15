@@ -53,6 +53,8 @@ distributed."
     redo-stamp
     dynamic-require-as))
 
+(declaim (notinline hard-freeze-targets))
+
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
@@ -63,7 +65,6 @@ distributed."
                (unload-db)
                (setf *frozen* t))
              (hard-freeze ()
-               (declare (notinline hard-freeze-targets))
                (freeze)
                (format t "~&Overlord: hard freeze...~%")
                (fmakunbound 'unfreeze)
