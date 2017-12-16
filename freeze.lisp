@@ -10,7 +10,7 @@
    :file
    :check-not-frozen
    :frozen?
-   :hard-freeze-targets))
+   :*before-hard-freeze-hook*))
 (in-package :overlord/freeze)
 
 (deftype freeze-policy ()
@@ -18,6 +18,8 @@
 
 (defparameter *freeze-policy* t)
 (declaim (type freeze-policy *freeze-policy*))
+
+(defvar *before-hard-freeze-hook* nil)
 
 (defun freeze-policy ()
   "Get or set the current freeze policy.
@@ -53,8 +55,6 @@ distributed."
     redo-stamp
     dynamic-require-as))
 
-(declaim (notinline hard-freeze-targets))
-
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
@@ -68,7 +68,7 @@ distributed."
                (freeze)
                (format t "~&Overlord: hard freeze...~%")
                (fmakunbound 'unfreeze)
-               (hard-freeze-targets)
+               (run-hooks '*before-hard-freeze-hook*)
                ;; The DB will not be reloaded.
                (deactivate-db)
                (dolist (fn *freeze-fmakunbound-hit-list*)
