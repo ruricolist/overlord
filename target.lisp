@@ -210,18 +210,14 @@ Works for SBCL, at least."
   (let ((map (temp-prereqs target)))
     (if (fset:empty? map)
         (delete-prop target prereqs)
-        (setf (prop target prereqs)
-              (collecting
-                (fset:do-map (k v map)
-                  (collect (saved-prereq k v))))))
+        (setf (prop target prereqs) map))
     (clear-temp-prereqs target)))
 
 (defun save-temp-prereqsne (target)
   (let ((set (temp-prereqsne target)))
     (if (fset:empty? set)
         (delete-prop target prereqsne)
-        (setf (prop target prereqsne)
-              (fset:convert 'list set)))
+        (setf (prop target prereqsne) set))
     (clear-temp-prereqsne target)))
 
 (defun target-up-to-date? (target)
@@ -233,11 +229,25 @@ Works for SBCL, at least."
       (setf (prop target uptodate) t)
       (delete-prop target uptodate)))
 
-(defplace target-saved-prereqs (target)
-  (prop target prereqs))
+(defun target-saved-prereqs (target)
+  (let ((map (prop target prereqs)))
+    (and (typep map 'fset:map)
+         (collecting
+           (fset:do-map (k v map)
+             (collect (saved-prereq k v)))))))
 
-(defplace target-saved-prereqsne (target)
-  (prop target prereqsne))
+(defun (setf target-saved-prereqs) (value target)
+  (setf (prop target prereqs)
+        (assure fset:map value)))
+
+(defun target-saved-prereqsne (target)
+  (let ((set (prop target prereqsne)))
+    (and (typep set 'fset:map)
+         (fset:convert 'list set))))
+
+(defun (setf target-saved-prereqsne) (value target)
+  (setf (prop target prereqsne)
+        (assure fset:set value)))
 
 
 ;;; Types.

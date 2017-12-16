@@ -42,7 +42,7 @@ has to see before the other forms.")
 (defvar-unbound *language* "The name (symbol) of the current language.")
 (declaim (type symbol *language*))
 
-(defparameter *db-version* 18
+(defparameter *db-version* 19
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type db-version *db-version*))
