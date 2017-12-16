@@ -184,9 +184,10 @@ Works for SBCL, at least."
 
 (defun record-prereq (target &aux (parent (current-parent)))
   (check-type target target)
-  (withf (temp-prereqs parent)
-         target
-         (target-stamp target)))
+  (unless (root-target? parent)
+    (withf (temp-prereqs parent)
+           target
+           (target-stamp target))))
 
 (defun record-prereqne (target &aux (parent (current-parent)))
   (check-type target target)
@@ -411,6 +412,12 @@ Works for SBCL, at least."
 (declaim (type boolean *building-root*))
 
 (defunit root-target)
+
+(defun root-target ()
+  root-target)
+
+(defun root-target? (x)
+  (eql x root-target))
 
 (defun current-parent ()
   (or (first *parents*)
@@ -865,6 +872,11 @@ Works for SBCL, at least."
 (define-global-state *top-level-targets* (make-target-table :synchronized t))
 (declaim (type target-table *top-level-targets*))
 
+(defun ensure-target-recorded (target)
+  (if *parents*
+      (record-prereq target)
+      (setf (target-table-member *top-level-targets* target) t)))
+
 (defun list-top-level-targets ()
   (target-table-keys *top-level-targets*))
 
@@ -913,6 +925,10 @@ Works for SBCL, at least."
       (root-target
        (task target
              (lambda ()
+               ;; NB. Note that we do not get the prereqs of the root
+               ;; target from the database. We do not want them to be
+               ;; persistent; we only want to build the targets that
+               ;; have been defined in this image.
                (let ((*building-root* t))
                  (redo-ifchange-all (list-top-level-targets))))
              trivial-target))
@@ -1425,9 +1441,9 @@ specify the dependencies you want on build."
     :type pathname
     :reader pattern.output-defaults)
    (script
-    :initarg :script
-    :type target
-    :reader pattern.script))
+     :initarg :script
+     :type target
+     :reader pattern.script))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
@@ -2495,21 +2511,23 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defmacro import-module/lazy (module &key as from)
   ;; TODO
-  (let ((target (module-spec as from))
-        (*parents* (or *parents* (list (root-target)))))
-    (record-prereq target))
+  (let ((target (module-spec as from)))
+    (ensure-target-recorded target))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
-    (etypecase-of import-alias module
-      (var-alias
-       `(overlord/shadows:define-symbol-macro ,module ,lazy-load))
-      (function-alias
-       (let ((fn (second module)))
-         `(progn
-            (declaim (notinline ,fn))
-            (overlord/shadows:defun ,fn (&rest args)
-              (apply ,lazy-load args)))))
-      (macro-alias
-       (error 'module-as-macro :name (second module))))))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel)
+         (ensure-target-recorded (module-spec ,as ,from)))
+       ,(etypecase-of import-alias module
+          (var-alias
+           `(overlord/shadows:define-symbol-macro ,module ,lazy-load))
+          (function-alias
+           (let ((fn (second module)))
+             `(progn
+                (declaim (notinline ,fn))
+                (overlord/shadows:defun ,fn (&rest args)
+                  (apply ,lazy-load args)))))
+          (macro-alias
+           (error 'module-as-macro :name (second module)))))))
 
 (defmacro import-task (module &key as from values lazy)
   (declare (ignorable lazy))
