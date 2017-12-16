@@ -400,7 +400,7 @@ Works for SBCL, at least."
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
 
-(define-singleton-type root-target)
+(defunit root-target)
 
 (defun current-parent ()
   (or (first *parents*)
@@ -414,8 +414,8 @@ Works for SBCL, at least."
 
 (fset:define-cross-type-compare-methods root-target)
 
-(define-singleton-type impossible-target)
-(define-singleton-type trivial-target)
+(defunit impossible-target)
+(defunit trivial-target)
 
 (defmethod fset:compare ((x impossible-target) (y impossible-target))
   :equal)

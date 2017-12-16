@@ -7,7 +7,6 @@
     :overlord/time-tuple
     :local-time)
   (:import-from :overlord/types
-    :define-singleton-type
     :universal-time)
   (:import-from :overlord/redo
     :stamp=)
@@ -41,8 +40,8 @@
 ;;; implementation/platform combinations (e.g. Clozure on Windows)
 ;;; where local-time timestamps are too fuzzy to be useful.
 
-(define-singleton-type never)
-(define-singleton-type far-future)
+(defunit never)
+(defunit far-future)
 
 (declaim (type function *now-function*))
 (defvar *now-function*
