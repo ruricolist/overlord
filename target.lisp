@@ -1834,8 +1834,7 @@ interoperation with Emacs."
 (defmethods static-exports-pattern (self lang source)
   (:method pattern.output-defaults (self)
     ;; Bear in mind *input* may have been resolved.
-    (path-join (faslize lang source)
-               (extension "static-exports")))
+    (static-exports-file lang source))
 
   (:method pattern-build (self)
     (save-static-exports lang source)
@@ -1858,9 +1857,11 @@ interoperation with Emacs."
 (def static-exports-extension (extension "static-exports"))
 
 (defun static-exports-file (lang source)
-  (merge-pathnames*
-   static-exports-extension
-   (faslize lang source)))
+  (lret ((file
+          (path-join (faslize lang source)
+                     static-exports-extension)))
+    (assert (equal (pathname-type file) "static-exports"))
+    file))
 
 (defun module-dynamic-exports (lang source)
   (module-exports (dynamic-require-as lang source)))
