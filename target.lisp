@@ -1837,8 +1837,8 @@ interoperation with Emacs."
     (static-exports-file lang source))
 
   (:method pattern-build (self)
-    (save-static-exports lang source)
-    (redo-ifchange (fasl-lang-pattern-ref lang source))))
+    (redo-ifchange (fasl-lang-pattern-ref lang source))
+    (save-static-exports lang source)))
 
 (defun static-exports-pattern (lang source)
   ;; The static export file depends on the fasl.
