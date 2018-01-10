@@ -3,7 +3,7 @@
   (:mix :serapeum :alexandria :overlord/shadows :overlord/types)
   (:import-from :alexandria :mappend)
   (:import-from :serapeum :op :car-safe :keep)
-  (:import-from :overlord/module :module-ref :module-ref* :module-exports)
+  (:import-from :overlord/module :make-module)
   (:import-from :overlord/parsers :slurp-stream :slurp-file)
   (:import-from :overlord/target :with-imports)
   (:export
@@ -70,24 +70,12 @@
       ((or macro-spec (tuple macro-spec :as export-alias))
        (error "Simple modules cannot export macros.")))))
 
-(defstruct-read-only simple-module
-  (thunk :type function))
-
-(defmethod print-object ((self simple-module) stream)
-  (print-unreadable-object (self stream :type t)))
-
-(def list-exports '%list-exports)
-
-(defmethod module-ref ((sm simple-module) (key symbol))
-  (funcall (simple-module-thunk sm) key))
-
-(defmethod module-exports ((sm simple-module))
-  (module-ref* sm list-exports))
-
 (defmacro simple-module ((&rest exports) &body body)
-  `(make-simple-module
-    :thunk (mlet ,exports
-             ,@body)))
+  (let ((export-keys (mapcar #'export-keyword exports)))
+    `(make-module
+      :exports ',export-keys
+      :exports-table (mlet ,exports
+                       ,@body))))
 
 (defmacro mlet (exports &body body)
   `(local*
@@ -102,5 +90,4 @@
     ;; No duplicate exports.
     (assert (length= export-keys (nub export-keys)))
     `(ecase ,key
-       (,list-exports ',export-keys)
        ,@(mapcar #'list export-keys export-bindings))))
