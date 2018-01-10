@@ -1631,12 +1631,6 @@ resolved at load time."
     (setf lock
           (bt:make-recursive-lock (fmt "Lock for module ~a" self))))
 
-  (:method module-ref (self name)
-    (module-ref* module name))
-
-  (:method module-exports (self)
-    (module-exports module))
-
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
       (format stream "~a (~a) (~:[not loaded~;loaded~])"
