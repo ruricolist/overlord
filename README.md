@@ -269,14 +269,6 @@ same file can be loaded as a module in more than one language. And
 each language-file combination gets its own, completely independent
 module.
 
-Overlord is very liberal about what can be a module. In Overlord, any
-value can be a module – a string, a function, a hash table, anything –
-and any module can provide exports as long as it specializes certain
-generic functions, like `module-ref`.
-
-(Most of the time, however, what you want
-is [`simple-module`](#simple-modules).)
-
 ## Languages
 
 In Overlord, a language is just a package. The package exports a
