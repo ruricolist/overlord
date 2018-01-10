@@ -135,6 +135,9 @@
 (deftype pathname ()
   'cl:pathname)
 
+(setf (find-class 'pathname)
+      (find-class 'cl:pathname))
+
 ;;; Conditionals should always be exhaustive.
 
 (defmacro if (test then else)
