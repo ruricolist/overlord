@@ -2608,19 +2608,20 @@ actually exported by the module specified by LANG and SOURCE."
       (function-alias
        (let ((alias (second alias))
              (exp (macroexpand-1 `(function-wrapper ,ref) env)))
-         ;; We used to use dynamic-extent declarations here, but Core
-         ;; Lisp binds `args' as a symbol macro, and SBCL, stickler
-         ;; that it is, objects to dynamic-extent declarations for
-         ;; symbol macros.
+         ;; NB Core Lisp binds `args' as a symbol macro, and SBCL,
+         ;; stickler that it is, objects to dynamic-extent
+         ;; declarations for symbol macros.
          (if (equal exp ref)
              `(progn
                 (declaim (notinline ,alias))
                 (overlord/shadows:defun ,alias (&rest args)
+                  #-sbcl (declare (dynamic-extent args))
                   (apply ,ref args)))
              `(progn
                 (overlord/shadows:defalias ,alias
                   (function-wrapper
                    (lambda (&rest args)
+                    #-sbcl (declare (dynamic-extent args))
                     (apply ,ref args))))))))
       (macro-alias
        (let ((alias (second alias)))
