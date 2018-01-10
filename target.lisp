@@ -1921,7 +1921,7 @@ interoperation with Emacs."
            (define-script ,script ,reader)
            (defparameter ,ext (extension ,extension))
            (defun ,load (,source)
-             ,reader)
+             (make-module :default ,reader))
            (defun ,read (,source _stream)
              (declare (ignore _stream))
              (list ',load ,source))
