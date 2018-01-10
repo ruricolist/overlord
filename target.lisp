@@ -1812,16 +1812,20 @@ interoperation with Emacs."
         (pattern-ref source)
         redo-ifchange)))
 
+(defgeneric language-static-exports (lang source)
+  (:method (lang (source pathname))
+    (check-type source absolute-pathname)
+    (let ((lang (resolve-lang-package lang)))
+      (if-let (sym (find-external-symbol 'static-exports lang))
+        ;; If the language exports a function to parse static exports,
+        ;; use it.
+        (funcall sym source)
+        ;; Otherwise, get the list of exports by loading the module at
+        ;; compile time.
+        (module-exports (dynamic-require-as lang source))))))
+
 (defun extract-static-exports (lang source)
-  (check-type source absolute-pathname)
-  (let ((lang (resolve-lang-package lang)))
-    (if-let (sym (find-external-symbol 'static-exports lang))
-      ;; If the language exports a function to parse static exports,
-      ;; use it.
-      (funcall sym source)
-      ;; Otherwise, get the list of exports by loading the module at
-      ;; compile time.
-      (module-exports (dynamic-require-as lang source)))))
+  (language-static-exports lang source))
 
 (defclass static-exports-pattern (pattern)
   ((lang :initarg :lang)
