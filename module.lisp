@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria #:serapeum #:overlord/util)
   (:export
    #:package-exports
+   #:make-module
    #:module-ref
    #:module-ref*
    #:module-exports
@@ -39,6 +40,32 @@ Inlinable, and skips generic dispatch for some common types."
     (function (funcall module name))
     (hash-table (gethash name module))
     (t (module-ref module name))))
+
+
+
+;;; Distinguished module objects.
+
+(defconst unbound "unbound")
+
+(defun empty-exports-table (module key)
+  (error "Module ~a does not export ~a" module key))
+
+(defstruct-read-only (module (:conc-name __module-)
+                             (:constructor __make-module))
+  (default unbound :type t)
+  (exports nil :type list)
+  (exports-table #'empty-exports-table :type function))
+
+(defmethod module-exports ((module module))
+  (__module-exports module))
+
+(defmethod module-ref ((module module) key)
+  (funcall (__module-exports-table module) key))
+
+(defun make-module (&key default exports exports-table)
+  (__make-module :default default
+                 :exports exports
+                 :exports-table exports-table))
 
 
 
