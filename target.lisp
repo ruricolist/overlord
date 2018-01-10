@@ -1025,7 +1025,7 @@ building from there."
          (spaces (make-string depth :initial-element #\Space)))
     (message "~a~s"
              spaces
-             `(redo ,(dump-target/pretty target)))))
+             `(build ,(dump-target/pretty target)))))
 
 (defun dump-target/pretty (target)
   "Return a form which, when evaluated, returns a target equivalent to
