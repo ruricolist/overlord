@@ -475,6 +475,12 @@ Works for SBCL, at least."
     module-spec
     task))
 
+(defconstructor task
+  "A task."
+  (target (and target (not task)))
+  (thunk function)
+  (script (and target (not task))))
+
 
 ;;; Manipulating targets.
 
@@ -879,12 +885,6 @@ Works for SBCL, at least."
 
 (defun list-top-level-targets ()
   (target-table-keys *top-level-targets*))
-
-(defconstructor task
-  "A task."
-  (target (and target (not task)))
-  (thunk function)
-  (script (and target (not task))))
 
 (defun target-build-script-target (target)
   (check-not-frozen)
