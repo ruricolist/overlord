@@ -45,28 +45,27 @@
    #:generate-impossible-target))
 (in-package #:overlord/redo)
 
-(declaim (notinline
-          root-target
-          target-stamp
-          stamp=
-          target-exists?
-          target=
-          target-build-script-target
-          target-default-build-script-target
-          run-script
-          record-prereq
-          save-temp-prereqs
-          record-prereqne
-          save-temp-prereqsne
-          target-in-db?
-          target-saved-prereqs
-          target-saved-prereqsne
-          saved-prereq-target
-          saved-prereq-stamp
-          target-up-to-date?
-          clear-temp-prereqs
-          clear-temp-prereqsne
-          generate-impossible-target))
+(defgeneric root-target ())
+(defgeneric target-stamp (target))
+(defgeneric stamp= (stamp1 stamp2))
+(defgeneric target-exists? (target))
+(defgeneric target= (target1 target2))
+(defgeneric target-build-script-target (target))
+(defgeneric target-default-build-script-target (target))
+(defgeneric run-script (task))
+(defgeneric record-prereq (target))
+(defgeneric save-temp-prereqs (target))
+(defgeneric record-prereqne (target))
+(defgeneric save-temp-prereqsne (target))
+(defgeneric target-in-db? (target))
+(defgeneric target-saved-prereqs (target))
+(defgeneric target-saved-prereqsne (target))
+(defgeneric saved-prereq-target (prereq))
+(defgeneric saved-prereq-stamp (prereq))
+(defgeneric target-up-to-date? (target))
+(defgeneric clear-temp-prereqs (target))
+(defgeneric clear-temp-prereqsne (target))
+(defgeneric generate-impossible-target ())
 
 (defvar *parents* '()
   "The chain of parents being built.")

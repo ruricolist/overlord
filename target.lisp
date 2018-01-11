@@ -177,8 +177,8 @@ Works for SBCL, at least."
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
   (cons x (assure stamp stamp)))
 
-(defun saved-prereq-target (p) (car p))
-(defun saved-prereq-stamp (p) (cdr p))
+(defmethod saved-prereq-target (p) (car p))
+(defmethod saved-prereq-stamp (p) (cdr p))
 
 (defplace temp-prereqs (target)
   (prop target prereqs-temp (fset:empty-map)))
@@ -186,18 +186,18 @@ Works for SBCL, at least."
 (defplace temp-prereqsne (target)
   (prop target prereqsne-temp (fset:empty-set)))
 
-(defun record-prereq (target &aux (parent (current-parent)))
+(defmethod record-prereq (target &aux (parent (current-parent)))
   (check-type target target)
   (unless (root-target? parent)
     (withf (temp-prereqs parent)
            target
            (target-stamp target))))
 
-(defun record-prereqne (target &aux (parent (current-parent)))
+(defmethod record-prereqne (target &aux (parent (current-parent)))
   (check-type target target)
   (withf (temp-prereqsne parent) target))
 
-(defun target-in-db? (target)
+(defmethod target-in-db? (target)
   (has-prop? target
              uptodate
              prereqs
@@ -205,27 +205,27 @@ Works for SBCL, at least."
              prereqsne
              prereqsne-temp))
 
-(defun clear-temp-prereqs (target)
+(defmethod clear-temp-prereqs (target)
   (delete-prop target prereqs-temp))
 
-(defun clear-temp-prereqsne (target)
+(defmethod clear-temp-prereqsne (target)
   (delete-prop target prereqsne-temp))
 
-(defun save-temp-prereqs (target)
+(defmethod save-temp-prereqs (target)
   (let ((map (temp-prereqs target)))
     (if (fset:empty? map)
         (delete-prop target prereqs)
         (setf (prop target prereqs) map))
     (clear-temp-prereqs target)))
 
-(defun save-temp-prereqsne (target)
+(defmethod save-temp-prereqsne (target)
   (let ((set (temp-prereqsne target)))
     (if (fset:empty? set)
         (delete-prop target prereqsne)
         (setf (prop target prereqsne) set))
     (clear-temp-prereqsne target)))
 
-(defun target-up-to-date? (target)
+(defmethod target-up-to-date? (target)
   (prop target uptodate))
 
 (defun (setf target-up-to-date?) (value target)
@@ -234,7 +234,7 @@ Works for SBCL, at least."
       (setf (prop target uptodate) t)
       (delete-prop target uptodate)))
 
-(defun target-saved-prereqs (target)
+(defmethod target-saved-prereqs (target)
   (let ((map (prop target prereqs)))
     (and (typep map 'fset:map)
          (collecting
@@ -245,7 +245,7 @@ Works for SBCL, at least."
   (setf (prop target prereqs)
         (assure fset:map value)))
 
-(defun target-saved-prereqsne (target)
+(defmethod target-saved-prereqsne (target)
   (let ((set (prop target prereqsne)))
     (and (typep set 'fset:map)
          (fset:convert 'list set))))
@@ -417,7 +417,7 @@ Works for SBCL, at least."
 
 (defunit root-target)
 
-(defun root-target ()
+(defmethod root-target ()
   root-target)
 
 (defun root-target? (x)
@@ -447,7 +447,7 @@ Works for SBCL, at least."
 (fset:define-cross-type-compare-methods impossible-target)
 (fset:define-cross-type-compare-methods trivial-target)
 
-(defun generate-impossible-target ()
+(defmethod generate-impossible-target ()
   impossible-target)
 
 (defconstructor phony-target
@@ -498,7 +498,7 @@ Works for SBCL, at least."
      (or (file-exists-p path)
          (directory-exists-p path)))))
 
-(defun target-exists? (target)
+(defmethod target-exists? (target)
   (true
    (etypecase-of target target
      ((or root-target trivial-target) t)
@@ -662,7 +662,7 @@ Works for SBCL, at least."
     ;; Bottom.
     (otherwise nil)))
 
-(defun target= (x y)
+(defmethod target= (x y)
   "Are two targets the same?"
   (etypecase-of target x
     (root-target
@@ -890,7 +890,7 @@ Works for SBCL, at least."
 (defun list-top-level-targets ()
   (target-table-keys *top-level-targets*))
 
-(defun target-build-script-target (target)
+(defmethod target-build-script-target (target)
   (check-not-frozen)
   (assure target
     (etypecase-of target target
@@ -915,7 +915,7 @@ Works for SBCL, at least."
         (constantly nil)
         trivial-target))
 
-(defun target-default-build-script-target (target)
+(defmethod target-default-build-script-target (target)
   (check-not-frozen)
   ;; TODO Alternately, instead of trivial-target for the script, you
   ;; could actually use define-script-for and depend on those scripts.
@@ -979,7 +979,7 @@ Works for SBCL, at least."
                      (load-module-into-cell cell)))
                  trivial-target)))))))
 
-(defun run-script (task &aux (parent (current-parent)))
+(defmethod run-script (task &aux (parent (current-parent)))
   (check-not-frozen)
   ;; XXX exhaustive?
   (unless (typep parent
@@ -1064,15 +1064,7 @@ TARGET."
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
 
-(defun target-stamper (parent)
-  (let ((map
-          (assure fset:map
-            (prop parent prereqs-temp (fset:empty-map)))))
-    (lambda (target)
-      (or (fset:lookup map target)
-          (target-stamp target)))))
-
-(defun target-stamp (target)
+(defmethod target-stamp (target)
   (assure stamp
     (etypecase-of target target
       ((or root-target

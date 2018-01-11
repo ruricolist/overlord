@@ -181,7 +181,7 @@
     ((far-future far-future) t)
     ((target-timestamp target-timestamp) nil)))
 
-(defun stamp= (s1 s2)
+(defmethod stamp= (s1 s2)
   (dispatch-case ((s1 stamp)
                   (s2 stamp))
     ((target-timestamp target-timestamp)
