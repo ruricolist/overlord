@@ -1,5 +1,6 @@
 (uiop:define-package :overlord/shadows
     (:import-from :alexandria)
+  (:nicknames :overlord/cl)
   (:shadow
    #:module-progn
 

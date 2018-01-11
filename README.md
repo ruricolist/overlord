@@ -307,9 +307,9 @@ also be a nickname.
 implementation that supports [package-local nicknames][].)
 
 It is recommended, although not required, that your language package
-inherit from `overlord/shadows` rather than from `cl`. The result is
-the same, except that `overlord/shadows` shadows Common Lisp’s binding
-and definition forms so they can, in turn, be shadowed in further
+inherit from `overlord/cl` rather than from `cl`. The result is the
+same, except that `overlord/cl` globally shadows Common Lisp’s binding
+and definition forms so they can, in turn, be shadowed locally by
 language implementations.
 
 The package must at least export a binding for one of `read-module`,
