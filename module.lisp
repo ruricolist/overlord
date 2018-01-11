@@ -5,6 +5,7 @@
    #:make-module
    #:module-ref
    #:module-ref*
+   #:module-default-export
    #:module-exports
    #:module-static-exports #:module-static-exports/cache
    #:with-static-exports-cache
@@ -26,6 +27,10 @@
 
 (defgeneric module-exports (module)
   (:documentation "A list of names exported by MODULE."))
+
+(defgeneric module-default-export (module)
+  (:documentation "MODULE's default export.")
+  (:method (module) module))
 
 (defsubst module-ref* (module name)
   "Entry point for calling `module-ref'.
