@@ -5,9 +5,8 @@
   (:export
    #:package-exports
    #:make-module
-   #:module-ref
-   #:module-ref*
-   #:module-exports
+   #:module-ref #:module-ref*
+   #:module-exports #:module-exports*
    #:module-static-exports #:module-static-exports/cache
    #:no-such-export
    #:with-static-exports-cache
@@ -29,20 +28,6 @@
 
 (defgeneric module-exports (module)
   (:documentation "A list of names exported by MODULE."))
-
-(defsubst module-ref* (module name)
-  "Entry point for calling `module-ref'.
-Inlinable, and skips generic dispatch for some common types."
-  (declare (optimize
-            (speed 3)
-            (safety 1)
-            (debug 0)
-            (compilation-speed 0)
-            (space 0)))
-  (typecase module
-    (function (funcall module name))
-    (hash-table (gethash name module))
-    (t (module-ref module name))))
 
 
 
@@ -76,6 +61,33 @@ Inlinable, and skips generic dispatch for some common types."
   (assert (every #'symbolp exports))
   (__make-module :exports exports
                  :exports-table exports-table))
+
+
+;;; Actual entry points.
+
+(defconst flank-speed
+  '((speed 3)
+    (safety 1)
+    (debug 0)
+    (compilation-speed 0)
+    (space 0)))
+
+(defsubst module-ref* (module name)
+  "Entry point for calling `module-ref'.
+Inlinable, and skips generic dispatch for some common types."
+  (declare (optimize . #.flank-speed))
+  (typecase module
+    (function (funcall module name))
+    (hash-table (gethash name module))
+    (module (funcall (__module-exports-table module) name))
+    (t (module-ref module name))))
+
+(defsubst module-exports* (module)
+  (declare (optimize . #.flank-speed))
+  (typecase module
+    (module (__module-exports module))
+    (hash-table (hash-table-keys module))
+    (t (module-exports module))))
 
 
 

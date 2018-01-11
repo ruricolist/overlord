@@ -1823,7 +1823,7 @@ interoperation with Emacs."
         (funcall sym source)
         ;; Otherwise, get the list of exports by loading the module at
         ;; compile time.
-        (module-exports (dynamic-require-as lang source))))))
+        (module-exports* (dynamic-require-as lang source))))))
 
 (defun extract-static-exports (lang source)
   (language-static-exports lang source))
@@ -1866,7 +1866,7 @@ interoperation with Emacs."
     file))
 
 (defun module-dynamic-exports (lang source)
-  (module-exports (dynamic-require-as lang source)))
+  (module-exports* (dynamic-require-as lang source)))
 
 
 ;;; Languages.
