@@ -1641,9 +1641,9 @@ resolved at load time."
 
 (defun load-module-into-cell (cell)
   (lret ((module
-          (assure (not null)
-            (load-module (module-cell.lang cell)
-                         (module-cell.source cell)))))
+          (validate-module
+           (load-module (module-cell.lang cell)
+                        (module-cell.source cell)))))
     (setf
      (module-cell.module cell) module
      (module-cell.timestamp cell) (now))))

@@ -4,6 +4,7 @@
     #:overlord-error)
   (:export
    #:package-exports
+   #:validate-module
    #:make-module
    #:module-ref #:module-ref*
    #:module-exports #:module-exports*
@@ -28,6 +29,24 @@
 
 (defgeneric module-exports (module)
   (:documentation "A list of names exported by MODULE."))
+
+(defun validate-module (module)
+  "Validate that MODULE belongs to a class that implements the
+protocol for modules."
+  (if (null module)
+      (error "~s cannot be used as a module." nil)
+      (let ((class (class-of module))
+            (class-t (class-of t)))
+        (or (and (find-method #'module-ref nil (list class class-t)
+                              nil)
+                 (find-method #'module-exports nil (list class)
+                              nil)
+                 module)
+            (error "Invalid module: ~a.
+A module must have methods for both ~s and ~s."
+                   module
+                   'module-ref
+                   'module-exports)))))
 
 
 
