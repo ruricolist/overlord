@@ -13,6 +13,7 @@
     :ensure-directory-pathname
     :merge-pathnames*
     :pathname-directory-pathname)
+  (:import-from :trivial-file-size :file-size-in-octets)
   (:import-from :fset)
   (:import-from :local-time)
   (:export
@@ -84,10 +85,9 @@
       (format stream "v.~a ~d record~:p, ~:d byte~:p~@[ (~a)~]"
               version
               (fset:size current-map)
-              (let ((log log))
-                (if (file-exists-p log)
-                    (file-size log)
-                    0))
+              (if (file-exists-p log)
+                  (file-size-in-octets log)
+                  0)
               (and (not (eql current-map last-saved-map))
                    "unsaved"))))
 
