@@ -306,19 +306,17 @@ also be a nickname.
 (Note that resolution of package names is absolute, even in a Lisp
 implementation that supports [package-local nicknames][].)
 
-It is strongly recommended, although not required, that your language
-package inherit from `overlord/shadows` rather than from `cl`. The
-result is the same, except that `overlord/shadows` shadows Common
-Lisp’s binding and definition forms so they can, in turn, be shadowed
-in further language implementations.
+It is recommended, although not required, that your language package
+inherit from `overlord/shadows` rather than from `cl`. The result is
+the same, except that `overlord/shadows` shadows Common Lisp’s binding
+and definition forms so they can, in turn, be shadowed in further
+language implementations.
 
 The package must at least export a binding for one of `read-module`,
 for direct use, or `module-progn`, for use with a meta-language.
 Preferably, it would export both.
 
-There are other special exports. For example, if the package has a
-function binding for `module-static-exports`, it is used,
-unsurprisingly, to statically determine the module’s exports.
+If the syntax of your language makes it possible to determine exports statically, you should also define and export `static-exports`. If your language defines `static-exports`, then Overlord can statically check the validity of import forms.
 
 ## Imports and exports
 
