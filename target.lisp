@@ -1801,7 +1801,7 @@ interoperation with Emacs."
   (let ((*base* (pathname-directory-pathname source)))
     (load-fasl-lang lang source)))
 
-(defun module-static-exports (lang source)
+(defmethod module-static-exports (lang source)
   (ensure-static-exports lang source)
   (assure list
     (snarf-static-exports lang source)))

@@ -20,9 +20,6 @@
 
 (in-package #:overlord/module)
 
-;;; Actually defined in target.lisp.
-(declaim (notinline module-static-exports))
-
 ;;; Generic functions.
 
 (defgeneric module-ref (module name)
@@ -30,6 +27,9 @@
 
 (defgeneric module-exports (module)
   (:documentation "A list of names exported by MODULE."))
+
+(defgeneric module-static-exports (lang source)
+  (:documentation "Get static exports from LANG and SOURCE."))
 
 (defun validate-module (module)
   "Validate that MODULE belongs to a class that implements the
