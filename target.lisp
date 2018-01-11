@@ -1802,68 +1802,13 @@ interoperation with Emacs."
     (load-fasl-lang lang source)))
 
 (defmethod module-static-exports (lang source)
-  (ensure-static-exports lang source)
-  (assure list
-    (snarf-static-exports lang source)))
-
-(defun ensure-static-exports (lang source)
-  (let ((*base* (pathname-directory-pathname source)))
-    (~> lang
-        (static-exports-pattern source)
-        (pattern-ref source)
-        redo-ifchange)))
-
-(defgeneric language-static-exports (lang source)
-  (:method (lang (source pathname))
-    (check-type source absolute-pathname)
-    (let ((lang (resolve-lang-package lang)))
-      (if-let (sym (find-external-symbol 'static-exports lang))
-        ;; If the language exports a function to parse static exports,
-        ;; use it.
-        (funcall sym source)
-        ;; Otherwise, get the list of exports by loading the module at
-        ;; compile time.
-        (module-exports* (dynamic-require-as lang source))))))
-
-(defun extract-static-exports (lang source)
-  (language-static-exports lang source))
-
-(defclass static-exports-pattern (pattern)
-  ((lang :initarg :lang)
-   (source :initarg :source))
-  (:documentation "Pattern to extract static exports from a file."))
-
-(defmethods static-exports-pattern (self lang source)
-  (:method pattern.output-defaults (self)
-    ;; Bear in mind *input* may have been resolved.
-    (static-exports-file lang source))
-
-  (:method pattern-build (self)
-    (redo-ifchange (fasl-lang-pattern-ref lang source))
-    (save-static-exports lang source)))
-
-(defun static-exports-pattern (lang source)
-  ;; The static export file depends on the fasl.
-  (make 'static-exports-pattern :lang lang :source source))
-
-(defun snarf-static-exports (lang source)
-  (let ((file (static-exports-file lang source)))
-    (assert (file-exists-p file))
-    (read-file-form file)))
-
-(defun save-static-exports (lang source)
-  (let ((exports (extract-static-exports lang source))
-        (file (static-exports-file lang source)))
-    (write-form-as-file exports file)))
-
-(def static-exports-extension (extension "static-exports"))
-
-(defun static-exports-file (lang source)
-  (lret ((file
-          (path-join (faslize lang source)
-                     static-exports-extension)))
-    (assert (equal (pathname-type file) "static-exports"))
-    file))
+  (check-type source absolute-pathname)
+  (let ((lang (resolve-lang-package lang)))
+    (if-let (sym (find-external-symbol 'static-exports lang))
+      ;; If the language exports a function to parse static exports,
+      ;; use it.
+      (values (funcall sym source) t)
+      (values nil nil))))
 
 (defun module-dynamic-exports (lang source)
   (module-exports* (dynamic-require-as lang source)))
@@ -2308,7 +2253,7 @@ about ease of development or debugging, only speed.")
            ;; all if there was a problem with the imports, which is
            ;; frustrating. Instead, we push the check down into the
            ;; `check-static-bindings-now' macro.
-           (module-static-exports/cache lang source)))
+           (module-static-exports lang source)))
     (etypecase-of binding-spec spec
       ((eql :all)
        (loop for export in (get-static-exports)
@@ -2488,19 +2433,20 @@ actually exported by the module specified by LANG and SOURCE."
     (restart-case
         (progn
           (redo (module-spec lang source))
-          (let ((exports
-                  (module-static-exports lang source))
-                (bindings
-                  (mapcar (op (import-keyword (first _)))
-                          (canonicalize-bindings bindings))))
+          (mvlet ((exports exports-statically-known?
+                   (module-static-exports lang source))
+                  (bindings
+                   (mapcar (op (import-keyword (first _)))
+                           (canonicalize-bindings bindings))))
             ;; Check for duplicated bindings.
             (unless (set-equal bindings (remove-duplicates bindings))
               (error* "Duplicated bindings."))
             ;; Make sure the bindings match the exports.
-            (unless (subsetp bindings exports :test #'string=)
-              (error 'binding-export-mismatch
-                     :bindings bindings
-                     :exports exports))))
+            (when exports-statically-known?
+              (unless (subsetp bindings exports :test #'string=)
+                (error 'binding-export-mismatch
+                       :bindings bindings
+                       :exports exports)))))
       (recompile-object-file ()
         :report "Recompile the object file."
         (let ((object-file (faslize lang source))

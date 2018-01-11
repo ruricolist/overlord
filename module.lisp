@@ -8,9 +8,8 @@
    #:make-module
    #:module-ref #:module-ref*
    #:module-exports #:module-exports*
-   #:module-static-exports #:module-static-exports/cache
+   #:module-static-exports
    #:no-such-export
-   #:with-static-exports-cache
    #:current-module
    #:current-module-cell
    #:current-module-source
@@ -29,7 +28,8 @@
   (:documentation "A list of names exported by MODULE."))
 
 (defgeneric module-static-exports (lang source)
-  (:documentation "Get static exports from LANG and SOURCE."))
+  (:documentation "Get static exports from LANG and SOURCE.
+Returns two values: a list of static exports, and a second value that is T if the exports could be statically determined."))
 
 (defun validate-module (module)
   "Validate that MODULE belongs to a class that implements the
@@ -116,33 +116,3 @@ Inlinable, and skips generic dispatch for some common types."
     (module (__module-exports module))
     (hash-table (hash-table-keys module))
     (t (module-exports module))))
-
-
-
-(defvar-unbound *static-exports-cache*
-  "You can bind this to a dictionary to prevent redundant computation
-  of static exports.")
-(declaim (type hash-table *static-exports-cache*))
-
-(def static-exports-lock
-  (bt:make-recursive-lock "Static exports lock"))
-
-(defun module-static-exports/cache (lang source)
-  (check-type lang symbol)
-  (if (boundp '*static-exports-cache*)
-      (let ((c *static-exports-cache*))
-        (assert (hash-table-p c))
-        (assert (eql (hash-table-test c) 'equal))
-        (mvlet* ((key (cons lang source))
-                 (cached cached?
-                  (synchronized (static-exports-lock)
-                    (gethash key c))))
-          (if cached? cached
-              (let ((exports (module-static-exports lang source)))
-                (synchronized (static-exports-lock)
-                  (setf (gethash key c) exports))))))
-      (module-static-exports lang source)))
-
-(defmacro with-static-exports-cache ((&key) &body body)
-  `(let ((*static-exports-cache* (dict)))
-     ,@body))
