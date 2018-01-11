@@ -2233,6 +2233,9 @@ about ease of development or debugging, only speed.")
                (format s "Cannot import a macro as a value: ~a."
                        name)))))
 
+(defun extract-exports (lang source)
+  (module-exports* (dynamic-require-as lang source)))
+
 (defun expand-binding-spec (spec lang source)
   (setf source (merge-pathnames source (base))
         lang (lang-name lang))
@@ -2245,7 +2248,10 @@ about ease of development or debugging, only speed.")
            ;; all if there was a problem with the imports, which is
            ;; frustrating. Instead, we push the check down into the
            ;; `check-static-bindings-now' macro.
-           (module-static-exports lang source)))
+           (receive (exports exports?)
+               (module-static-exports lang source)
+             (if exports? exports
+                 (extract-exports lang source)))))
     (etypecase-of binding-spec spec
       ((eql :all)
        (loop for export in (get-static-exports)
