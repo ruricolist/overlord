@@ -81,7 +81,8 @@
   `(local*
      ,@body
      ;; The name for the lambda is just to make debugging easier.
-     (named-lambda ,(string-gensym 'simple-module-lookup) (key)
+     (named-lambda ,(string-gensym 'simple-module-lookup) (module key)
+       (declare (ignore module))
        ,(mlet-get exports 'key))))
 
 (defun mlet-get (exports key)

@@ -1,13 +1,15 @@
 (defpackage #:overlord/module
   (:use #:cl #:alexandria #:serapeum #:overlord/util)
+  (:import-from #:overlord/types
+    #:overlord-error)
   (:export
    #:package-exports
    #:make-module
    #:module-ref
    #:module-ref*
-   #:module-default-export
    #:module-exports
    #:module-static-exports #:module-static-exports/cache
+   #:no-such-export
    #:with-static-exports-cache
    #:current-module
    #:current-module-cell
@@ -28,10 +30,6 @@
 (defgeneric module-exports (module)
   (:documentation "A list of names exported by MODULE."))
 
-(defgeneric module-default-export (module)
-  (:documentation "MODULE's default export.")
-  (:method (module) module))
-
 (defsubst module-ref* (module name)
   "Entry point for calling `module-ref'.
 Inlinable, and skips generic dispatch for some common types."
@@ -50,14 +48,21 @@ Inlinable, and skips generic dispatch for some common types."
 
 ;;; Distinguished module objects.
 
-(defconst unbound "unbound")
+(defcondition no-such-export (overlord-error)
+  ((module :initarg :module)
+   (key :initarg :key :type symbol))
+  (:report (lambda (c s)
+             (with-slots (module key) c
+               (format s "Module ~a does not export ~a"
+                       module key)))))
 
 (defun empty-exports-table (module key)
-  (error "Module ~a does not export ~a" module key))
+  (error 'no-such-export
+         :module module
+         :key key))
 
 (defstruct-read-only (module (:conc-name __module-)
                              (:constructor __make-module))
-  (default unbound :type t)
   (exports nil :type list)
   (exports-table #'empty-exports-table :type function))
 
@@ -67,9 +72,9 @@ Inlinable, and skips generic dispatch for some common types."
 (defmethod module-ref ((module module) key)
   (funcall (__module-exports-table module) key))
 
-(defun make-module (&key default exports exports-table)
-  (__make-module :default default
-                 :exports exports
+(defun make-module (&key exports exports-table)
+  (assert (every #'symbolp exports))
+  (__make-module :exports exports
                  :exports-table exports-table))
 
 
