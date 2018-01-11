@@ -1922,13 +1922,22 @@ interoperation with Emacs."
            (define-script ,script ,reader)
            (defparameter ,ext (extension ,extension))
            (defun ,load (,source)
-             (make-module :default ,reader))
+             (make-module
+              :exports-table
+              (loader-language-table ,reader)))
            (defun ,read (,source _stream)
              (declare (ignore _stream))
              (list ',load ,source))
            (defmethod lang-deps :after ((self (eql ,keyword)) source)
              (declare (ignore source))
              (redo-ifchange ',script)))))))
+
+(defun loader-language-table (val)
+  (lambda (module key)
+    (if (eql key :default) val
+        (error 'no-such-export
+               :key key
+               :module module))))
 
 (defun load-fasl-lang (lang source)
   (let ((object-file (faslize lang source)))
@@ -2532,25 +2541,13 @@ actually exported by the module specified by LANG and SOURCE."
           (macro-alias
            (error 'module-as-macro :name (second module)))))))
 
-(defmacro import-default (module &key as from)
-  (let ((target (module-spec as from)))
-    (ensure-target-recorded target))
-  (let ((lazy-load `(load-module/lazy ',as ,from)))
-    `(progn
-       (eval-when (:compile-toplevel :load-toplevel)
-         (ensure-target-recorded (module-spec ,as ,from)))
-       ,(etypecase-of import-alias module
-          (var-alias
-           `(overlord/shadows:define-symbol-macro ,module
-                (module-default-export ,lazy-load)))
-          (function-alias
-           (let ((fn (second module)))
-             `(progn
-                (declaim (notinline ,fn))
-                (overlord/shadows:defun ,fn (&rest args)
-                  (apply (module-default-export ,lazy-load) args)))))
-          (macro-alias
-           (error 'module-as-macro :name (second module)))))))
+(defmacro import-default (var &key as from)
+  (check-type var symbol)
+  (let ((module-name (symbolicate '__module-for- var)))
+    `(import ,module-name
+       :as ,as
+       :from ,from
+       :binding ((:default :as ,var)))))
 
 (defmacro import-task (module &key as from values lazy)
   (declare (ignorable lazy))
