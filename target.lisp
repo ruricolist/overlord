@@ -108,6 +108,7 @@
    :module-meta
 
    :import :import/local
+   :import-default
    :import-as-package
    :import-as-subpackage
    :with-imports
@@ -2528,6 +2529,26 @@ actually exported by the module specified by LANG and SOURCE."
                 (declaim (notinline ,fn))
                 (overlord/shadows:defun ,fn (&rest args)
                   (apply ,lazy-load args)))))
+          (macro-alias
+           (error 'module-as-macro :name (second module)))))))
+
+(defmacro import-default (module &key as from)
+  (let ((target (module-spec as from)))
+    (ensure-target-recorded target))
+  (let ((lazy-load `(load-module/lazy ',as ,from)))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel)
+         (ensure-target-recorded (module-spec ,as ,from)))
+       ,(etypecase-of import-alias module
+          (var-alias
+           `(overlord/shadows:define-symbol-macro ,module
+                (module-default-export ,lazy-load)))
+          (function-alias
+           (let ((fn (second module)))
+             `(progn
+                (declaim (notinline ,fn))
+                (overlord/shadows:defun ,fn (&rest args)
+                  (apply (module-default-export ,lazy-load) args)))))
           (macro-alias
            (error 'module-as-macro :name (second module)))))))
 
