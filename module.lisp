@@ -15,7 +15,8 @@
    #:current-module-cell
    #:current-module-source
    #:current-module-lang
-   #:current-module-meta))
+   #:current-module-meta
+   #:default-export-module))
 
 (in-package #:overlord/module)
 
@@ -80,6 +81,14 @@ A module must have methods for both ~s and ~s."
   (assert (every #'symbolp exports))
   (__make-module :exports exports
                  :exports-table exports-table))
+
+(defun default-export-module (default)
+  (make-module :exports-table (default-export-table default)))
+
+(defun default-export-table (default)
+  (lambda (module key)
+    (if (eql key :default) default
+        (error "Module ~a has no export named ~a" module key))))
 
 
 ;;; Actual entry points.
