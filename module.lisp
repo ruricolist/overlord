@@ -107,7 +107,7 @@ Inlinable, and skips generic dispatch for some common types."
   (typecase module
     (function (funcall module name))
     (hash-table (gethash name module))
-    (module (funcall (__module-exports-table module) name))
+    (module (funcall (__module-exports-table module) module name))
     (t (module-ref module name))))
 
 (defsubst module-exports* (module)
