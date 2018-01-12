@@ -316,7 +316,15 @@ The package must at least export a binding for one of `read-module`,
 for direct use, or `module-progn`, for use with a meta-language.
 Preferably, it would export both.
 
-If the syntax of your language makes it possible to determine exports statically, you should also define and export `static-exports`. If your language defines `static-exports`, then Overlord can statically check the validity of import forms.
+If the syntax of your language makes it possible to determine exports
+statically, you should also define and export `static-exports`. If
+your language defines `static-exports`, then Overlord can statically
+check the validity of import forms.
+
+(This also has implications for phasing. If your language *doesn’t*
+provide a `static-exports` binding, then the only way Overlord can
+expand a request to import *all* bindings from a module is by loading
+that module *at compile time* to get a list of its exports.)
 
 ## Imports and exports
 
