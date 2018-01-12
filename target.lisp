@@ -2465,13 +2465,10 @@ actually exported by the module specified by LANG and SOURCE."
        (error 'module-as-macro :name (second module))))))
 
 (defmacro import-module/lazy (module &key as from)
-  ;; TODO
-  (let ((target (module-spec as from)))
-    (ensure-target-recorded target))
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel)
-         (ensure-target-recorded (module-spec ,as ,from)))
+       (propagate-side-effect
+         (ensure-target-record (module-spec ,as ,from)))
        ,(etypecase-of import-alias module
           (var-alias
            `(overlord/shadows:define-symbol-macro ,module ,lazy-load))

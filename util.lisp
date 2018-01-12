@@ -37,7 +37,8 @@
    #:lessf
    #:with-absolute-package-names
    #:resolve-package
-   #:file-mtime))
+   #:file-mtime
+   #:propagate-side-effect))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with)
@@ -270,3 +271,22 @@ nicknames."
 This is provided in case we ever want to offer more precise timestamps
 on Lisp/OS/filesystem combinations that support it."
   (cl:file-write-date pathname))
+
+(defmacro propagate-side-effect (&body body &environment env)
+  "Force BODY to be evaluated both at compile time AND load time (but
+not run time).
+
+Note that BODY should be idempotent, as it may be evaluated more than
+once."
+  ;; Evaluate it right now, unless we're at the top level.
+  (unless (null env)
+    (eval `(progn ,@body)))
+  `(progn
+     ;; Ensure the effect happens both at compile time, and at load
+     ;; time, when not at the top level.
+     (eval-when (:compile-toplevel :load-toplevel)
+       ,@body)
+     (eval-when (:execute)
+       (load-time-value
+        (progn ,@body t)))
+     t))
