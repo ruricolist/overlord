@@ -2,7 +2,8 @@
 
 (defpackage #:overlord/specials
   (:use #:cl :overlord/types)
-  (:import-from :serapeum :defvar-unbound :assure)
+  (:import-from :serapeum :defvar-unbound :assure :~>)
+  (:import-from :alexandria :read-file-into-string)
   (:export #:*base*
            #:*cli*
            #:*input*
@@ -42,7 +43,10 @@ has to see before the other forms.")
 (defvar-unbound *language* "The name (symbol) of the current language.")
 (declaim (type symbol *language*))
 
-(defparameter *db-version* 20
+(defparameter *db-version*
+  (parse-integer
+   (asdf:component-version
+    (asdf:find-system :overlord)))
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type db-version *db-version*))
