@@ -4,7 +4,8 @@
     :uiop/pathname
     :overlord/types)
   (:import-from :overlord/specials :*language*)
-  (:import-from :md5 :md5sum-string)
+  #-sbcl (:import-from :md5 :md5sum-string)
+  #+sbcl (:import-from :sb-md5 :md5sum-string)
   (:import-from :s-base64 :encode-base64-bytes)
   (:import-from :overlord/util :package-exports)
   (:export
