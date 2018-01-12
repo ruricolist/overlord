@@ -14,7 +14,14 @@
         (string
          (qconc tokens (tokens arg)))
         (pathname
-         (enq (uiop:native-namestring arg) tokens))
+         (let ((string (uiop:native-namestring arg)))
+           (when (string^= "-" string)
+             ;; Should we ignore the unsafe file names if `--' or
+             ;; `---' is already present in the list of tokens?
+             (cerror "Allow the unsafe file name"
+                     "File name ~a begins with a dash"
+                     string))
+           (enq string tokens)))
         (plist
          (qappend plist arg))
         ((list-of string)
