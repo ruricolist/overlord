@@ -32,22 +32,10 @@
 Returns two values: a list of static exports, and a second value that is T if the exports could be statically determined."))
 
 (defun validate-module (module)
-  "Validate that MODULE belongs to a class that implements the
-protocol for modules."
+  "Validate that MODULE can be used as a module."
   (if (null module)
       (error "~s cannot be used as a module." nil)
-      (let ((class (class-of module))
-            (class-t (class-of t)))
-        (or (and (find-method #'module-ref nil (list class class-t)
-                              nil)
-                 (find-method #'module-exports nil (list class)
-                              nil)
-                 module)
-            (error "Invalid module: ~a.
-A module must have methods for both ~s and ~s."
-                   module
-                   'module-ref
-                   'module-exports)))))
+      module))
 
 
 
