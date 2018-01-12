@@ -136,8 +136,11 @@
 (deftype pathname ()
   'cl:pathname)
 
-(setf (find-class 'pathname)
-      (find-class 'cl:pathname))
+;;; This confuses CCL: it thinks our `pathname' is a built-in type and
+;;; won't compile the above `deftype' form.
+
+;; (setf (find-class 'pathname)
+;;       (find-class 'cl:pathname))
 
 ;;; Conditionals should always be exhaustive.
 
