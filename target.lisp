@@ -1195,10 +1195,6 @@ value and NEW do not match under TEST."
   (apply #'redo-ifcreate targets))
 
 (defmacro with-script ((&key) &body body)
-  `(with-keyword-macros
-     ,@body))
-
-(defmacro with-keyword-macros (&body body)
   `(macrolet ((:depends-on (x &rest xs)
                 `(redo-ifchange ,x ,@xs))
               (:depends-on* (x &rest xs)
@@ -1269,7 +1265,7 @@ value and NEW do not match under TEST."
   (check-type name symbol)
   (let ((init
           (save-base
-           `(with-keyword-macros
+           `(with-script ()
               ,init))))
     `(progn
        (eval-always
@@ -1290,7 +1286,7 @@ value and NEW do not match under TEST."
 (defmacro script-thunk (&body body)
   `(lambda ()
      ,(save-base
-       `(with-keyword-macros
+       `(with-script ()
           ,@body))))
 
 (defmacro define-script (name &body script)
@@ -1440,9 +1436,9 @@ specify the dependencies you want on build."
     :type pathname
     :reader pattern.output-defaults)
    (script
-     :initarg :script
-     :type target
-     :reader pattern.script))
+    :initarg :script
+    :type target
+    :reader pattern.script))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
@@ -1483,7 +1479,7 @@ depends on that."
        ,out
        ,@script)
      (eval-always
-       (with-keyword-macros
+       (with-script ()
          (defclass ,class-name (pattern)
            ()
            (:default-initargs
@@ -1495,7 +1491,7 @@ depends on that."
          (declare (ignorable ,in))
          (call/temp-file-pathname ,out
                                   (lambda (,out)
-                                    (with-keyword-macros
+                                    (with-script ()
                                       ,@script)))))))
 
 
