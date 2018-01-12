@@ -2402,7 +2402,10 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
     (let ((bindings (expand bindings))
           (values (expand values)))
       (if *always-import-values*
-          (values nil (append bindings values))
+          ;; Macros cannot be imported as values.
+          (let* ((macros (filter (of-type 'macro-alias) bindings))
+                 (bindings (set-difference bindings macros)))
+            (values macros (append bindings values)))
           (values bindings values)))))
 
 (defmacro check-static-bindings-now (lang source bindings)
