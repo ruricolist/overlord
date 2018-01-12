@@ -45,13 +45,12 @@
   (timestamp (get-universal-time) :type (integer 0 *))
   (data :type fset:map))
 
-(defun delete-versioned-db (&optional (version *db-version*))
+(defun delete-versioned-db (&optional (version (db-version)))
   (uiop:delete-directory-tree
    (db-version-dir version)
    :validate (op (subpathp _ (xdg-cache-home)))))
 
-(defun db-version-dir (&optional (version *db-version*))
-  (check-type version db-version)
+(defun db-version-dir (&optional (version (db-version)))
   (ensure-directory-pathname
    (xdg-cache-home "overlord"
                    (fmt "v~a" version)
@@ -59,7 +58,7 @@
 
 (defclass kv ()
   ((version
-    :initform *db-version*
+    :initform (db-version)
     :reader kv.version)
    (current-map
     :initarg :current-map
@@ -285,7 +284,7 @@ reloaded on demand."
 
 (defun check-version ()
   (unless (= (kv.version *kv*)
-             *db-version*)
+             (db-version))
     (cerror "Load the correct database"
             "Database version mismatch")
     (setq *kv* (reload-kv))))

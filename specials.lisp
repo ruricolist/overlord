@@ -15,7 +15,8 @@
            #:*language*
            #:*phase*
            #:*source*
-           #:*db-version*))
+           #:*db-version*
+           #:db-version))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -50,3 +51,6 @@ has to see before the other forms.")
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type db-version *db-version*))
+
+(defun db-version ()
+  (assure db-version *db-version*))

@@ -54,7 +54,7 @@
            (format t "~&Second run (2/2)~%")
            (overlord/global-state:reset-global-state)
            (run! 'overlord))
-      (when (equal overlord/specials:*db-version* version)
+      (when (equal (overlord/specials:db-version) version)
         (overlord/db:delete-versioned-db)))))
 
 ;;; Internal use.
