@@ -2598,14 +2598,18 @@ actually exported by the module specified by LANG and SOURCE."
       (function-alias
        (let ((alias (second alias)))
          `(overlord/shadows:defalias ,alias
-            (function-wrapper ,ref))))
+            (assure function (function-wrapper ,ref)))))
       (macro-alias
        (error 'macro-as-value :name (second alias))))))
 
 (defun import+alias+ref (clause module)
   (destructuring-bind (import alias) (canonicalize-binding clause)
     (let* ((key (import-keyword import))
-           (ref `(module-ref* ,module ',key)))
+           (ref
+             (etypecase-of import-alias alias
+               (var-alias `(module-ref* ,module ',key))
+               ((or function-alias macro-alias)
+                `(module-fn-ref ,module ',key)))))
       (values import alias ref))))
 
 (defun import-keyword (import)

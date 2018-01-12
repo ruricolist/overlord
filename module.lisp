@@ -6,7 +6,7 @@
    #:package-exports
    #:validate-module
    #:make-module
-   #:module-ref #:module-ref*
+   #:module-ref #:module-ref* #:module-fn-ref
    #:module-exports #:module-exports*
    #:module-static-exports
    #:no-such-export
@@ -116,3 +116,12 @@ Inlinable, and skips generic dispatch for some common types."
     (module (__module-exports module))
     (hash-table (hash-table-keys module))
     (t (module-exports module))))
+
+;;; TODO Expand this differently depending on the lexical environment
+;;; (speed vs. safety).
+
+(-> module-fn-ref (t symbol) function)
+(defsubst module-fn-ref (module name)
+  "Exactly like `module-ref*', but has a signature that says it
+returns a function."
+  (assure function (module-ref* module name)))
