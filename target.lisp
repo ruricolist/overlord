@@ -2395,16 +2395,15 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
 
 (defun bindings+values (bindings values &key lang source prefix)
   ;; Avoid redundant calls to module-static-bindings.
-  (with-static-exports-cache ()
-    (flet ((expand (spec)
-             (~> (expand-binding-spec spec lang source)
-                 canonicalize-bindings
-                 (apply-prefix prefix))))
-      (let ((bindings (expand bindings))
-            (values (expand values)))
-        (if *always-import-values*
-            (values nil (append bindings values))
-            (values bindings values))))))
+  (flet ((expand (spec)
+           (~> (expand-binding-spec spec lang source)
+               canonicalize-bindings
+               (apply-prefix prefix))))
+    (let ((bindings (expand bindings))
+          (values (expand values)))
+      (if *always-import-values*
+          (values nil (append bindings values))
+          (values bindings values)))))
 
 (defmacro check-static-bindings-now (lang source bindings)
   "Wrapper around check-static-bindings to force evaluation at compile time.
