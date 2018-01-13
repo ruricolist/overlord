@@ -2414,12 +2414,13 @@ Can't use eval-when because it has to work for local bindings."
   (check-static-bindings lang source bindings))
 
 (defcondition binding-export-mismatch (overlord-error)
-  ((bindings :initarg :bindings :type list)
+  ((source :initarg :source)
+   (bindings :initarg :bindings :type list)
    (exports :initarg :exports :type list))
   (:report (lambda (c s)
-             (with-slots (bindings exports) c
-               (format s "Requested bindings do not match exports.~%Bindings: ~s~%Exports: ~s"
-                       bindings exports)))))
+             (with-slots (bindings exports source) c
+               (format s "Requested bindings do not match exports.~%Source: ~a~%Bindings: ~s~%Exports: ~s"
+                       source bindings exports)))))
 
 (defun check-static-bindings (lang source bindings)
   "Check that BINDINGS is free of duplicates. Also, using
@@ -2435,10 +2436,11 @@ actually exported by the module specified by LANG and SOURCE."
      (mapcar (op (import-keyword (first _)))
              (canonicalize-bindings bindings)))))
 
-(defun check-exports (bindings exports)
+(defun check-exports (source bindings exports)
   "Make sure the bindings are a subset of the exports."
   (unless (subsetp bindings exports :test #'string=)
     (error 'binding-export-mismatch
+           :source source
            :bindings bindings
            :exports exports)))
 
@@ -2451,13 +2453,10 @@ actually exported by the module specified by LANG and SOURCE."
   (receive (static-exports exports-statically-known?)
       (module-static-exports lang source)
     (if exports-statically-known?
-        (check-exports bindings static-exports)
+        (check-exports source bindings static-exports)
         (restart-case
-            (progn
-              (redo (module-spec lang source))
-              (let* ((module (find-module lang source))
-                     (exports (module-exports module)))
-                (check-exports bindings exports)))
+            (let ((exports (extract-exports lang source)))
+              (check-exports source bindings exports))
           (recompile-object-file ()
             :report "Recompile the object file."
             (let ((object-file (faslize lang source))
