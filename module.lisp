@@ -3,7 +3,6 @@
   (:import-from #:overlord/types
     #:overlord-error)
   (:export
-   #:package-exports
    #:validate-module
    #:make-module
    #:module-ref #:module-ref* #:module-fn-ref
