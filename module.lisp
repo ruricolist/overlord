@@ -9,23 +9,56 @@
    #:module-ref #:module-ref* #:module-fn-ref
    #:module-exports #:module-exports*
    #:module-static-exports
-   #:no-such-export
    #:current-module
    #:current-module-cell
    #:current-module-source
    #:current-module-lang
    #:current-module-meta
-   #:default-export-module))
+   #:default-export-module
+   #:module-error
+   #:module-error-module
+   #:no-such-export
+   #:not-a-module))
 
 (in-package #:overlord/module)
 
 ;;; Generic functions.
 
+(defcondition module-error (overlord-error)
+  ((module :initarg :module
+           :reader module-error-module)))
+
+(defcondition not-a-module (module-error)
+  ()
+  (:report (lambda (c s)
+             (with-slots ((x module)) c
+               (format s "Not a module: ~a" x)))))
+
+(defcondition invalid-module (not-a-module)
+  ()
+  (:report (lambda (c s)
+             (with-slots ((x module)) c
+               (format s "~a cannot be a module." x)))))
+
+(defcondition no-such-export (module-error)
+  ((key :initarg :key :type symbol))
+  (:report (lambda (c s)
+             (with-slots (module key) c
+               (format s "Module ~a does not export ~a."
+                       module key)))))
+
 (defgeneric module-ref (module name)
-  (:documentation "Get the value of NAME in MODULE."))
+  (:documentation "Get the value of NAME in MODULE.")
+  (:method (module name)
+    (declare (ignore name))
+    (error 'not-a-module
+           :module module)))
 
 (defgeneric module-exports (module)
-  (:documentation "A list of names exported by MODULE."))
+  (:documentation "A list of names exported by MODULE.")
+  (:method (module)
+    (error 'not-a-module
+           :module module)))
 
 (defgeneric module-static-exports (lang source)
   (:documentation "Get static exports from LANG and SOURCE.
@@ -33,21 +66,16 @@ Returns two values: a list of static exports, and a second value that is T if th
 
 (defun validate-module (module)
   "Validate that MODULE can be used as a module."
-  (if (null module)
-      (error "~s cannot be used as a module." nil)
-      module))
+  (when (null module)
+    (error 'invalid-module :module module))
+  ;; `module-exports' signals `not-a-module' if there is no defined
+  ;; method.
+  (module-exports module)
+  module)
 
 
 
 ;;; Distinguished module objects.
-
-(defcondition no-such-export (overlord-error)
-  ((module :initarg :module)
-   (key :initarg :key :type symbol))
-  (:report (lambda (c s)
-             (with-slots (module key) c
-               (format s "Module ~a does not export ~a"
-                       module key)))))
 
 (defun empty-exports-table (module key)
   (error 'no-such-export
