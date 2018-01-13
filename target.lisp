@@ -2132,7 +2132,7 @@ This should be a superset of the variables bound by CL during calls to
          (let ((lang (string-downcase lang)))
            (asdf:find-system lang nil)))))
 
-(defun ensure-lang-exists (lang &optional (cont #'identity))
+(defun ensure-lang-exists (lang &optional (cont #'ensure-lang-exists))
   (check-type lang package-designator)
   (check-type cont function)
   (if (packagep lang) lang
@@ -2427,32 +2427,44 @@ Can't use eval-when because it has to work for local bindings."
 actually exported by the module specified by LANG and SOURCE."
   (ensure-lang-exists lang)
   (when bindings
-    (when (relative-pathname-p source)
-      (setf source (merge-pathnames* source (base))))
-    (restart-case
-        (progn
-          (redo (module-spec lang source))
-          (mvlet ((exports exports-statically-known?
-                   (module-static-exports lang source))
-                  (bindings
-                   (mapcar (op (import-keyword (first _)))
-                           (canonicalize-bindings bindings))))
-            ;; Check for duplicated bindings.
-            (unless (set-equal bindings (remove-duplicates bindings))
-              (error* "Duplicated bindings."))
-            ;; Make sure the bindings match the exports.
-            (when exports-statically-known?
-              (unless (subsetp bindings exports :test #'string=)
-                (error 'binding-export-mismatch
-                       :bindings bindings
-                       :exports exports)))))
-      (recompile-object-file ()
-        :report "Recompile the object file."
-        (let ((object-file (faslize lang source))
-              (target (module-spec lang source)))
-          (delete-file-if-exists object-file)
-          (redo target)
-          (check-static-bindings lang source bindings))))))
+    (check-static-bindings-1
+     (ensure-lang-exists lang)
+     (if (relative-pathname-p source)
+         (merge-pathnames* source (base))
+         source)
+     (mapcar (op (import-keyword (first _)))
+             (canonicalize-bindings bindings)))))
+
+(defun check-exports (bindings exports)
+  "Make sure the bindings are a subset of the exports."
+  (unless (subsetp bindings exports :test #'string=)
+    (error 'binding-export-mismatch
+           :bindings bindings
+           :exports exports)))
+
+(defun check-static-bindings-1 (lang source bindings)
+  (check-type lang keyword)
+  (check-type source absolute-pathname)
+  ;; (check-type bindings (satisfies setp))
+  (unless (setp bindings)
+    (error* "Duplicated bindings in ~a" bindings))
+  (receive (static-exports exports-statically-known?)
+      (module-static-exports lang source)
+    (if exports-statically-known?
+        (check-exports bindings static-exports)
+        (restart-case
+            (progn
+              (redo (module-spec lang source))
+              (let* ((module (find-module lang source))
+                     (exports (module-exports module)))
+                (check-exports bindings exports)))
+          (recompile-object-file ()
+            :report "Recompile the object file."
+            (let ((object-file (faslize lang source))
+                  (target (module-spec lang source)))
+              (delete-file-if-exists object-file)
+              (redo target)
+              (check-static-bindings lang source bindings)))))))
 
 (defmacro import-module (module &key as from)
   (let ((req-form `(require-as ',as ,from)))
