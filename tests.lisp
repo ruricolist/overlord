@@ -1,7 +1,8 @@
 (uiop/package:define-package :overlord-tests
     (:use :fiveam :overlord/import-set)
   (:mix :overlord/shadows :serapeum :alexandria)
-  (:import-from :overlord :with-imports :require-as)
+  (:import-from :overlord :with-imports :require-as
+    :with-import-default :require-default)
   (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :local-time :now)
@@ -163,7 +164,7 @@
 
 (test s-exp
   (is (= 42
-         (with-imports* (answer :from "tests/s-exp-test.sexp")
+         (with-import-default (answer :from "tests/s-exp-test.sexp")
            answer))))
 
 (test sweet-exp
@@ -172,20 +173,10 @@
       (with-imports* (factorializer :from "tests/factorial.lsp" :binding (#'fact))
         (fact 20)))))
 
-(test import-as-function
+(test import-default-as-function
   (is (= 2432902008176640000
-         (with-imports* (#'fact :from "tests/import-as-function.lsp")
+         (with-import-default (#'fact :from "tests/import-as-function.lsp")
            (fact 20)))))
-
-;;; This test doesn't work in SBCL.
-#-sbcl
-(test import-as-function-with-exports
-  (signals overlord-error
-    (compile nil
-             '(cl:lambda ()
-               (= 2432902008176640000
-                (with-imports* (#'m :from "tests/import-as-function.lsp" :binding (#'fact))
-                  (fact 20)))))))
 
 
 ;;; Prefixes and renaming.
@@ -433,16 +424,19 @@
                          ,(expand-xyz nil nil))))))))))
 
 (test islisp-imports
-  (is (equal '(:var :fn :macro) (require-as nil "tests/islisp/imports.lsp"))))
+  (is (equal '(:var :fn :macro)
+             (require-default "tests/islisp/imports.lsp"))))
 
 (test islisp-auto-alias
-  (is (equal '(0 1) (require-as nil "tests/islisp/shadowing.lsp"))))
+  (is (equal '(0 1)
+             (require-default "tests/islisp/shadowing.lsp"))))
 
 (test islisp-hygiene
   (touch #1="tests/islisp/hygiene.lsp")
   ;; Not the desired results, just the ones we expect.
   (handler-bind ((warning #'muffle-warning))
-    (is (equal '(4 6 :ERROR 4 16 :ERROR) (require-as nil #1#)))))
+    (is (equal '(4 6 :ERROR 4 16 :ERROR)
+               (require-default #1#)))))
 
 (test islisp-globals-can-close
   "Test that globals defined with `defglobal' close over themselves."
@@ -451,7 +445,7 @@
 
 (test islisp-phasing
   "Test that state is not preserved across rebuilds."
-  (overlord:require-as :core-lisp #1="tests/islisp/phasing.lsp")
+  (require-as :core-lisp #1="tests/islisp/phasing.lsp")
   (with-imports* (m :from #1# :binding (#'inc-count))
     (is (= (inc-count) 0))))
 

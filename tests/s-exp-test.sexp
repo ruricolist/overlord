@@ -1,2 +1,2 @@
 #lang overlord/lang/s-exp overlord/shadows
-42
+(overlord/module:default-export-module 42)

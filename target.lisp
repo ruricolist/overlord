@@ -101,8 +101,8 @@
    ;; Loading.
    :*language* :*source*
    :read-lang-name
-   :require-as
-   :dynamic-require-as
+   :require-as :require-default
+   :dynamic-require-as :dynamic-require-default
 
    ;; Module protocol.
    :module-meta
@@ -112,6 +112,7 @@
    :import-as-package
    :import-as-subpackage
    :with-imports
+   :with-import-default
    :reintern :reinterning
    :*file-local-variables*
    :find-module
@@ -1712,6 +1713,10 @@ if it does not exist."
          (merge-pathnames* source *base*)
          args))
 
+(defun dynamic-require-default (lang source &key force)
+  (let ((module (dynamic-require-as lang source :force force)))
+    (module-ref module :default)))
+
 (defun dynamic-require-as (lang source &key force)
   (check-type source (and absolute-pathname file-pathname))
   (ensure lang (guess-lang+pos source))
@@ -1734,9 +1739,20 @@ if it does not exist."
   (unload-module lang source)
   (values))
 
-(defmacro require-as (lang source)
-  "Wrap `%require-as`, resolving the base at macro-expansion time."
-  `(%require-as ,lang ,source ,(base)))
+(defmacro require-as (&rest args)
+  "Wrap `%require-as`, resolving the base at macro-expansion time.
+A single arg is treated as the source, with the language being inferred.
+Two args is treated as the language and the source."
+  (receive (lang source)
+      (ematch args
+        ((list source)
+         (values nil source))
+        ((list lang source)
+         (values lang source)))
+    `(%require-as ,lang ,source ,(base))))
+
+(defmacro require-default (&rest args)
+  `(module-ref* (require-as ,@args) :default))
 
 (defun require-for-emacs (lang source)
   "Like `dynamic-require-as', but with looser restrictions for easy
@@ -2216,14 +2232,6 @@ about ease of development or debugging, only speed.")
          :documentation "The name of the macro."))
   (:documentation "Invalid attempt to import something as a macro."))
 
-(defcondition module-as-macro (bad-macro-import)
-  ()
-  (:documentation "Attempt to import a module as a macro.")
-  (:report (lambda (c s)
-             (with-slots (name) c
-               (format s "Cannot import a module as a macro: ~a"
-                       name)))))
-
 (defcondition macro-as-value (bad-macro-import)
   ()
   (:documentation "Attempt to import a macro as a value.")
@@ -2323,13 +2331,6 @@ about ease of development or debugging, only speed.")
           (required-argument :as)
           (required-argument :from))))))
 
-(defun imports-with-module-as-function-not-supported (mod bindings values)
-  (when (and (typep mod 'function-alias)
-             (or bindings values))
-    (error* "~
-Binding imports (~a) from a module imported as a function (~a) is not currently supported."
-            (append bindings values) mod)))
-
 (defun resolve-import-spec
     (&key lang source bindings values module (base (base)) env prefix)
   (check-type base absolute-pathname)
@@ -2339,7 +2340,6 @@ Binding imports (~a) from a module imported as a function (~a) is not currently 
                                              :lang lang
                                              :source source
                                              :prefix prefix)))
-    (imports-with-module-as-function-not-supported module bindings values)
     (values lang source bindings values)))
 
 (defmacro import (module &body (&key
@@ -2466,35 +2466,28 @@ actually exported by the module specified by LANG and SOURCE."
               (redo target)
               (check-static-bindings lang source bindings)))))))
 
+(defmacro declaim-module (as from)
+  `(propagate-side-effect
+     (ensure-target-recorded
+      (module-spec ,as ,from))))
+
 (defmacro import-module (module &key as from)
+  (check-type module var-alias)
   (let ((req-form `(require-as ',as ,from)))
-    (etypecase-of import-alias module
-      (var-alias
-       `(overlord/shadows:def ,module ,req-form))
-      (function-alias
-       `(overlord/shadows:defalias ,(second module) ,req-form))
-      (macro-alias
-       (error 'module-as-macro :name (second module))))))
+    `(progn
+       (overlord/shadows:def ,module ,req-form)
+       (declaim-module ,as ,from)
+       ',module)))
 
 (defmacro import-module/lazy (module &key as from)
+  (check-type module var-alias)
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     `(progn
-       ,(etypecase-of import-alias module
-          (var-alias
-           `(overlord/shadows:define-symbol-macro ,module ,lazy-load))
-          (function-alias
-           (let ((fn (second module)))
-             `(progn
-                (declaim (notinline ,fn))
-                (overlord/shadows:defun ,fn (&rest args)
-                  (apply ,lazy-load args)))))
-          (macro-alias
-           (error 'module-as-macro :name (second module))))
-       (propagate-side-effect
-         (ensure-target-recorded (module-spec ,as ,from))))))
+       (overlord/shadows:define-symbol-macro ,module ,lazy-load)
+       (declaim-module ,as ,from)
+       ',module)))
 
 (defmacro import-default (var &body (&key as from))
-  (check-type var symbol)
   (let ((module-name (symbolicate '__module-for- var)))
     `(import ,module-name
        :as ,as
@@ -2658,6 +2651,14 @@ actually exported by the module specified by LANG and SOURCE."
        :values ,values
        :prefix ,prefix)
      (progn ,@body)))
+
+(defmacro with-import-default ((bind &key from as) &body body)
+  (with-unique-names (mod)
+    `(with-imports (,mod
+                    :from ,from
+                    :as ,as
+                    :binding ((:default :as ,bind)))
+       ,@body)))
 
 (defmacro import-as-package (package-name
                              &body body

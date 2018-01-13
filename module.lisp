@@ -91,7 +91,7 @@ Returns two values: a list of static exports, and a second value that is T if th
   (__module-exports module))
 
 (defmethod module-ref ((module module) key)
-  (funcall (__module-exports-table module) key))
+  (funcall (__module-exports-table module) module key))
 
 (defun make-module (&key exports exports-table)
   (assert (every #'symbolp exports))
@@ -99,7 +99,9 @@ Returns two values: a list of static exports, and a second value that is T if th
                  :exports-table exports-table))
 
 (defun default-export-module (default)
-  (make-module :exports-table (default-export-table default)))
+  (make-module
+   :exports '(:default)
+   :exports-table (default-export-table default)))
 
 (defun default-export-table (default)
   (lambda (module key)
