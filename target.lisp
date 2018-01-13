@@ -2493,7 +2493,7 @@ actually exported by the module specified by LANG and SOURCE."
        (propagate-side-effect
          (ensure-target-recorded (module-spec ,as ,from))))))
 
-(defmacro import-default (var &key as from)
+(defmacro import-default (var &body (&key as from))
   (check-type var symbol)
   (let ((module-name (symbolicate '__module-for- var)))
     `(import ,module-name
