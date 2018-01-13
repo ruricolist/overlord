@@ -2479,8 +2479,6 @@ actually exported by the module specified by LANG and SOURCE."
 (defmacro import-module/lazy (module &key as from)
   (let ((lazy-load `(load-module/lazy ',as ,from)))
     `(progn
-       (propagate-side-effect
-         (ensure-target-record (module-spec ,as ,from)))
        ,(etypecase-of import-alias module
           (var-alias
            `(overlord/shadows:define-symbol-macro ,module ,lazy-load))
@@ -2491,7 +2489,9 @@ actually exported by the module specified by LANG and SOURCE."
                 (overlord/shadows:defun ,fn (&rest args)
                   (apply ,lazy-load args)))))
           (macro-alias
-           (error 'module-as-macro :name (second module)))))))
+           (error 'module-as-macro :name (second module))))
+       (propagate-side-effect
+         (ensure-target-recorded (module-spec ,as ,from))))))
 
 (defmacro import-default (var &key as from)
   (check-type var symbol)
