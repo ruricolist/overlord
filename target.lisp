@@ -416,6 +416,18 @@ Works for SBCL, at least."
 
 (fset:define-cross-type-compare-methods module-spec)
 
+(defmethod fset:compare ((spec1 module-spec) (spec2 module-spec))
+  (nest
+   (let-match1 (module-spec lang1 path1) spec1)
+   (let-match1 (module-spec lang2 path2) spec2)
+   (if (and (eql lang1 lang2)
+            (equal path1 path2))
+       :equal
+       (let ((list1 (list lang1 path1))
+             (list2 (list lang2 path2)))
+         (declare (dynamic-extent list1 list2))
+         (fset:compare list1 list2)))))
+
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
 
