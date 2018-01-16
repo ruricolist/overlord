@@ -191,6 +191,9 @@ Works for SBCL, at least."
   (prop target prereqsne-temp (fset:empty-set)))
 
 (defmethod record-prereq (target &aux (parent (current-parent)))
+  (record-parent-prereq parent target))
+
+(defun record-parent-prereq (parent target)
   (check-type target target)
   (unless (root-target? parent)
     (withf (temp-prereqs parent)
@@ -198,6 +201,9 @@ Works for SBCL, at least."
            (target-stamp target))))
 
 (defmethod record-prereqne (target &aux (parent (current-parent)))
+  (record-parent-prereqne parent target))
+
+(defun record-parent-prereqne (parent target)
   (check-type target target)
   (withf (temp-prereqsne parent) target))
 
