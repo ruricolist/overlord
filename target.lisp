@@ -1497,13 +1497,12 @@ depends on that."
        ,in
        ,out
        ,@script)
-     (eval-always
-       (with-script ()
-         (defclass ,class-name (pattern)
-           ()
-           (:default-initargs
-            :script ',(script-for class-name)
-            ,@options))))
+     (with-script ()
+       (defclass ,class-name (pattern)
+         ()
+         (:default-initargs
+          :script ',(script-for class-name)
+          ,@options)))
      (defmethod pattern-build ((self ,class-name))
        (let ((,in *input*)
              (,out *output*))
