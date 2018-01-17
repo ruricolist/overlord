@@ -2258,9 +2258,6 @@ about ease of development or debugging, only speed.")
                (format s "Cannot import a macro as a value: ~a."
                        name)))))
 
-(defun extract-exports (lang source)
-  (module-exports* (dynamic-require-as lang source)))
-
 (defun expand-binding-spec (spec lang source)
   (setf source (merge-pathnames source (base))
         lang (lang-name lang))
@@ -2276,7 +2273,7 @@ about ease of development or debugging, only speed.")
            (receive (exports exports?)
                (module-static-exports lang source)
              (if exports? exports
-                 (extract-exports lang source)))))
+                 (module-dynamic-exports lang source)))))
     (etypecase-of binding-spec spec
       ((eql :all)
        (loop for export in (get-static-exports)
@@ -2473,7 +2470,7 @@ actually exported by the module specified by LANG and SOURCE."
     (if exports-statically-known?
         (check-exports source bindings static-exports)
         (restart-case
-            (let ((exports (extract-exports lang source)))
+            (let ((exports (module-dynamic-exports lang source)))
               (check-exports source bindings exports))
           (recompile-object-file ()
             :report "Recompile the object file."
