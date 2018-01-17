@@ -383,14 +383,19 @@ Works for SBCL, at least."
             (merge-pattern-defaults pattern input))))
 
   (:method print-object (self stream)
-    (if *print-escape*
-        (format stream "#.~s"
-                (make-load-form self))
-        (print-unreadable-object (self stream :type t)
-          (format stream "~a (~a -> ~a)"
-                  (class-name-of pattern)
-                  input
-                  output))))
+    (let ((pattern-name
+            (assure symbol
+              (if (symbolp pattern) pattern
+                  (class-name-of pattern)))))
+      (if *print-escape*
+          (format stream "#.~s"
+                  `(pattern-ref ',pattern-name
+                                ,input))
+          (print-unreadable-object (self stream :type t)
+            (format stream "~a (~a -> ~a)"
+                    pattern-name
+                    input
+                    output)))))
 
   (:method make-load-form (self &optional env)
     (make-load-form-saving-slots self
