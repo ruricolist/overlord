@@ -1879,24 +1879,27 @@ interoperation with Emacs."
 
 (defmacro define-loader-language-1 (package-name (source) &body (reader &key extension))
   "The part that gets expanded once PACKAGE-NAME exists."
-  (let* ((p (find-package package-name))
-         (syms (mapcar (op (find-symbol (string _) p))
-                       (loader-language-exports)))
-         (keyword (package-name-keyword package-name)))
-    (destructuring-bind (load read ext script) syms
-      `(progn
-         (declaim (notinline ,load ,read))
-         (eval-always
-           (define-script ,script ,reader)
-           (defparameter ,ext (extension ,extension))
-           (defun ,load (,source)
-             (default-export-module ,reader))
-           (defun ,read (,source _stream)
-             (declare (ignore _stream))
-             (list ',load ,source))
-           (defmethod lang-deps :after ((self (eql ,keyword)) source)
-             (declare (ignore source))
-             (redo-ifchange ',script)))))))
+  (let ((p (find-package package-name)))
+    (unless (packagep p)
+      (error "This macro cannot expand until package ~a exists."
+             package-name))
+    (let ((syms (mapcar (op (find-symbol (string _) p))
+                        (loader-language-exports)))
+          (keyword (package-name-keyword package-name)))
+      (destructuring-bind (load read ext script) syms
+        `(progn
+           (declaim (notinline ,load ,read))
+           (eval-always
+             (define-script ,script ,reader)
+             (defparameter ,ext (extension ,extension))
+             (defun ,load (,source)
+               (default-export-module ,reader))
+             (defun ,read (,source _stream)
+               (declare (ignore _stream))
+               (list ',load ,source))
+             (defmethod lang-deps :after ((self (eql ,keyword)) source)
+               (declare (ignore source))
+               (redo-ifchange ',script))))))))
 
 (defun loader-language-table (val)
   (lambda (module key)
