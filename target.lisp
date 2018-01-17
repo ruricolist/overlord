@@ -1744,9 +1744,8 @@ if it does not exist."
   (assure (not module-cell)
     (let ((spec (module-spec lang source)))
       (redo-ifchange spec)
-      (~> spec
-          module-spec-cell
-          module-cell.module))))
+      (module-cell.module
+       (module-spec-cell spec)))))
 
 (defun %unrequire-as (lang source *base*)
   (dynamic-unrequire-as lang
