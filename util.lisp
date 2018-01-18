@@ -20,8 +20,6 @@
    #:locate-dominating-file
    #:quoted-symbol?
    #:class-name-of
-   #:once
-   #:mv-once
    #:package-name-keyword
    #:find-external-symbol
    #:coerce-case
@@ -88,30 +86,6 @@
 
 (defsubst class-name-of (x)
   (class-name (class-of x)))
-
-(defmacro once (expr)
-  "Evaluate EXPR exactly once and store the result for future calls.
-
-This works by allocating a cell using `load-time-value'. At run time,
-we check if the cell has been set. If the cell has been set, then we
-return the value stored in the cell. If the cell has not been set,
-then we set its value inside a critical section."
-  (with-unique-names (cell value)
-    (let ((empty "empty"))
-      `(let* ((,cell (load-time-value (box ,empty)))
-              (,value (unbox ,cell)))
-         (if (eq ,value ,empty)         ;Identity.
-             (synchronized () "Lock for once"
-               ;; "Double-checked locking."
-               (let ((,value (unbox ,cell)))
-                 (if (eq ,value ,empty)
-                     (setf (unbox ,cell) ,expr)
-                     ,value)))
-             ;; The value has been set, just return it.
-             ,value)))))
-
-(defmacro mv-once (expr)
-  `(values-list (once (multiple-value-list ,expr))))
 
 (defun package-name-keyword (x)
   (assure keyword
