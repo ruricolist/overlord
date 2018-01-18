@@ -2265,7 +2265,7 @@ about ease of development or debugging, only speed.")
                (format s "Cannot import a macro as a value: ~a."
                        name)))))
 
-(defun expand-import-set-spec (spec lang source)
+(defun expand-binding-spec (spec lang source)
   (setf source (merge-pathnames source (base))
         lang (lang-name lang))
   (flet ((get-static-exports ()
@@ -2281,7 +2281,7 @@ about ease of development or debugging, only speed.")
                (module-static-exports lang source)
              (if exports? exports
                  (module-dynamic-exports lang source)))))
-    (etypecase-of import-set-spec spec
+    (etypecase-of binding-spec spec
       ((eql :all)
        (loop for export in (get-static-exports)
              for sym = (intern (string export))
@@ -2418,7 +2418,7 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
 (defun bindings+values (bindings values &key lang source prefix)
   ;; Avoid redundant calls to module-static-bindings.
   (flet ((expand (spec)
-           (~> (expand-import-set-spec spec lang source)
+           (~> (expand-binding-spec spec lang source)
                canonicalize-bindings
                (apply-prefix prefix))))
     (let ((bindings (expand bindings))
@@ -2558,17 +2558,18 @@ actually exported by the module specified by LANG and SOURCE."
 
 (defun canonicalize-binding (clause)
   (assure canonical-binding
-    (etypecase-of import-spec clause
-      (canonical-binding clause)
-      (var-alias
-       (list (make-keyword clause) clause))
-      (function-alias
-       (list (make-keyword (second clause)) clause))
-      (macro-alias
-       (list (make-keyword (second clause)) clause))
-      ((tuple symbol :as import-alias)
-       (destructuring-bind (import &key ((:as alias))) clause
-         (list (make-keyword import) alias))))))
+    (if (typep clause 'canonical-binding)
+        clause
+        (etypecase-of binding-designator clause
+          (var-spec
+           (list (make-keyword clause) clause))
+          (function-alias
+           (list (make-keyword (second clause)) clause))
+          (macro-alias
+           (list (make-keyword (second clause)) clause))
+          ((tuple symbol :as import-alias)
+           (destructuring-bind (import &key ((:as alias))) clause
+             (list (make-keyword import) alias)))))))
 
 (defun canonicalize-bindings (clauses)
   (mapcar #'canonicalize-binding clauses))

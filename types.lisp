@@ -37,22 +37,19 @@
    #:var-spec
    #:function-spec
    #:macro-spec
-   #:import-set-spec
+   #:binding-spec
    #:export-spec
    #:var-alias
    #:function-alias
    #:macro-alias
    #:definable-symbol
+   #:binding-designator
    #:canonical-binding
    #:non-keyword
    #:db-version
-   #:qualified-symbol
-   #:import-spec
-   #:exim-spec))
+   #:qualified-symbol))
 
 (in-package :overlord/types)
-
-(deftype db-version () '(integer 1 *))
 
 
 ;;; Conditions.
@@ -258,13 +255,12 @@ If the value of `*default-pathname-defaults*' and a call to
 
 ;;; Imports.
 
-(deftype var-alias () 'var-spec)
-(deftype function-alias () 'function-spec)
-(deftype macro-alias () 'macro-spec)
-(deftype import-alias ()
-  '(or var-alias function-alias macro-alias))
+(deftype var-alias () 'bindable-symbol)
+(deftype function-alias () '(tuple 'function bindable-symbol))
+(deftype macro-alias () '(tuple 'macro-function bindable-symbol))
+(deftype import-alias () '(or var-alias function-alias macro-alias))
 
-(deftype import-set-spec ()
+(deftype binding-spec ()
   '(or (member :all :all-as-functions)
     (tuple :import-set list)
     list))
@@ -272,13 +268,11 @@ If the value of `*default-pathname-defaults*' and a call to
 (deftype canonical-binding ()
   '(tuple keyword import-alias))
 
-(deftype import-spec ()
+(deftype binding-designator ()
   '(or
-    var-alias
-    function-alias
-    macro-alias
-    canonical-binding
+    var-spec
+    function-spec
+    macro-spec
     (tuple symbol :as import-alias)))
 
-(deftype exim-spec ()
-  '(or import-spec export-spec))
+(deftype db-version () '(integer 1 *))
