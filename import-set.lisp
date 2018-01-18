@@ -14,10 +14,13 @@
 
 (defun public-name+private-name (import)
   (receive (public private)
-      (etypecase-of binding-designator import
-        (var-spec (values import import))
+      (etypecase-of import-spec import
+        (var-alias (values import import))
         (function-alias (values import (second import)))
         (macro-alias (values import (second import)))
+        (canonical-binding
+         (values (public-name+private-name (second import))
+                 (first import)))
         ((tuple symbol :as import-alias)
          (destructuring-bind (private &key ((:as public))) import
            (values public private))))
@@ -34,7 +37,7 @@
   (equal x y))
 
 (defun rename-import (import new-name)
-  (assure binding-designator
+  (assure import-spec
     (list (private-name import) :as new-name)))
 
 (defun expand-import-set (import-set get-exports
