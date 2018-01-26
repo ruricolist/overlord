@@ -1346,11 +1346,18 @@ A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  `(progn
-     (var-target ,name ,expr
-       ,@deps)
-     (redo-ifchange ',name)
-     ',name))
+  (let ((docstring
+          (and (stringp (car deps))
+               (pop deps))))
+    `(progn
+       (var-target ,name ,expr
+         ,@deps)
+       (redo-ifchange ',name)
+       ,@(unsplice
+          (when (stringp docstring)
+            `(setf (documentation ',name 'variable)
+                   ,docstring)))
+       ',name)))
 
 (defmacro defconfig/deps (name expr &body deps)
   "Define a conf with dependencies.
@@ -1358,12 +1365,19 @@ A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  (let ((script (append1 deps expr)))
+  (let* ((docstring
+           (and (stringp (car deps))
+                (pop deps)))
+         (script (append1 deps expr)))
     `(progn
        ;; The script must be available at compile time to be depended
        ;; on.
        (define-script-for ,name
          ,@script)
+       ,@(unsplice
+          (when docstring
+            `(setf (documentation ',name 'variable)
+                   ,docstring)))
        (defconfig/deps-aux ,name
          ,@script))))
 
