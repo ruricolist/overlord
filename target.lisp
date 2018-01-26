@@ -1359,6 +1359,9 @@ rebuilt."
                    ,docstring)))
        ',name)))
 
+;;; NB There is no `config-target' because configuration variables
+;;; must always be bound.
+
 (defmacro defconfig/deps (name expr &body deps)
   "Define a conf with dependencies.
 A dependency can be a file or another variable.
