@@ -126,6 +126,7 @@
    :run
    :depends-on
    :depends-not
+   :use-var :use-env
    :with-script))
 
 (in-package :overlord/target)
@@ -485,6 +486,96 @@ Works for SBCL, at least."
 
 (fset:define-cross-type-compare-methods phony-target)
 
+;;; Oracles. Oracles let you depend on the environment: either the
+;;; Lisp environment (bound variables) or the system environment
+;;; (environment variables). When you depend on an oracle, Overlord
+;;; remembers the value of the oracle at the time of the dependency
+;;; (or the lack of a value, if the oracle was unbound). If that value
+;;; changes, then any targets that depend on the oracle are considered
+;;; out of date.
+
+;;; At the moment, there are two kinds of oracles: oracles for Lisp
+;;; variables, and oracles for environment variables. Oracles for Lisp
+;;; variables are intended to allow a target to record the fact that
+;;; it depends on some aspect of the compile time or read time
+;;; environment (e.g. `*read-base*') and should be considered out of
+;;; date if that changes.
+
+;;; Note that, because Overlord remembers the value of the oracle,
+;;; that value should be small -- a flag, a symbol, a file name. Note
+;;; also that the value per se is not remember, but a string
+;;; representation with `princ', so the value should be one with a
+;;; meaningful literal representation.
+
+(defgeneric oracle-timestamp (oracle))
+
+(defgeneric oracle-exists? (oracle))
+
+(defgeneric oracle-value (oracle))
+
+(defgeneric oracle= (oracle1 oracle2))
+
+(defclass oracle ()
+  ((key :initarg :key
+        :reader oracle.key)))
+
+(defun depends-on-oracle (oracle)
+  (check-type oracle oracle)
+  (if (oracle-exists? oracle)
+      (depends-on oracle)
+      (depends-not oracle))
+  (oracle-value oracle))
+
+(defmethods oracle (self key)
+  (:method make-load-form (self &optional env)
+    (make-load-form-saving-slots self
+                                 :slot-names '(key)
+                                 :environment env))
+  (:method print-object (self stream)
+    (format stream "~a~s"
+            (read-eval-prefix self stream)
+            `(make ',(class-name-of self) :key ,key)))
+  (:method oracle-timestamp (self)
+    (princ-to-string (oracle-value self)))
+  (:method oracle= (self (other oracle))
+    nil))
+
+(defclass var-oracle ()
+  ((key :initarg :var
+        :reader var-oracle.var
+        :type symbol))
+  (:default-initargs
+   :var (required-argument :var)))
+
+(defmethods var-oracle (self (var key))
+  (:method oracle-value (self)
+    (symbol-value var))
+  (:method oracle-exists? (self)
+    (boundp var))
+  (:method oracle1 (self (other var-oracle))
+    (eql var (var-oracle.var other))))
+
+(defun use-var (var)
+  (depends-on-oracle (make 'var-oracle :var var)))
+
+(defclass env-oracle ()
+  ((key :initarg :name
+        :type string
+        :reader env-oracle.name))
+  (:default-initargs
+   :name (required-argument :name)))
+
+(defmethods env-oracle (self (name key))
+  (:method oracle-value (self)
+    (uiop:getenv name))
+  (:method oracle-exists? (self)
+    (uiop:getenvp name))
+  (:method oracle= (self (other env-oracle))
+    (equal name (env-oracle.name other))))
+
+(defun use-env (name)
+  (depends-on (make 'env-oracle :name name)))
+
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In
@@ -504,6 +595,7 @@ Works for SBCL, at least."
     directory-ref
     pattern-ref
     module-spec
+    oracle
     task))
 
 (defconstructor task
@@ -550,6 +642,7 @@ Works for SBCL, at least."
       (~> target
           module-spec-cell
           module-cell.module))
+     (oracle (oracle-exists? target))
      (task (target-exists? (task-script target))))))
 
 (defun target-timestamp (target)
@@ -585,6 +678,7 @@ Works for SBCL, at least."
      (let* ((cell (module-spec-cell target)))
        (with-slots (module timestamp) cell
          (if (null module) never timestamp))))
+    (oracle (oracle-timestamp target))
     (task
      (if-let (script (task-script target))
        (target-timestamp script)
@@ -614,7 +708,7 @@ Works for SBCL, at least."
            ;; TODO Ditto.
            (error* "Cannot set directory timestamps (yet).")
            (ensure-directories-exist dir))))
-    ((or pattern-ref package-ref)
+    ((or pattern-ref package-ref oracle)
      ;; TODO Or does it?
      (error* "Setting the timestamp of ~s does not make sense."))
     (module-spec
@@ -637,7 +731,8 @@ Works for SBCL, at least."
   (etypecase-of target target
     ((or root-target impossible-target trivial-target
          bindable-symbol package-ref
-         phony-target)
+         phony-target
+         oracle)
      target)
     (pathname
      (let ((path (merge-pathnames* target base)))
@@ -686,6 +781,7 @@ Works for SBCL, at least."
     (pattern-ref 'pattern-ref)
     (task 'task)
     (phony-target 'phony-target)
+    (oracle 'oracle)
     ;; Bottom.
     (otherwise nil)))
 
@@ -723,6 +819,8 @@ Works for SBCL, at least."
     (directory-ref
      (and (typep y 'directory-ref)
           (compare #'pathname-equal #'ref.name x y)))
+    (oracle
+     (oracle= x y))
     (pattern-ref
      (and (typep y 'pattern-ref)
           (and (compare #'equal #'pattern-ref.input    x y)
@@ -762,6 +860,8 @@ Works for SBCL, at least."
      (dx-sxhash
       (multiple-value-list
        (task-values target))))
+    (oracle
+     (dx-sxhash (make-load-form target)))
     (phony-target
      (let ((name (phony-target-name target)))
        (dx-sxhash `(phony ,name))))))
@@ -951,7 +1051,7 @@ Works for SBCL, at least."
     (etypecase-of target target
       ((or task pathname bindable-symbol phony-target)
        impossible-target)
-      ((or impossible-target trivial-target)
+      ((or impossible-target trivial-target oracle)
        (trivial-task target))
       (root-target
        (task target
@@ -1024,7 +1124,8 @@ Works for SBCL, at least."
   (etypecase-of target target
     ((or root-target trivial-target impossible-target
          module-spec
-         directory-ref package-ref pattern-ref)
+         directory-ref package-ref pattern-ref
+         oracle)
      (error* "Task for ~a cannot be redefined." target))
     ((or bindable-symbol pathname)
      (let ((task (task target thunk script)))
@@ -1082,6 +1183,8 @@ TARGET."
             (pattern-name (class-name-of pattern)))
        `(pattern-ref (find-pattern ',pattern-name)
                      ,input)))
+    (oracle
+     `(,(class-name-of target) ,(oracle.key target)))
     (task `(task ,@(multiple-value-list (task-values target))))
     (phony-target
      `(phony-target ,@(multiple-value-list (deconstruct target))))))
@@ -1106,6 +1209,7 @@ TARGET."
            phony-target
            task)
        (target-timestamp target))
+      (oracle (oracle-timestamp target))
       (pathname
        (cond ((file-exists-p target)
               (file-stamp target))
@@ -1219,7 +1323,8 @@ value and NEW do not match under TEST."
   (apply #'redo-ifcreate targets))
 
 (defmacro with-script ((&key) &body body)
-  `(macrolet ((:depends-on (x &rest xs)
+  `(macrolet ( ;; Depending on things in general.
+              (:depends-on (x &rest xs)
                 `(redo-ifchange ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(:depends-on-all* (list ,x ,@xs)))
@@ -1231,6 +1336,8 @@ value and NEW do not match under TEST."
                 `(redo-ifcreate ,x ,@xs))
               (:depends-not* (xs)
                 `(redo-ifcreate-all ,xs))
+
+              ;; Things to depend on.
               (:path (path)
                 (assure pathname
                   (path path)))
@@ -1247,6 +1354,17 @@ value and NEW do not match under TEST."
                 `(module-spec ',lang
                               (resolve-target (ensure-pathname ,source)
                                               ,(base))))
+
+              ;; Depending on specific things.
+              (:use-env (name)
+                `(use-env ,name))
+              (:use-var (var)
+                `(use-var ,var))
+              (:always (&optional (bool t))
+                `(and ,bool (redo-always)))
+
+
+              ;; Utilities.
               (:extension (ext)
                 `(extension ,ext))
               (:cmd (&rest args)
@@ -1254,9 +1372,7 @@ value and NEW do not match under TEST."
               (:message (control-string &rest args)
                 `(message ,control-string ,@args))
               (:basename (file)
-                `(basename ,file))
-              (:always (bool)
-                `(and ,bool (redo-always))))
+                `(basename ,file)))
      ,@body))
 
 
