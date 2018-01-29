@@ -536,7 +536,7 @@ Works for SBCL, at least."
             (read-eval-prefix self stream)
             `(make ',(class-name-of self) :key ,key)))
   (:method oracle-timestamp (self)
-    (princ-to-string (oracle-value self)))
+    (prin1-to-string (oracle-value self)))
   (:method oracle= (self (other oracle))
     nil))
 
