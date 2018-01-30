@@ -568,6 +568,8 @@ Works for SBCL, at least."
 (defmethods env-oracle (self (name key))
   (:method oracle-value (self)
     (uiop:getenv name))
+  (:method oracle-timestamp (self)
+    (oracle-value self))
   (:method oracle-exists? (self)
     (uiop:getenvp name))
   (:method oracle= (self (other env-oracle))
