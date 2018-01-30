@@ -2,7 +2,7 @@
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
   (:import-from :uiop :getcwd)
-  (:import-from :trivia :match)
+  (:import-from :trivia :match :let-match1)
   (:export
    ;; Conditions.
    #:overlord-condition
@@ -21,6 +21,9 @@
    #:package-designator
    #:case-mode
    #:hash-code
+   #:delayed-symbol
+   #:delay-symbol
+   #:force-symbol
    ;; Pathname types.
    #:wild-pathname
    #:tame-pathname
@@ -149,6 +152,29 @@ If the value of `*default-pathname-defaults*' and a call to
 
 (deftype hash-code ()
   '(integer 0 #.most-positive-fixnum))
+
+(defconstructor delayed-symbol
+  (package-name string)
+  (symbol-name string))
+
+(defun delay-symbol (symbol)
+  (let ((package-name
+          (~> symbol
+              symbol-package
+              package-name))
+        (symbol-name (symbol-name symbol)))
+    (delayed-symbol package-name symbol-name)))
+
+(defun force-symbol (delay)
+  (let-match1 (delayed-symbol package-name symbol-name) delay
+    (if-let (package (find-package package-name))
+      (receive (symbol status) (find-symbol symbol-name package)
+        (if (null status)
+            (error* "No such symbol as ~a::~a"
+                    package-name
+                    symbol-name)
+            symbol))
+      (error* "No such package as ~a" package))))
 
 
 ;;; Pathname types.

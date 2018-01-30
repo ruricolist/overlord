@@ -40,7 +40,7 @@
   (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
   (:import-from :trivia
-    :match :ematch :let-match1
+    :match :ematch :let-match1 :multiple-value-ematch
     :multiple-value-match)
   (:import-from :trivial-file-size
     :file-size-in-octets)
@@ -517,7 +517,7 @@ Works for SBCL, at least."
 
 (defclass oracle ()
   ((key :initarg :key
-        :reader oracle.key)))
+        :accessor oracle.key)))
 
 (defun depends-on-oracle (oracle)
   (check-type oracle oracle)
@@ -541,19 +541,32 @@ Works for SBCL, at least."
     nil))
 
 (defclass var-oracle ()
-  ((key :initarg :var
-        :reader var-oracle.var
-        :type symbol))
+  ((key :reader var-oracle.var
+        :type delayed-symbol)
+   (sym :type symbol))
   (:default-initargs
    :var (required-argument :var)))
 
-(defmethods var-oracle (self (var key))
+(defmethods var-oracle (self (var key) sym)
+  (:method initialize-instance :after (self &key var)
+    (setf (oracle.key self) (delay-symbol var)))
+  ;; Cache the symbol.
+  (:method slot-unbound ((class t) self (slot-name (eql 'sym)))
+    (setf sym (force-symbol var)))
   (:method oracle-value (self)
-    (symbol-value var))
+    (symbol-value sym))
   (:method oracle-exists? (self)
-    (boundp var))
+    (boundp sym))
   (:method oracle1 (self (other var-oracle))
-    (eql var (var-oracle.var other))))
+    (handler-case
+        (eql sym (slot-value other 'sym))
+      (overlord-error ()
+        (multiple-value-ematch
+            (values var (var-oracle.var other))
+          (((delayed-symbol p1 s1)
+            (delayed-symbol p2 s2))
+           (and (equal p1 p2)
+                (equal s1 s2))))))))
 
 (defun use-var (var)
   (depends-on-oracle (make 'var-oracle :var var)))
