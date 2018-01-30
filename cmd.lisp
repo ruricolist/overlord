@@ -3,6 +3,7 @@
   (:shadowing-import-from :serapeum :collecting :summing :in)
   (:import-from :overlord/base :base)
   (:import-from :overlord/types :list-of :plist)
+  (:import-from :overlord/message :*message-stream*)
   (:export :cmd))
 (cl:in-package :overlord/cmd)
 
@@ -36,4 +37,4 @@
       tokens
       (values-list plist)
       :output t
-      :error-output t)))
+      :error-output *message-stream*)))
