@@ -1933,10 +1933,11 @@ interoperation with Emacs."
   (assure (and absolute-pathname directory-pathname)
     (let ((lang-string (escape-lang-name lang))
           (suffix
-            (make-pathname :directory
-                           (cons :relative
-                                 (drop-while #'keywordp
-                                             (pathname-directory current-dir))))))
+            (~>> current-dir
+                 pathname-directory
+                 (drop-while #'keywordp)
+                 (cons :relative)
+                 (make-pathname :directory))))
       (path-join
        (db-version-dir)
        #p"fasls/"
