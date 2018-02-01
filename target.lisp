@@ -239,7 +239,7 @@ Works for SBCL, at least."
 (defmethod target-up-to-date? (target)
   (prop target uptodate))
 
-(defun (setf target-up-to-date?) (value target)
+(defmethod (setf target-up-to-date?) (value target)
   (check-type value boolean)
   (if value
       (setf (prop target uptodate) t)

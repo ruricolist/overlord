@@ -63,6 +63,7 @@
 (defgeneric saved-prereq-target (prereq))
 (defgeneric saved-prereq-stamp (prereq))
 (defgeneric target-up-to-date? (target))
+(defgeneric (setf target-up-to-date?) (value target))
 (defgeneric clear-temp-prereqs (target))
 (defgeneric clear-temp-prereqsne (target))
 (defgeneric generate-impossible-target ())
