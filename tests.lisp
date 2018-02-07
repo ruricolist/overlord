@@ -112,12 +112,12 @@
 
 (overlord:defconfig +literal-string-file+ #p"tests/literal.txt")
 
-(overlord:defconfig/deps +literal-string+
+(overlord:define-target-config +literal-string+
     (read-file-into-string +literal-string-file+)
   (:depends-on '+literal-string-file+)
   (:depends-on +literal-string-file+))
 
-(overlord:defvar/deps *literal-string*
+(overlord:define-target-var *literal-string*
     (read-file-into-string +literal-string-file+)
   (:depends-on '+literal-string-file+)
   (:depends-on +literal-string-file+))

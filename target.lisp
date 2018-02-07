@@ -80,9 +80,9 @@
    ;; Defining and building targets.
    :deftask
    :defconfig
-   :defconfig/deps
+   :define-target-config
    :var-target
-   :defvar/deps
+   :define-target-var
    :file-target
 
    :ensure-absolute
@@ -1410,7 +1410,7 @@ value and NEW do not match under TEST."
 
 ;;; Note that while configuration timestamps persist across loads,
 ;;; they do not persist across compilations. If that is the behavior
-;;; you need, you should use `defconfig/deps' and depend on a dummy
+;;; you need, you should use `define-target-config' and depend on a dummy
 ;;; file. If we did it for you, a dummy file would have to be involved
 ;;; anyway, and that is probably something it is better to be explicit
 ;;; about.
@@ -1471,7 +1471,7 @@ value and NEW do not match under TEST."
                   (rebuild-symbol ',name (script-thunk ,@script)))
        ',name)))
 
-(defmacro defvar/deps (name expr &body deps)
+(defmacro define-target-var (name expr &body deps)
   "Define a variable with dependencies.
 A dependency can be a file or another variable.
 
@@ -1493,7 +1493,7 @@ rebuilt."
 ;;; NB There is no `config-target' because configuration variables
 ;;; must always be bound.
 
-(defmacro defconfig/deps (name expr &body deps)
+(defmacro define-target-config (name expr &body deps)
   "Define a conf with dependencies.
 A dependency can be a file or another variable.
 
@@ -1512,10 +1512,10 @@ rebuilt."
           (when docstring
             `(setf (documentation ',name 'variable)
                    ,docstring)))
-       (defconfig/deps-aux ,name
+       (define-target-config/aux ,name
          ,@script))))
 
-(defmacro defconfig/deps-aux (name &body script)
+(defmacro define-target-config/aux (name &body script)
   (unless (boundp name)
     (let* ((*base* (base))
            (script-thunk (eval* `(script-thunk ,@script)))
