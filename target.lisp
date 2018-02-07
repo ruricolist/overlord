@@ -38,7 +38,6 @@
     :overlord/freeze
     ;; Oracles.
     :overlord/oracle)
-  (:shadowing-import-from :overlord/stamp :now)
   (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
   (:import-from :trivia

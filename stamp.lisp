@@ -3,8 +3,6 @@
 ;;; implementation-dependent) precisions.
 (defpackage :overlord/stamp
   (:use :cl :alexandria :serapeum
-    ;; Time tuples.
-    :overlord/time-tuple
     :local-time)
   (:import-from :overlord/types
     :universal-time)
@@ -14,11 +12,9 @@
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
     :file-size-in-octets)
-  (:shadow :now)
   (:export
    #:never
    #:far-future
-   #:now
    #:file-meta
    #:target-timestamp
    #:stamp
@@ -33,34 +29,20 @@
 ;;; unconditionally needs building) and the singleton `far-future'
 ;;; (which means the target unconditionally does not need building).
 
-;;; Alternatively, a timestamp can be a `time-tuple', which consists
-;;; of a universal time and a count of internal time units. A time
-;;; tuple does not establish a specific time but does establish an
-;;; ordering, and is used instead of a local-time timestamp on
-;;; implementation/platform combinations (e.g. Clozure on Windows)
-;;; where local-time timestamps are too fuzzy to be useful.
-
 (defunit never)
 (defunit far-future)
 
-(declaim (type function *now-function*))
-(defvar *now-function*
-  (let ((local-time-resolution-bad?
-          #.(loop repeat 1000
-                  for timestamp = (local-time:now)
-                  always (zerop (local-time:timestamp-microsecond
-                                 timestamp)))))
-    (if local-time-resolution-bad?
-        #'time-tuple
-        #'local-time:now)))
-
-(defun now ()
-  (funcall *now-function*))
+(let ((local-time-resolution-bad?
+        #.(loop repeat 1000
+                for timestamp = (now)
+                always (zerop (timestamp-microsecond
+                               timestamp)))))
+  (when local-time-resolution-bad?
+    (warn "Local time resolution is too low to be useful.")))
 
 (deftype target-timestamp ()
   "Possible formats for the timestamp of a target."
   '(or timestamp
-    time-tuple
     universal-time
     never
     far-future))
@@ -114,34 +96,12 @@
      (timestamp> ts1 ts2))
     ((timestamp universal-time)
      (> (timestamp-to-universal ts1) ts2))
-    ((timestamp time-tuple)
-     ;; TODO Should we consider precision here?
-     (timestamp> ts1 (time-tuple->timestamp ts2)))
 
     ((universal-time universal-time)
      (> ts1
         ts2))
-    ((universal-time time-tuple)
-     (> ts1
-        (time-tuple-universal-time ts2)))
     ((universal-time timestamp)
-     (> ts1 (timestamp-to-universal ts2)))
-
-    ((time-tuple universal-time)
-     (let ((u1 (time-tuple-universal-time ts1)))
-       (or (> u1 ts2)
-           (and (= u1 ts2)
-                (> (time-tuple-real-time ts1) 0)))))
-    ((time-tuple time-tuple)
-     (let ((u1 (time-tuple-universal-time ts1))
-           (u2 (time-tuple-universal-time ts2)))
-       (or (> u1 u2)
-           (and (= u1 u2)
-                (> (time-tuple-real-time ts1)
-                   (time-tuple-real-time ts2))))))
-    ((time-tuple timestamp)
-     (timestamp> (time-tuple->timestamp ts1)
-                 ts2))))
+     (> ts1 (timestamp-to-universal ts2)))))
 
 (defun target-timestamp= (ts1 ts2)
   "Is TS1 greater than TS2?"
@@ -151,29 +111,11 @@
      (timestamp= ts1 ts2))
     ((timestamp universal-time)
      (= (timestamp-to-universal ts1) ts2))
-    ((timestamp time-tuple)
-     ;; TODO Should we consider precision here?
-     (timestamp= ts1 (time-tuple->timestamp ts2)))
 
     ((universal-time universal-time)
      (= ts1 ts2))
-    ((universal-time time-tuple)
-     (= ts1
-        (time-tuple-universal-time ts2)))
     ((universal-time timestamp)
      (= ts1 (timestamp-to-universal ts2)))
-
-    ((time-tuple universal-time)
-     (let ((u1 (time-tuple-universal-time ts1)))
-       (= u1 ts2)))
-    ((time-tuple time-tuple)
-     (let ((u1 (time-tuple-universal-time ts1))
-           (u2 (time-tuple-universal-time ts2)))
-       (and (= u1 u2)
-            (= (time-tuple-real-time ts1)
-               (time-tuple-real-time ts2)))))
-    ((time-tuple timestamp)
-     (timestamp= (time-tuple->timestamp ts1) ts2))
 
     ;; This might seem weird, but it's necessary for impossible
     ;; targets to always show up as changed.
