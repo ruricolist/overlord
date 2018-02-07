@@ -780,7 +780,7 @@ Works for SBCL, at least."
 (defun target-type-of (x)
   (let ((type (target-type-of x)))
     ;; Remember that `nil' is a subtype of everything.
-    (assert (subtypep type 'target-type))
+    (assert (subtypep type 'target))
     type))
 
 (defun target-type-of-1 (x)
