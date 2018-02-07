@@ -35,7 +35,9 @@
     ;; The database.
     :overlord/db
     ;; Freezing the state of the Lisp image.
-    :overlord/freeze)
+    :overlord/freeze
+    ;; Oracles.
+    :overlord/oracle)
   (:shadowing-import-from :overlord/stamp :now)
   (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
@@ -126,7 +128,6 @@
    :run
    :depends-on
    :depends-not
-   :use-var :use-env
    :with-script))
 
 (in-package :overlord/target)
@@ -486,111 +487,6 @@ Works for SBCL, at least."
 
 (fset:define-cross-type-compare-methods phony-target)
 
-;;; Oracles. Oracles let you depend on the environment: either the
-;;; Lisp environment (bound variables) or the system environment
-;;; (environment variables). When you depend on an oracle, Overlord
-;;; remembers the value of the oracle at the time of the dependency
-;;; (or the lack of a value, if the oracle was unbound). If that value
-;;; changes, then any targets that depend on the oracle are considered
-;;; out of date.
-
-;;; At the moment, there are two kinds of oracles: oracles for Lisp
-;;; variables, and oracles for environment variables. Oracles for Lisp
-;;; variables are intended to allow a target to record the fact that
-;;; it depends on some aspect of the compile time or read time
-;;; environment (e.g. `*read-base*') and should be considered out of
-;;; date if that changes.
-
-;;; Note that, because Overlord remembers the value of the oracle,
-;;; that value should be small -- a flag, a symbol, a file name. Note
-;;; also that the value per se is not remember, but a string
-;;; representation with `princ', so the value should be one with a
-;;; meaningful literal representation.
-
-(defgeneric oracle-timestamp (oracle))
-
-(defgeneric oracle-exists? (oracle))
-
-(defgeneric oracle-value (oracle))
-
-(defgeneric oracle= (oracle1 oracle2))
-
-(defclass oracle ()
-  ((key :initarg :key
-        :accessor oracle.key)))
-
-(defun depends-on-oracle (oracle)
-  (check-type oracle oracle)
-  (if (oracle-exists? oracle)
-      (depends-on oracle)
-      (depends-not oracle))
-  (oracle-value oracle))
-
-(defmethods oracle (self key)
-  (:method make-load-form (self &optional env)
-    (make-load-form-saving-slots self
-                                 :slot-names '(key)
-                                 :environment env))
-  (:method print-object (self stream)
-    (format stream "~a~s"
-            (read-eval-prefix self stream)
-            `(make ',(class-name-of self) :key ,key)))
-  (:method oracle-timestamp (self)
-    (prin1-to-string (oracle-value self)))
-  (:method oracle= (self (other oracle))
-    nil))
-
-(defclass var-oracle ()
-  ((key :reader var-oracle.var
-        :type delayed-symbol)
-   (sym :type symbol))
-  (:default-initargs
-   :var (required-argument :var)))
-
-(defmethods var-oracle (self (var key) sym)
-  (:method initialize-instance :after (self &key var)
-    (setf (oracle.key self) (delay-symbol var)))
-  ;; Cache the symbol.
-  (:method slot-unbound ((class t) self (slot-name (eql 'sym)))
-    (setf sym (force-symbol var)))
-  (:method oracle-value (self)
-    (symbol-value sym))
-  (:method oracle-exists? (self)
-    (boundp sym))
-  (:method oracle1 (self (other var-oracle))
-    (handler-case
-        (eql sym (slot-value other 'sym))
-      (overlord-error ()
-        (multiple-value-ematch
-            (values var (var-oracle.var other))
-          (((delayed-symbol p1 s1)
-            (delayed-symbol p2 s2))
-           (and (equal p1 p2)
-                (equal s1 s2))))))))
-
-(defun use-var (var)
-  (depends-on-oracle (make 'var-oracle :var var)))
-
-(defclass env-oracle ()
-  ((key :initarg :name
-        :type string
-        :reader env-oracle.name))
-  (:default-initargs
-   :name (required-argument :name)))
-
-(defmethods env-oracle (self (name key))
-  (:method oracle-value (self)
-    (uiop:getenv name))
-  (:method oracle-timestamp (self)
-    (oracle-value self))
-  (:method oracle-exists? (self)
-    (uiop:getenvp name))
-  (:method oracle= (self (other env-oracle))
-    (equal name (env-oracle.name other))))
-
-(defun use-env (name)
-  (depends-on (make 'env-oracle :name name)))
-
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In
@@ -876,7 +772,7 @@ Works for SBCL, at least."
       (multiple-value-list
        (task-values target))))
     (oracle
-     (dx-sxhash (make-load-form target)))
+     (hash-oracle target))
     (phony-target
      (let ((name (phony-target-name target)))
        (dx-sxhash `(phony ,name))))))
@@ -1199,7 +1095,7 @@ TARGET."
        `(pattern-ref (find-pattern ',pattern-name)
                      ,input)))
     (oracle
-     `(,(class-name-of target) ,(oracle.key target)))
+     (make-load-form target))
     (task `(task ,@(multiple-value-list (task-values target))))
     (phony-target
      `(phony-target ,@(multiple-value-list (deconstruct target))))))
