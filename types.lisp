@@ -2,7 +2,8 @@
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
   (:import-from :uiop :getcwd)
-  (:import-from :trivia :match :let-match1)
+  (:import-from :trivia :match :let-match1
+    :multiple-value-ematch)
   (:export
    ;; Conditions.
    #:overlord-condition
@@ -50,7 +51,8 @@
    #:canonical-binding
    #:non-keyword
    #:db-version
-   #:qualified-symbol))
+   #:qualified-symbol
+   #:delayed-symbol=))
 
 (in-package :overlord/types)
 
@@ -175,6 +177,13 @@ If the value of `*default-pathname-defaults*' and a call to
                     symbol-name)
             symbol))
       (error* "No such package as ~a" package))))
+
+(defun delayed-symbol= (ds1 ds2)
+  (multiple-value-ematch (values ds1 ds2)
+    (((delayed-symbol p1 s1)
+      (delayed-symbol p2 s2))
+     (and (equal p1 p2)
+          (equal s1 s2)))))
 
 
 ;;; Pathname types.

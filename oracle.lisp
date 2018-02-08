@@ -1,6 +1,8 @@
 (defpackage :overlord/oracle
   (:use :cl :alexandria :serapeum :trivia)
   (:shadowing-import-from :trivia :@)
+  (:import-from :named-readtables
+    :readtable-name)
   (:import-from :overlord/util
     :class-name-of)
   (:import-from :overlord/redo
@@ -8,6 +10,7 @@
     :redo-ifcreate)
   (:import-from :overlord/types
     :delayed-symbol
+    :delayed-symbol=
     :force-symbol
     :delay-symbol)
   (:export
@@ -93,7 +96,8 @@
         :type delayed-symbol)
    (sym :type symbol))
   (:default-initargs
-   :var (required-argument :var)))
+   :var (required-argument :var))
+  (:documentation "Oracle that wraps a special variable."))
 
 (defmethods var-oracle (self (var key) sym)
   (:method initialize-instance :after (self &key var)
@@ -109,18 +113,16 @@
     (handler-case
         (eql sym (slot-value other 'sym))
       (overlord-error ()
-        (multiple-value-ematch
-            (values var (var-oracle.var other))
-          (((delayed-symbol p1 s1)
-            (delayed-symbol p2 s2))
-           (and (equal p1 p2)
-                (equal s1 s2))))))))
+        ;; The symbols haven't been, or can't be, resolved.
+        (delayed-symbol= var (var-oracle.var other))))))
 
 (defclass cl-var-oracle (oracle)
   ((key :type symbol
         :initarg :var))
   (:default-initargs
-   :var (required-argument :var)))
+   :var (required-argument :var))
+  (:documentation
+   "Oracle that wraps a special variable in the CL package."))
 
 (defun cl-sym? (sym)
   (eql (symbol-package sym)
@@ -136,18 +138,52 @@
   (:method oracle= (self (other cl-var-oracle))
     (eql var (slot-value other 'var))))
 
+(defclass name-oracle (oracle)
+  ((key :reader name-oracle.name))
+  (:documentation
+   "Oracle that extracts a name from a value instead of recording the value directly."))
+
+(defmethods name-oracle (self (name key))
+  (:method oracle-value (self)
+    name)
+  (:method oracle-exists? (self)
+    t)
+  (:method oracle= (self (other name-oracle))
+    (equal name (name-oracle.name other))))
+
+(defclass package-oracle (name-oracle)
+  ((key :type string
+        :initform (package-name *package*)))
+  (:documentation "Oracle that wraps the current package."))
+
+(defclass readtable-oracle (oracle)
+  ((key :type delayed-symbol
+        :initform (delay-symbol (readtable-name *readtable*))))
+  (:documentation "Oracle that wraps the current readtable.
+A name is extracted using `named-readtable:readtable-name'."))
+
+(defmethods readtable-oracle (self (name key))
+  (:method oracle= (self (other readtable-oracle))
+    (delayed-symbol= name (name-oracle.name other))))
+
 (defun use-var (var)
+  (check-type var symbol)
   (depends-on-oracle
-   (if (cl-sym? var)
-       (make 'cl-oracle :var var)
-       (make 'var-oracle :var var))))
+   (cond ((eql var '*readtable*)
+          (make 'readtable-oracle))
+         ((eql var '*package*)
+          (make 'package-oracle))
+         ((cl-sym? var)
+          (make 'cl-var-oracle :var var))
+         (t (make 'var-oracle :var var)))))
 
 (defclass env-oracle (oracle)
   ((key :initarg :name
         :type string
         :reader env-oracle.name))
   (:default-initargs
-   :name (required-argument :name)))
+   :name (required-argument :name))
+  (:documentation "Oracle that wraps an environment variable."))
 
 (defmethods env-oracle (self (name key))
   (:method oracle-value (self)
@@ -160,4 +196,6 @@
     (equal name (env-oracle.name other))))
 
 (defun use-env (name)
-  (depends-on-oracle (make 'env-oracle :name name)))
+  (check-type name string)
+  (depends-on-oracle
+   (make 'env-oracle :name name)))
