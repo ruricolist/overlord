@@ -41,6 +41,13 @@
 ;;; representation with `princ', so the value should be one with a
 ;;; meaningful literal representation.
 
+(deftype oracle-value ()
+  '(or
+    number
+    ;; NB boolean is a subtype of symbol.
+    symbol
+    string))
+
 (defgeneric oracle-timestamp (oracle))
 
 (defgeneric oracle-exists? (oracle))
@@ -73,6 +80,9 @@
             `(make ',(class-name-of self) :key ,key)))
   (:method hash-oracle (self)
     (sxhash (make-load-form self)))
+  (:method oracle-value :around (self)
+    (assure oracle-timestamp
+      (call-next-method)))
   (:method oracle-timestamp (self)
     (prin1-to-string (oracle-value self)))
   (:method oracle= (self (other oracle))
