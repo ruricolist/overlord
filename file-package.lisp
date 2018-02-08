@@ -4,8 +4,7 @@
     :uiop/pathname
     :overlord/types)
   (:import-from :overlord/specials :*language*)
-  #-sbcl (:import-from :md5 :md5sum-string)
-  #+sbcl (:import-from :sb-md5 :md5sum-string)
+  (:import-from :overlord/digest :digest-string)
   (:import-from :s-base64 :encode-base64-bytes)
   (:import-from :overlord/util :package-exports)
   (:export
@@ -17,8 +16,6 @@
 
 (deftype symbol-status ()
   '(member null :internal :external :inherited))
-
-(defparameter *external-format* :utf-8)
 
 (defparameter *suffix-bytes* 4)
 
@@ -53,7 +50,7 @@
            (fmt "file=~a,lang=~a"
                 (ellipsize (unix-namestring file) 20)
                 lang))
-         (hash (hash-string string))
+         (hash (digest-string string))
          (bytes (subseq hash 0 *suffix-bytes*))
          (suffix (make-suffix bytes))
          (file-name (pathname-name file))
@@ -62,9 +59,6 @@
          (string-upcase file-name)
          type
          suffix)))
-
-(defun hash-string (string)
-  (md5sum-string string :external-format *external-format*))
 
 (defun make-suffix (suffix)
   (~>> suffix
