@@ -7,6 +7,10 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/types #:error*)
+  (:import-from #:overlord/parallel
+    #:with-our-kernel
+    #:do-each/async)
+  (:import-from #:lparallel #:psome #:pevery)
   (:nicknames :redo)
   (:export
    #:redo
@@ -90,15 +94,19 @@
 (defun redo-all (args)
   ;; NB This is where you would add parallelism.
   (do-each (target (reshuffle args))
+    ;; Avoid deadlocks.
+    (when (member target *parents* :test #'target=)
+      (error* "Recursive dependency: ~a depends on itself" target))
     (when (target? target)
       (clear-temp-prereqs target)
       (clear-temp-prereqsne target)
       (let ((build-script (resolve-build-script target)))
         (nix (target-up-to-date? target))
-        (let ((*parents* (cons target *parents*)))
-          (run-script build-script))
-        (save-temp-prereqs target)
-        (save-temp-prereqsne target)
+        (unwind-protect
+             (let ((*parents* (cons target *parents*)))
+               (run-script build-script))
+          (save-temp-prereqs target)
+          (save-temp-prereqsne target))
         (setf (target-up-to-date? target) t)))))
 
 (defun target-has-build-script? (target)
@@ -122,40 +130,41 @@
                 default)
               (error* "No script found for ~a" target))))))
 
+(defun unchanged? (saved-prereq)
+  (let ((req   (saved-prereq-target saved-prereq))
+        (stamp (saved-prereq-stamp  saved-prereq)))
+    (stamp= stamp (target-stamp req))))
+
 ;;; Should be (target).
 (-> changed? (t) boolean)
 (defun changed? (target)
-  (let ((changed? nil))
-    ;; This can't be an or, since we have to check (and possibly
-    ;; rebuild in turn) each target.
-    (unless (target-exists? target)
-      (setf changed? t))
-    (let* ((prereqs (target-saved-prereqs target))
-           (reqs (map 'list #'saved-prereq-target prereqs)))
-      ;; Check regular prerequisites.
-      (let* ((outdated
-               ;; Although they will be reshuffled by `redo', we still
-               ;; want to shuffle them here so the prereqs are built
-               ;; unpredictably.
-               (~> reqs
-                   reshuffle
-                   (filter #'changed? _)
-                   (coerce 'list))))
-        (when outdated
-          ;; TODO redo $outdated || result=0
-          (apply #'redo outdated))
-        (flet ((unchanged? (prereq)
-                 (let ((req   (saved-prereq-target prereq))
-                       (stamp (saved-prereq-stamp prereq)))
-                   (stamp= stamp (target-stamp req)))))
+  (with-our-kernel ()
+    (let ((changed? nil))
+      ;; This can't be an or, since we have to check (and possibly
+      ;; rebuild in turn) each target.
+      (unless (target-exists? target)
+        (setf changed? t))
+      (let* ((prereqs (target-saved-prereqs target))
+             (reqs (map 'vector #'saved-prereq-target prereqs)))
+        ;; Check regular prerequisites.
+        (let* ((outdated
+                 ;; Although they will be reshuffled by `redo', we still
+                 ;; want to shuffle them here so the prereqs are built
+                 ;; unpredictably.
+                 (~> reqs
+                     reshuffle
+                     (filter #'changed? _)
+                     (coerce 'list))))
+          (when outdated
+            (apply #'redo outdated))
           ;; Check regular prerequisitves.
-          (unless (every #'unchanged? (reshuffle prereqs))
-            (setf changed? t)))))
-    ;; Check non-existent prereqs.
-    (let ((prereqsne (target-saved-prereqsne target)))
-      (when (some #'target-exists? prereqsne)
-        (setf changed? t)))
-    changed?))
+          (unless (pevery #'unchanged? (reshuffle prereqs))
+            (setf changed? t))))
+      ;; Check non-existent prereqs.
+      (let ((prereqsne (target-saved-prereqsne target)))
+        (when (psome #'target-exists? prereqsne)
+          (setf changed? t)))
+      changed?)))
 
 ;;; The only thing special about redo-ifchange is that it writes out
 ;;; stamps for its deps.
@@ -173,10 +182,10 @@
   (redo-ifcreate-all targets))
 
 (defun redo-ifcreate-all (targets)
-  ;; NB This is where you would add parallelism.
+  (with-our-kernel ()
+    (when-let (i (psome #'target-exists? targets))
+      (error* "Non-existent prerequisite ~a already exists" i)))
   (do-each (i (reshuffle targets))
-    (when (target-exists? i)
-      (error* "Non-existent prerequisite ~a already exists" i))
     (record-prereqne i)))
 
 (defun redo-always ()
