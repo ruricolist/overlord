@@ -13,9 +13,14 @@
   "The stream printed to by the default message handler.")
 
 (defun message (control &rest args)
-  (let ((stream *message-stream*))
+  (let ((stream *message-stream*)
+        (control
+          (if (stringp control)
+              (string-right-trim "." control)
+              control)))
     (format stream "~&[Overlord] ~?~%" control args)))
 
 (define-compiler-macro message (&whole call format-control &rest format-arguments)
-  (eif (not (stringp format-control)) call
-       `(message (formatter ,format-control) ,@format-arguments)))
+  (if (not (stringp format-control)) call
+      (let ((format-control (string-right-trim "." format-control)))
+        `(message (formatter ,format-control) ,@format-arguments))))
