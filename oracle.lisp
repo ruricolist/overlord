@@ -84,7 +84,7 @@
   (:method hash-oracle (self)
     (sxhash (make-load-form self)))
   (:method oracle-value :around (self)
-    (assure oracle-timestamp
+    (assure oracle-value
       (call-next-method)))
   (:method oracle-timestamp (self)
     (prin1-to-string (oracle-value self)))
