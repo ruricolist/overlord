@@ -440,9 +440,6 @@ Works for SBCL, at least."
          (declare (dynamic-extent list1 list2))
          (fset:compare list1 list2)))))
 
-(defvar *building-root* nil)
-(declaim (type boolean *building-root*))
-
 (defunit root-target)
 
 (defmethod root-target ()

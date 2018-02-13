@@ -105,6 +105,7 @@
 
 (defparameter *specials*
   '(*parents*
+    *trace-output*                      ;For debugging.
     *base*
     *input*
     *output*
@@ -115,7 +116,8 @@
     *default-pathname-defaults*
     *compile-file-truename*
     *load-truename*
-    *cli*)
+    *cli*
+    *building-root*)
   "Special variables whose bindings, if any, should be propagated into
   subthreads.")
 

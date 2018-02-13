@@ -16,7 +16,8 @@
            #:*source*
            #:*db-version*
            #:db-version
-           #:*use-threads*))
+           #:*use-threads*
+           #:*building-root*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -56,3 +57,6 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *use-threads* t
   "Whether to allow parallelism.")
+
+(defvar *building-root* nil)
+(declaim (type boolean *building-root*))
