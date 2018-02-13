@@ -37,26 +37,34 @@
 (in-suite overlord)
 
 
-;;; Running tests.
-(defun run-overlord-tests ()
-  (let* ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
-         (fiveam:*on-error* :debug)
-         ;; Use a ridiculous fasl version so we can be reasonably sure
+(defun call/temp-db (fn)
+  (let* (;; Use a random fasl version so we can be reasonably sure
          ;; everything is being compiled clean.
-         (version most-positive-fixnum)
+         (version (random most-positive-fixnum))
          (overlord/specials:*db-version* version)
          (overlord/db::*kv* (overlord/db::reload-kv)))
     (unwind-protect
-         (progn
-           (format t "~&First run (1/2)~%")
-           (run! 'overlord)
-           (format t "~&Resetting global state for second run...~%")
-           (nap 2)
-           (format t "~&Second run (2/2)~%")
-           (overlord/global-state:reset-global-state)
-           (run! 'overlord))
+         (funcall fn)
       (when (equal (overlord/specials:db-version) version)
         (overlord/db:delete-versioned-db)))))
+
+(defmacro with-temp-db ((&key) &body body)
+  (with-thunk (body)
+    `(call/temp-db ,body)))
+
+;;; Running tests.
+(defun run-overlord-tests ()
+  (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
+        (fiveam:*on-error* :debug)))
+  (format t "~&First run (1/2)~%")
+  (with-temp-db ()
+    (run! 'overlord))
+  (format t "~&Resetting global state for second run...~%")
+  (nap 2)
+  (format t "~&Second run (2/2)~%")
+  (overlord/global-state:reset-global-state)
+  (with-temp-db ()
+    (run! 'overlord)))
 
 ;;; Internal use.
 (defun debug-test (test)
