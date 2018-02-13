@@ -111,7 +111,11 @@
     *deps*
     *source*
     *language*
-    *program-preamble*)
+    *program-preamble*
+    *default-pathname-defaults*
+    *compile-file-truename*
+    *load-truename*
+    *cli*)
   "Special variables whose bindings, if any, should be propagated into
   subthreads.")
 
