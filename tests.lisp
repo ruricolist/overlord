@@ -69,7 +69,8 @@
 ;;; Internal use.
 (defun debug-test (test)
   (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
-        (fiveam:*on-error* :debug))
+        (fiveam:*on-error* :debug)
+        (fiveam:*on-failure* :debug))
     (run! test)))
 
 
