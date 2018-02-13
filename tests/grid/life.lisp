@@ -26,17 +26,18 @@
   (write-string (string separator))
   (each grid
         (lambda (i j v) (declare (ignore i))
-          (format t "~:[ ~;*~]" v)
+          (write-string (if v "*" " "))
           (when (= j (- (cols grid) 1))
             (terpri)))))
 
 (defun life (grid iterations &optional (separator #\Page))
-  (loop repeat iterations
-        for grid0 = grid then grid1
-        and grid1 = (make (rows grid) (cols grid))
-              then grid0
-        do (each grid0
-                 (lambda (j k v) (declare (ignore v))
-                   (let ((a (life-alive? grid0 j k)))
-                     (set! grid1 j k a))))
-           (life-print grid1 separator)))
+  (do ((i 0 (+ i 1))
+       (grid0 grid grid1)
+       (grid1 (make (rows grid) (cols grid))
+              grid0))
+      ((= i iterations))
+    (each grid0
+          (lambda (j k v) (declare (ignore v))
+            (let ((a (life-alive? grid0 j k)))
+              (set! grid1 j k a))))
+    (life-print grid1 separator)))
