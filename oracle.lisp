@@ -13,6 +13,9 @@
     :delayed-symbol=
     :force-symbol
     :delay-symbol)
+  (:import-from :overlord/digest
+    :digest-string
+    :byte-array-to-hex-string)
   (:export
    :oracle
    :oracle-exists?
@@ -87,7 +90,10 @@
     (assure oracle-value
       (call-next-method)))
   (:method oracle-timestamp (self)
-    (prin1-to-string (oracle-value self)))
+    (let ((value (oracle-value self)))
+      (if (stringp value)
+          (byte-array-to-hex-string (digest-string value))
+          (prin1-to-string (oracle-value self)))))
   (:method oracle= (self (other oracle))
     nil))
 
@@ -189,7 +195,10 @@ A name is extracted using `named-readtable:readtable-name'."))
   (:method oracle-value (self)
     (uiop:getenv name))
   (:method oracle-timestamp (self)
-    (oracle-value self))
+    (~> self
+        oracle-value
+        digest-string
+        byte-array-to-hex-string))
   (:method oracle-exists? (self)
     (uiop:getenvp name))
   (:method oracle= (self (other env-oracle))
