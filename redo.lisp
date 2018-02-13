@@ -5,12 +5,12 @@
 ;;; file-based Redo build system.
 
 (defpackage :overlord/redo
-  (:use #:cl #:alexandria #:serapeum)
+  (:use #:cl #:alexandria #:serapeum
+    #:overlord/specials)
   (:import-from #:overlord/types #:error*)
   (:import-from #:overlord/parallel
-    #:with-our-kernel
-    #:do-each/async)
-  (:import-from #:lparallel #:psome #:pevery)
+    #:with-our-kernel)
+  (:import-from #:lparallel #:pmap)
   (:nicknames :redo)
   (:export
    #:redo
@@ -46,8 +46,13 @@
    #:clear-temp-prereqs
    #:save-temp-prereqsne
    #:clear-temp-prereqsne
-   #:generate-impossible-target))
+   #:generate-impossible-target
+   #:call-with-target-locked))
 (in-package #:overlord/redo)
+
+;;; NB This file is only concerned with the logic of the build system.
+;;; It is not concerned with what targets are, what timestamps are, or
+;;; so forth.
 
 (defgeneric root-target ())
 (defgeneric target-stamp (target))
@@ -71,9 +76,16 @@
 (defgeneric clear-temp-prereqs (target))
 (defgeneric clear-temp-prereqsne (target))
 (defgeneric generate-impossible-target ())
+(defgeneric call-with-target-locked (target fn))
 
 (defvar *parents* '()
   "The chain of parents being built.")
+
+(defmacro with-target-locked ((target) &body body)
+  (with-thunk (body)
+    `(call-with-target-locked
+      ,target
+      ,body)))
 
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
@@ -91,23 +103,41 @@
 (defun redo (&rest args)
   (redo-all (or args (list (root-target)))))
 
-(defun redo-all (args)
+(defparameter *specials*
+  '(*parents*
+    *base*
+    *input*
+    *output*
+    *deps*
+    *source*
+    *language*
+    *program-preamble*)
+  "Special variables whose bindings, if any, should be propagated into
+  subthreads.")
+
+(defun redo-all (targets)
   ;; NB This is where you would add parallelism.
-  (do-each (target (reshuffle args))
-    ;; Avoid deadlocks.
-    (when (member target *parents* :test #'target=)
-      (error* "Recursive dependency: ~a depends on itself" target))
-    (when (target? target)
-      (clear-temp-prereqs target)
-      (clear-temp-prereqsne target)
-      (let ((build-script (resolve-build-script target)))
-        (nix (target-up-to-date? target))
-        (unwind-protect
-             (let ((*parents* (cons target *parents*)))
-               (run-script build-script))
-          (save-temp-prereqs target)
-          (save-temp-prereqsne target))
-        (setf (target-up-to-date? target) t)))))
+  (with-our-kernel ()
+    (flet ((redo (target)
+             (when (member target *parents* :test #'target=)
+               (error* "Recursive dependency: ~a depends on itself" target))
+             (when (target? target)
+               (clear-temp-prereqs target)
+               (clear-temp-prereqsne target)
+               (let ((build-script (resolve-build-script target)))
+                 (nix (target-up-to-date? target))
+                 (unwind-protect
+                      (let ((*parents* (cons target *parents*)))
+                        (run-script build-script))
+                   (save-temp-prereqs target)
+                   (save-temp-prereqsne target))
+                 (setf (target-up-to-date? target) t)))))
+      (if (single targets)
+          (redo (elt targets 0))
+          (funcall (if *use-threads* #'lparallel:pmap #'map)
+                   nil
+                   (dynamic-closure *specials* #'redo)
+                   (reshuffle targets))))))
 
 (defun target-has-build-script? (target)
   (let ((script-target (target-build-script-target target)))
@@ -139,43 +169,27 @@
 (-> changed? (t) boolean)
 (defun changed? (target)
   (with-our-kernel ()
-    (let ((changed? nil))
-      ;; This can't be an or, since we have to check (and possibly
-      ;; rebuild in turn) each target.
-      (unless (target-exists? target)
-        (setf changed? t))
-      (let* ((prereqs (target-saved-prereqs target))
-             (reqs (map 'vector #'saved-prereq-target prereqs)))
-        ;; Check regular prerequisites.
-        (let* ((outdated
-                 ;; Although they will be reshuffled by `redo', we still
-                 ;; want to shuffle them here so the prereqs are built
-                 ;; unpredictably.
-                 (~> reqs
-                     reshuffle
-                     (filter #'changed? _)
-                     (coerce 'list))))
-          (when outdated
-            (apply #'redo outdated))
-          ;; Check regular prerequisitves.
-          (unless (pevery #'unchanged? (reshuffle prereqs))
-            (setf changed? t))))
-      ;; Check non-existent prereqs.
-      (let ((prereqsne (target-saved-prereqsne target)))
-        (when (psome #'target-exists? prereqsne)
-          (setf changed? t)))
-      changed?)))
+    (let* ((prereqsne (target-saved-prereqsne target))
+           (prereqs (target-saved-prereqs target))
+           (target-does-not-exist? (not (target-exists? target)))
+           (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
+           (regular-prereqs-changed?
+             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
+                    (outdated (filter #'changed? reqs)))
+               (redo-all outdated)
+               (notevery #'unchanged? prereqs))))
+      (or target-does-not-exist?
+          non-existent-prereqs-exist?
+          regular-prereqs-changed?))))
 
-;;; The only thing special about redo-ifchange is that it writes out
-;;; stamps for its deps.
 (defun redo-ifchange (&rest args)
   (redo-ifchange-all args))
 
 (defun redo-ifchange-all (args)
-  ;; NB This is where you would add parallelism.
   (do-each (i (reshuffle args))
-    (when (changed? i)
-      (redo i))
+    (with-target-locked (i)
+      (when (changed? i)
+        (redo i)))
     (record-prereq i)))
 
 (defun redo-ifcreate (&rest targets)
@@ -183,7 +197,7 @@
 
 (defun redo-ifcreate-all (targets)
   (with-our-kernel ()
-    (when-let (i (psome #'target-exists? targets))
+    (when-let (i (some #'target-exists? targets))
       (error* "Non-existent prerequisite ~a already exists" i)))
   (do-each (i (reshuffle targets))
     (record-prereqne i)))

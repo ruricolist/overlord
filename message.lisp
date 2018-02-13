@@ -18,7 +18,10 @@
           (if (stringp control)
               (string-right-trim "." control)
               control)))
-    (format stream "~&[Overlord] ~?~%" control args)))
+    ;; Try to prevent interleaving messages.
+    (synchronized ()
+      (format stream "~&[Overlord] ~?~%" control args)
+      (force-output stream))))
 
 (define-compiler-macro message (&whole call format-control &rest format-arguments)
   (if (not (stringp format-control)) call

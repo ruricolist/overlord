@@ -11,18 +11,17 @@
            #:*module*
            #:*program*
            #:*program-preamble*
-           #:*deps*
            #:*language*
            #:*phase*
            #:*source*
            #:*db-version*
-           #:db-version))
+           #:db-version
+           #:*use-threads*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
 (defvar-unbound *input* "Input of a pattern.")
 (defvar-unbound *output* "Output of a pattern.")
-(defvar-unbound *deps* "Dependencies being collected.")
 (defvar-unbound *source* "Source file being compiled.")
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
@@ -54,3 +53,6 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defun db-version ()
   (assure db-version *db-version*))
+
+(defvar *use-threads* t
+  "Whether to allow parallelism.")

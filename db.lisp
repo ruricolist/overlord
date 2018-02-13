@@ -46,9 +46,11 @@
   (data :type fset:map))
 
 (defun delete-versioned-db (&optional (version (db-version)))
-  (uiop:delete-directory-tree
-   (db-version-dir version)
-   :validate (op (subpathp _ (xdg-cache-home)))))
+  (let ((dir (db-version-dir version)))
+    (when (uiop:directory-exists-p dir)
+      (uiop:delete-directory-tree
+       dir
+       :validate (op (subpathp _ (xdg-cache-home)))))))
 
 (defun db-version-dir (&optional (version (db-version)))
   (ensure-directory-pathname

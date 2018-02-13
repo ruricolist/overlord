@@ -823,6 +823,13 @@ Works for SBCL, at least."
              (funcall ,body))
            (funcall ,body)))))
 
+(defun target-table-len (table)
+  (with-target-table-locked (table)
+    (let ((hash-table (target-table.hash-table table))
+          (map (target-table.map table)))
+      (+ (hash-table-count hash-table)
+         (fset:size map)))))
+
 (defun target-table-to-alist (table)
   (collecting
     (let ((hash-table (target-table.hash-table table))
@@ -909,6 +916,23 @@ Works for SBCL, at least."
                      0))))
             (when (= count 1)
               (collect target))))))))
+
+
+
+;;; This is bad; how many locks can a program have? There could be
+;;; millions of targets.
+(defvar *target-locks-table*
+  (make-target-table :size 1024))
+
+(defmethod call-with-target-locked ((target t) (fn function))
+  (let ((lock
+          (let ((table *target-locks-table*))
+            (or (target-table-ref table target)
+                (synchronized (table)
+                  (ensure (target-table-ref table target)
+                    (bt:make-lock)))))))
+    (synchronized (lock)
+      (funcall fn))))
 
 
 ;;; Building targets (scripts).

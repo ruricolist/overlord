@@ -7,8 +7,7 @@
     #:end-kernel
     #:pmap)
   (:export
-   #:with-our-kernel
-   #:do-each/async))
+   #:with-our-kernel))
 (in-package :overlord/parallel)
 
 (def nprocs
@@ -39,7 +38,8 @@
         (message "Initializing Overlord thread pool")
         (setf *our-kernel*
               (make-kernel (* nprocs 2)
-                           :name "Overlord worker"))))))
+                           :name "Overlord worker"
+                           :use-caller t))))))
 
 (defun end-our-kernel ()
   "Terminate the Overlord kernel."
@@ -51,9 +51,3 @@
 
 (uiop:register-image-dump-hook 'end-our-kernel)
 
-(define-do-macro do-each/async ((item seq &optional return) &body body)
-  `(with-our-kernel ()
-     (pmap nil
-           (lambda (,item)
-             ,@body)
-           ,seq)))
