@@ -39,7 +39,7 @@
 (defgeneric kv.ref (kv key))
 (defgeneric (setf kv.ref) (value kv key))
 (defgeneric kv.del (kv key))
-(defgeneric kv.sync (kv &key))
+(defgeneric kv.sync (kv))
 (defgeneric kv.squash (kv))
 
 (defunit tombstone)
@@ -123,18 +123,14 @@
     (setf (kv.ref self key) tombstone)
     (values))
 
-  (:method kv.sync (self &key (lock t))
-    (flet ((sync ()
-             (log.update log last-saved-map current-map)
-             (setf last-saved-map current-map)))
-      (if lock
-          (synchronized (self)
-            (sync))
-          (sync))))
+  (:method kv.sync (self)
+    (synchronized (self)
+      (log.update log last-saved-map current-map)
+      (setf last-saved-map current-map)))
 
   (:method kv.squash (self)
     (synchronized (self)
-      (kv.sync self :lock nil)
+      (kv.sync self)
       (log.squash log))))
 
 (defclass dead-kv (kv)
@@ -150,7 +146,7 @@
   (:method kv.del (self key)
     (declare (ignore key))
     (values))
-  (:method kv.sync (self &key)
+  (:method kv.sync (self)
     (values))
   (:method kv.squash (self)
     (values)))
