@@ -4,7 +4,8 @@
   (:import-from :named-readtables
     :readtable-name)
   (:import-from :overlord/util
-    :class-name-of)
+    :class-name-of
+    :byte-array-to-hex-string)
   (:import-from :overlord/redo
     :redo-ifchange
     :redo-ifcreate)
@@ -14,8 +15,7 @@
     :force-symbol
     :delay-symbol)
   (:import-from :overlord/digest
-    :digest-string
-    :byte-array-to-hex-string)
+    :digest-string)
   (:export
    :oracle
    :oracle-exists?

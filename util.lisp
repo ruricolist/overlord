@@ -14,6 +14,8 @@
     :rename-file-overwriting-target
     :delete-file-if-exists)
   (:import-from :babel :string-to-octets)
+  (:import-from :quri :url-encode)
+  (:import-from :bit-smasher :octets->hex)
   (:export
    #:compare
    #:package-exports
@@ -36,7 +38,9 @@
    #:with-absolute-package-names
    #:resolve-package
    #:file-mtime
-   #:propagate-side-effect))
+   #:propagate-side-effect
+   #:url-encode
+   #:byte-array-to-hex-string))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with)
@@ -264,3 +268,6 @@ once."
        (load-time-value
         (progn ,@body t)))
      t))
+
+(defun byte-array-to-hex-string (ba)
+  (octets->hex ba))

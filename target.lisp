@@ -60,7 +60,6 @@
     :with-temporary-file
     :rename-file-overwriting-target)
   ;; How to escape names for use in pathnames.
-  (:import-from :quri :url-encode)
   (:shadow :defconfig :import)
   ;; Shadow for style.
   (:shadow
