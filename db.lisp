@@ -335,15 +335,15 @@ reloaded on demand."
   (kv.del (kv) (prop-key obj prop)))
 
 (defun save-database (&optional time-units)
-  (message "Run complete, saving database~@[ (~as)~]."
+  (message "Saving database~@[ (after ~as)~]."
            (/ time-units internal-time-units-per-second))
   (kv.sync (kv))
   (values))
 
+(uiop:register-image-dump-hook 'save-database)
+
 (defun compact-database ()
   (kv.squash (kv)))
-
-(defvar *save-pending* nil)
 
 (defun call/saving-database (thunk)
   (if *save-pending*

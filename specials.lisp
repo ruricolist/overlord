@@ -17,7 +17,8 @@
            #:*db-version*
            #:db-version
            #:*use-threads*
-           #:*building-root*))
+           #:*building-root*
+           #:*save-pending*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -60,3 +61,5 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
+
+(defvar *save-pending* nil)

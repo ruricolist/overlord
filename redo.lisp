@@ -8,6 +8,7 @@
   (:use #:cl #:alexandria #:serapeum
     #:overlord/specials)
   (:import-from #:overlord/types #:error*)
+  (:import-from #:overlord/db #:saving-database)
   (:import-from #:overlord/parallel
     #:with-our-kernel)
   (:import-from #:lparallel #:pmap)
@@ -117,33 +118,35 @@
     *compile-file-truename*
     *load-truename*
     *cli*
-    *building-root*)
+    *building-root*
+    *save-pending*)
   "Special variables whose bindings, if any, should be propagated into
   subthreads.")
 
 (defun redo-all (targets)
-  ;; NB This is where you would add parallelism.
-  (with-our-kernel ()
-    (flet ((redo (target)
-             (when (member target *parents* :test #'target=)
-               (error* "Recursive dependency: ~a depends on itself" target))
-             (when (target? target)
-               (clear-temp-prereqs target)
-               (clear-temp-prereqsne target)
-               (let ((build-script (resolve-build-script target)))
-                 (nix (target-up-to-date? target))
-                 (unwind-protect
-                      (let ((*parents* (cons target *parents*)))
-                        (run-script build-script))
-                   (save-temp-prereqs target)
-                   (save-temp-prereqsne target))
-                 (setf (target-up-to-date? target) t)))))
-      (if (single targets)
-          (redo (elt targets 0))
-          (funcall (if *use-threads* #'lparallel:pmap #'map)
-                   nil
-                   (dynamic-closure *specials* #'redo)
-                   (reshuffle targets))))))
+  (nest
+   (with-our-kernel ())
+   (saving-database)
+   (flet ((redo (target)
+            (when (member target *parents* :test #'target=)
+              (error* "Recursive dependency: ~a depends on itself" target))
+            (when (target? target)
+              (clear-temp-prereqs target)
+              (clear-temp-prereqsne target)
+              (let ((build-script (resolve-build-script target)))
+                (nix (target-up-to-date? target))
+                (unwind-protect
+                     (let ((*parents* (cons target *parents*)))
+                       (run-script build-script))
+                  (save-temp-prereqs target)
+                  (save-temp-prereqsne target))
+                (setf (target-up-to-date? target) t))))))
+   (if (single targets)
+       (redo (elt targets 0))
+       (funcall (if *use-threads* #'lparallel:pmap #'map)
+                nil
+                (dynamic-closure *specials* #'redo)
+                (reshuffle targets)))))
 
 (defun target-has-build-script? (target)
   (let ((script-target (target-build-script-target target)))
