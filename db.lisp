@@ -33,13 +33,16 @@
 (deftype kv-value ()
   't)
 
+(define-modify-macro withf (&rest item-or-tuple) fset:with)
+(define-modify-macro lessf (&rest item-or-tuple) fset:less)
+
 (defgeneric kv.ref (kv key))
 (defgeneric (setf kv.ref) (value kv key))
 (defgeneric kv.del (kv key))
 (defgeneric kv.sync (kv &key))
 (defgeneric kv.squash (kv))
 
-(defconst tombstone '%tombstone)
+(defunit tombstone)
 
 (defstruct-read-only (log-record (:conc-name log-record.))
   (timestamp (get-universal-time) :type (integer 0 *))
@@ -180,13 +183,11 @@
             (kv-write record out)
             (finish-output out)))))))
 
-(defun map-union/tombstones (map1 map2)
-  (fset:do-map (k v map2)
-    (setf map1
-          (if (eql v tombstone)
-              (fset:less map1 k)
-              (fset:with map1 k v))))
-  map1)
+(defun strip-tombstones (map)
+  (let ((out (fset:empty-map)))
+    (fset:do-map (k v map out)
+      (unless (eq v tombstone)
+        (withf out k v)))))
 
 (defun log.load (log)
   (declare (optimize safety debug))
@@ -206,11 +207,12 @@
                                   until (eq record eof)
                                   collect record)))
                         (maps
-                          (mapcar #'log-record.data records)))
-                   (values
-                    (reduce #'map-union/tombstones maps
-                            :initial-value (fset:empty-map))
-                    (length maps)))))
+                          (mapcar #'log-record.data records))
+                        (map
+                          (reduce #'fset:map-union maps
+                                  :initial-value (fset:empty-map)))
+                        (map (strip-tombstones map)))
+                   (values map (length maps)))))
            (retry ()
              :report "Try loading the database again."
              (go :retry))
