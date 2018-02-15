@@ -1293,8 +1293,8 @@ value and NEW do not match under TEST."
 
 (defun save-base (form)
   `(let ((*base* ,(base)))
-     (setf (current-dir!) (pathname-directory-pathname *base*))
-     ,form))
+     (with-current-dir (*base*)
+       ,form)))
 
 ;;; `defconfig' is extremely important and rather tricky. It is one of
 ;;; the only two types of targets that have inherent timestamps (the
@@ -1477,8 +1477,7 @@ specify the dependencies you want on build."
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
          (script-form
-           `(progn
-              (setf (current-dir!) ,dir)
+           `(with-current-dir (,dir)
               ,@script)))
     `(progn
        ;; Make the task accessible by name.

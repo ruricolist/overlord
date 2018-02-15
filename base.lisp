@@ -5,14 +5,16 @@
     :overlord/types
     :overlord/global-state)
   (:import-from :overlord/specials
-    :*base* :*cli*)
+    :*base* :*cli* :*use-threads*)
   (:import-from :named-readtables
     :find-readtable)
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
+    :directory-pathname-p
     :merge-pathnames*
-    :chdir :getcwd :pathname-equal)
+    :chdir :getcwd :pathname-equal
+    :*nil-pathname*)
   (:import-from :overlord/util
     :locate-dominating-file)
   (:export
@@ -23,33 +25,59 @@
    :base-relative-pathname
    :infer-system
    :ensure-absolute
-   :cd))
+   :with-current-dir))
 
 (in-package :overlord/base)
 
-(defun current-dir! ()
+(deftype absolute-directory-pathname ()
+  '(and absolute-pathname directory-pathname))
+
+(defun absolute-directory-pathname? (x)
+  "Is X an absolute directory pathname?"
+  (and (absolute-pathname-p x)
+       (directory-pathname-p x)))
+
+(defun absolute-directory-pathname (x)
+  "Resolve X as an absolute directory pathname."
   (assure (and absolute-pathname directory-pathname)
-    (let ((cwd (getcwd))
-          (dpd *default-pathname-defaults*))
-      (unless (pathname-equal cwd dpd)
-        (setf *default-pathname-defaults* cwd))
-      cwd)))
+    (if (absolute-directory-pathname? x) x
+        (let ((x (truename x)))
+          (if (directory-pathname-p x) x
+              (pathname-directory-pathname x))))))
+
+(defun current-dir! ()
+  "Return the current directory.
+
+If `*default-pathname-defaults*' is an absolute directory pathname, return that.
+
+Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `*default-pathname-defaults*' to the new value, and return the new value."
+  (if *use-threads*
+      (let ((dpd *default-pathname-defaults*))
+        (if (absolute-directory-pathname? dpd) dpd
+            (setf *default-pathname-defaults*
+                  (absolute-directory-pathname dpd))))
+      (lret ((dpd *default-pathname-defaults*)
+             (cwd (getcwd)))
+        (unless (pathname-equal cwd dpd)
+          (setf *default-pathname-defaults* cwd)))))
 
 (defun (setf current-dir!) (dir)
-  (check-type dir (and absolute-pathname directory-pathname))
-  (ensure-directories-exist dir)
-  (unless (pathname-equal dir (getcwd))
-    (chdir dir))
-  (unless (pathname-equal dir *default-pathname-defaults*)
-    (setf *default-pathname-defaults* dir))
-  dir)
+  (lret ((dir (absolute-directory-pathname dir)))
+    (ensure-directories-exist dir)
+    (unless *use-threads*
+      (unless (pathname-equal dir (getcwd))
+        (chdir dir)))
+    (unless (pathname-equal dir *default-pathname-defaults*)
+      (setf *default-pathname-defaults* dir))))
 
-(defun cd (dir)
-  (setf (current-dir!) dir))
+(defun call/current-dir (thunk dir)
+  (let ((*default-pathname-defaults* *nil-pathname*))
+    (setf (current-dir!) dir)
+    (funcall thunk)))
 
-(defun call/current-dir! (thunk dir)
-  (setf (current-dir!) dir)
-  (funcall thunk))
+(defmacro with-current-dir ((dir &key) &body body)
+  (with-thunk (body)
+    `(call/current-dir ,body ,dir)))
 
 (deftype build-env ()
   '(member :cli :repl :compile :load))
@@ -96,11 +124,11 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 (defun base ()
   #+ () (or *compile-file-truename*
             *load-truename*)
-  (assure directory-pathname
-    (if (boundp '*base*) *base*
-        (build-env-case
-          ((:cli :repl) (current-dir!))
-          ((:compile :load) (infer-base-from-package))))))
+  (absolute-directory-pathname
+   (if (boundp '*base*) *base*
+       (build-env-case
+         ((:cli :repl) (current-dir!))
+         ((:compile :load) (infer-base-from-package))))))
 
 (defun infer-base-1 (&key (errorp t))
   (or (gethash *package* *package-bases*)
