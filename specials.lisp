@@ -17,6 +17,7 @@
            #:*db-version*
            #:db-version
            #:*use-threads*
+           #:use-threads?
            #:*building-root*
            #:*save-pending*))
 (in-package #:overlord/specials)
@@ -58,6 +59,9 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *use-threads* t
   "Whether to allow parallelism.")
+
+(defun use-threads? ()
+  *use-threads*)
 
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
