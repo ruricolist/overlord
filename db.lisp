@@ -164,15 +164,13 @@
     (local-time:enable-read-macros)))
 
 (defun call/standard-io-syntax (fn)
-  (restart-case
-      (with-standard-io-syntax
-        ;; It's possible a writer may look at the current readtable.
-        (handler-case
-            (funcall fn)
-          (error (e)
-            (invoke-restart 'resignal e))))
-    (resignal (e)
-      (signal e))))
+  (with-standard-io-syntax
+    ;; It's possible a writer may look at the current readtable.
+    (handler-bind ((serious-condition
+                     (lambda (e) (declare (ignore e))
+                       ;; Mutate the local binding only.
+                       (setq *print-readably* nil))))
+      (funcall fn))))
 
 (defmacro with-standard-io-syntax* (&body body)
   "Like `with-standard-io-syntax', but escape before signaling an error."
@@ -356,8 +354,9 @@ reloaded on demand."
   (kv.del (kv) (prop-key obj prop)))
 
 (defun save-database (&optional time-units)
-  (message "Saving database~@[ (after ~fs)~]."
-           (float (/ time-units internal-time-units-per-second)))
+  (message "Saving database~@[ (after ~as)~]."
+           (and time-units
+                (float (/ time-units internal-time-units-per-second))))
   (kv.sync (kv))
   (values))
 
