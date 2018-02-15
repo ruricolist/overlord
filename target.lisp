@@ -281,7 +281,21 @@ Works for SBCL, at least."
 (deftype lang ()
   '(or package lang-name))
 
-(defclass ref ()
+(defgeneric load-form-slot-names (self)
+  (:method-combination append))
+
+(defclass externalizable ()
+  ())
+
+(defmethod make-load-form ((self externalizable) &optional env)
+  (make-load-form-saving-slots self
+                               :slot-names (load-form-slot-names self)
+                               :environment env))
+
+(defmethod load-form-slot-names append ((self externalizable))
+  nil)
+
+(defclass ref (externalizable)
   ((name
     :reader ref.name
     :type t
@@ -293,10 +307,8 @@ Works for SBCL, at least."
     (unless (slot-boundp self 'name)
       (error* "No name")))
 
-  (:method make-load-form (self &optional env)
-    (declare (ignore env))
-    `(make-instance ,(class-of self)
-                    :name ,name))
+  (:method load-form-slots append (self)
+    '(name))
 
   (:method fset:compare (self (other ref))
     (fset:compare-slots self other #'class-name-of #'ref.name)))
@@ -331,10 +343,8 @@ Works for SBCL, at least."
    :use-list nil))
 
 (defmethods package-ref (self name nicknames use-list)
-  (:method make-load-form (self &optional env)
-    (make-load-form-saving-slots self
-                                 :slot-names '(name nicknames use-list)
-                                 :environment env)))
+  (:method load-form-slot-names append (self)
+    '(nicknames use-list)))
 
 (defun package-ref (name &key nicknames use-list)
   (make 'package-ref :name (string name)
@@ -375,6 +385,10 @@ Works for SBCL, at least."
     (merge-pathnames (pattern.output-defaults pattern)
                      input)))
 
+(defgeneric print-pattern-ref (pattern ref stream)
+  (:method ((pattern symbol) ref stream)
+    (print-pattern-ref (find-pattern pattern) ref stream)))
+
 (defmethods pattern-ref (self (input name) output pattern)
   (:method initialize-instance :after (self &key)
     ;; Merge in the defaults for inputs and outputs.
@@ -383,24 +397,10 @@ Works for SBCL, at least."
             (merge-pattern-defaults pattern input))))
 
   (:method print-object (self stream)
-    (let ((pattern-name
-            (assure symbol
-              (if (symbolp pattern) pattern
-                  (class-name-of pattern)))))
-      (if *print-escape*
-          (format stream "#.~s"
-                  `(pattern-ref ',pattern-name
-                                ,input))
-          (print-unreadable-object (self stream :type t)
-            (format stream "~a (~a -> ~a)"
-                    pattern-name
-                    input
-                    output)))))
+    (print-pattern-ref pattern self stream))
 
-  (:method make-load-form (self &optional env)
-    (make-load-form-saving-slots self
-                                 :slot-names '(pattern name output)
-                                 :environment env))
+  (:method load-form-slot-names append (self)
+    '(pattern output))
 
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
@@ -772,7 +772,7 @@ Works for SBCL, at least."
             (not *read-eval*))
     (return-from print-object
       (call-next-method)))
-  (format stream "#.")
+  (write-string (read-eval-prefix self stream) stream)
   (format stream "~s"
           `(alist-to-target-table
             '(,@(target-table-to-alist self)))))
@@ -1514,6 +1514,29 @@ specify the dependencies you want on build."
    :output-defaults *nil-pathname*
    :script trivial-target))
 
+(defmethod load-form-slot-names append ((self pattern))
+  '(input-defaults output-defaults script))
+
+(defmethod print-pattern-ref ((pattern pattern)
+                              (ref pattern-ref)
+                              stream)
+  (with-slots (input output) ref
+    (let ((pattern-name
+            (assure symbol
+              (if (symbolp pattern)
+                  pattern
+                  (class-name-of pattern)))))
+      (if *print-escape*
+          (format stream "~a~s"
+                  (read-eval-prefix ref stream)
+                  `(pattern-ref ',pattern-name
+                                ,input))
+          (print-unreadable-object (ref stream :type t)
+            (format stream "~a (~a -> ~a)"
+                    pattern-name
+                    input
+                    output))))))
+
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
     (etypecase-of (or symbol pattern) pattern
@@ -1988,7 +2011,8 @@ interoperation with Emacs."
 ;;; This can't use `defpattern', for bootstrapping reasons.
 
 (defclass fasl-lang-pattern (pattern)
-  ((lang :initarg :lang)
+  ((lang :initarg :lang
+         :initform (required-argument :lang))
    (source :initarg :source)))
 
 (defmethods fasl-lang-pattern (self lang source)
@@ -2009,7 +2033,16 @@ interoperation with Emacs."
         lang *input*)
        (ensure-directories-exist *output*)
        :top-level (package-compile-top-level? lang)
-       :source *source*))))
+       :source *source*)))
+
+  (:method print-pattern-ref (self (ref pattern-ref) stream)
+    (with-slots ((input name)) ref
+      (format stream "~a~s"
+              (read-eval-prefix self stream)
+              `(pattern-ref (fasl-lang-pattern
+                             ,(lang-name lang)
+                             ,source)
+                            ,input)))))
 
 (defun fasl-lang-pattern (lang source)
   (make 'fasl-lang-pattern :lang lang :source source))
