@@ -501,14 +501,13 @@ Works for SBCL, at least."
     directory-ref
     pattern-ref
     module-spec
-    oracle
-    task))
+    oracle))
 
 (defconstructor task
   "A task."
-  (target (and target (not task)))
+  (target target)
   (thunk function)
-  (script (and target (not task))))
+  (script target))
 
 
 ;;; Manipulating targets.
@@ -548,8 +547,7 @@ Works for SBCL, at least."
       (~> target
           module-spec-cell
           module-cell.module))
-     (oracle (oracle-exists? target))
-     (task (target-exists? (task-script target))))))
+     (oracle (oracle-exists? target)))))
 
 (defun target-timestamp (target)
   (etypecase-of target target
@@ -584,11 +582,7 @@ Works for SBCL, at least."
      (let* ((cell (module-spec-cell target)))
        (with-slots (module timestamp) cell
          (if (null module) never timestamp))))
-    (oracle (oracle-timestamp target))
-    (task
-     (if-let (script (task-script target))
-       (target-timestamp script)
-       far-future))))
+    (oracle (oracle-timestamp target))))
 
 (defun (setf target-timestamp) (timestamp target)
   (check-type timestamp target-timestamp)
@@ -619,8 +613,7 @@ Works for SBCL, at least."
      (error* "Setting the timestamp of ~s does not make sense."))
     (module-spec
      (let ((cell (module-spec-cell target)))
-       (setf (module-cell.timestamp cell) timestamp)))
-    (task (error* "Cannot set timestamp of a task."))))
+       (setf (module-cell.timestamp cell) timestamp)))))
 
 (defun touch-target (target &optional (date (now)))
   (setf (target-timestamp target) date))
@@ -657,13 +650,7 @@ Works for SBCL, at least."
      (let-match1 (module-spec lang source) target
        (module-spec lang
                     (assure tame-pathname
-                      (merge-pathnames* source base)))))
-    (task
-     (locally
-         (declare #+sbcl (notinline copy-task task-script))
-       (let* ((script (task-script target))
-              (script (resolve-target script base)))
-         (copy-task target :script script))))))
+                      (merge-pathnames* source base)))))))
 
 
 ;;; Target table abstract data type.
@@ -685,7 +672,6 @@ Works for SBCL, at least."
     (package-ref 'package-ref)
     (directory-ref 'directory-ref)
     (pattern-ref 'pattern-ref)
-    (task 'task)
     (phony-target 'phony-target)
     (oracle 'oracle)
     ;; Bottom.
@@ -704,10 +690,6 @@ Works for SBCL, at least."
      (and (typep y 'phony-target)
           (eql (phony-target-name x)
                (phony-target-name y))))
-    (task
-     (and (typep y 'task)
-          (target= (task-target x)
-                   (task-target y))))
     (bindable-symbol
      (eql x y))
     (pathname
@@ -762,10 +744,6 @@ Works for SBCL, at least."
      (dx-sxhash
       (list 'package-ref
             (ref.name target))))
-    (task
-     (dx-sxhash
-      (multiple-value-list
-       (task-values target))))
     (oracle
      (hash-oracle target))
     (phony-target
@@ -947,40 +925,45 @@ Works for SBCL, at least."
 (defun list-top-level-targets ()
   (target-table-keys *top-level-targets*))
 
-(defmethod target-build-script-target (target)
-  (check-not-frozen)
-  (assure target
-    (etypecase-of target target
-      (pathname
-       (or (gethash target *tasks*)
-           impossible-target))
-      (bindable-symbol
-       (or (gethash target *tasks*)
-           ;; If there is no real target by that name, look for a
-           ;; phony target.
-           (target-build-script-target
-            (phony-target target))))
-      (phony-target
-       (let* ((name (phony-target-name target))
-              (key `(phony ,name)))
-         (or (gethash key *tasks*)
-             impossible-target)))
-      (target impossible-target))))
-
 (defun trivial-task (target)
   (task target
         (constantly nil)
         trivial-target))
 
-(defmethod target-default-build-script-target (target)
+(defun impossible-task (target)
+  (task target
+        (constantly nil)
+        impossible-target))
+
+(defmethod target-build-script (target)
+  (check-not-frozen)
+  (assure task
+    (etypecase-of target target
+      (pathname
+       (or (gethash target *tasks*)
+           (impossible-task target)))
+      (bindable-symbol
+       (or (gethash target *tasks*)
+           ;; If there is no real target by that name, look for a
+           ;; phony target.
+           (target-build-script
+            (phony-target target))))
+      (phony-target
+       (let* ((name (phony-target-name target))
+              (key `(phony ,name)))
+         (or (gethash key *tasks*)
+             (impossible-task target))))
+      (target (impossible-task target)))))
+
+(defmethod target-default-build-script (target)
   (check-not-frozen)
   ;; TODO Alternately, instead of trivial-target for the script, you
   ;; could actually use define-script-for and depend on those scripts.
   ;; But: that would create serious bootstrapping issues.
-  (assure target
+  (assure task
     (etypecase-of target target
-      ((or task pathname bindable-symbol phony-target)
-       impossible-target)
+      ((or pathname bindable-symbol phony-target)
+       (impossible-task target))
       ((or impossible-target trivial-target oracle)
        (trivial-task target))
       (root-target
@@ -1036,6 +1019,9 @@ Works for SBCL, at least."
                      (load-module-into-cell cell)))
                  trivial-target)))))))
 
+(defmethod build-script-target (script)
+  (task-script script))
+
 (defmethod run-script (task &aux (parent (current-parent)))
   (check-not-frozen)
   ;; XXX exhaustive?
@@ -1064,8 +1050,7 @@ Works for SBCL, at least."
      (let* ((name (phony-target-name target))
             (task (task target thunk script))
             (key `(phony ,name)))
-       (setf (gethash key *tasks*) task)))
-    (task (error* "Cannot save a task as a task."))))
+       (setf (gethash key *tasks*) task)))))
 
 (defun task-values (task)
   (values (task-target task)
@@ -1115,7 +1100,6 @@ TARGET."
                      ,input)))
     (oracle
      (make-load-form target))
-    (task `(task ,@(multiple-value-list (task-values target))))
     (phony-target
      `(phony-target ,@(multiple-value-list (deconstruct target))))))
 
@@ -1136,8 +1120,7 @@ TARGET."
            ;; TODO?
            directory-ref
            module-spec
-           phony-target
-           task)
+           phony-target)
        (target-timestamp target))
       (oracle (oracle-timestamp target))
       (pathname
@@ -1513,7 +1496,7 @@ specify the dependencies you want on build."
 
 ;;; A pattern is an abstract relationship between two files.
 
-(defclass pattern ()
+(defclass pattern (externalizable)
   ((input-defaults
     :initarg :input-defaults
     :type pathname

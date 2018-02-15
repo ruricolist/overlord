@@ -32,8 +32,9 @@
    #:stamp=
    #:target-exists?
    #:target=
-   #:target-build-script-target
-   #:target-default-build-script-target
+   #:target-build-script
+   #:target-default-build-script
+   #:build-script-target
    #:run-script
    #:record-prereq
    #:record-prereqne
@@ -60,8 +61,9 @@
 (defgeneric stamp= (stamp1 stamp2))
 (defgeneric target-exists? (target))
 (defgeneric target= (target1 target2))
-(defgeneric target-build-script-target (target))
-(defgeneric target-default-build-script-target (target))
+(defgeneric target-build-script (target))
+(defgeneric target-default-build-script (target))
+(defgeneric build-script-target (script))
 (defgeneric run-script (task))
 (defgeneric record-prereq (target))
 (defgeneric save-temp-prereqs (target))
@@ -148,6 +150,14 @@
                 (dynamic-closure *specials* #'redo)
                 (reshuffle targets)))))
 
+(defun target-build-script-target (target)
+  (build-script-target
+   (target-build-script target)))
+
+(defun target-default-build-script-target (target)
+  (build-script-target
+   (target-default-build-script target)))
+
 (defun target-has-build-script? (target)
   (let ((script-target (target-build-script-target target)))
     (or (target-exists? script-target)
@@ -156,15 +166,17 @@
 
 (defun resolve-build-script (target)
   ;; TODO What directory should be current? Or should the script take care of that?
-  (let ((script-target (target-build-script-target target)))
+  (let* ((script (target-build-script target))
+         (script-target (build-script-target script)))
     (if (target-exists? script-target)
         (let ((*parents* (cons target *parents*)))
           (redo-ifchange script-target)
-          script-target)
-        (let ((default (target-default-build-script-target target)))
-          (if (target-exists? default)
+          script)
+        (let* ((default (target-default-build-script target))
+               (default-target (build-script-target default)))
+          (if (target-exists? default-target)
               (let ((*parents* (cons target *parents*)))
-                (redo-ifchange default)
+                (redo-ifchange default-target)
                 (redo-ifcreate script-target)
                 default)
               (error* "No script found for ~a" target))))))
