@@ -122,9 +122,7 @@
                               (fset:with map key value)))
       #-sbcl
       (synchronized (self)
-        (setf current-map
-              (fset:with current-map
-                         key value)))))
+        (withf current-map key value))))
 
   (:method kv.del (self key)
     (setf (kv.ref self key) tombstone)
