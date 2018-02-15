@@ -82,6 +82,13 @@
    :last-saved-map (fset:empty-map)
    :log (log-file-path)))
 
+(defun kv-alist (kv)
+  "For debugging."
+  (let ((map (kv.current-map kv)))
+    (collecting
+      (fset:do-map (k v map)
+        (collect (cons k v))))))
+
 (defmethods kv (self version current-map last-saved-map log)
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
@@ -158,8 +165,24 @@
           (copy-readtable fset::*fset-rereading-readtable*)))
     (local-time:enable-read-macros)))
 
+(defun call/standard-io-syntax (fn)
+  (restart-case
+      (with-standard-io-syntax
+        ;; It's possible a writer may look at the current readtable.
+        (handler-case
+            (funcall fn)
+          (error (e)
+            (invoke-restart 'resignal e))))
+    (resignal (e)
+      (signal e))))
+
+(defmacro with-standard-io-syntax* (&body body)
+  "Like `with-standard-io-syntax', but escape before signaling an error."
+  (with-thunk (body)
+    `(call/standard-io-syntax ,body)))
+
 (defun kv-write (obj stream)
-  (with-standard-io-syntax
+  (with-standard-io-syntax*
     ;; It's possible a writer may look at the current readtable.
     (let ((*readtable* kv-readtable))
       (write obj :stream stream
@@ -193,7 +216,7 @@
        :retry
          (restart-case
              (return-from log.load
-               (with-standard-io-syntax
+               (with-standard-io-syntax*
                  (let* ((*readtable* kv-readtable)
                         (records
                           (with-input-from-file (in log :element-type 'character)
@@ -335,8 +358,8 @@ reloaded on demand."
   (kv.del (kv) (prop-key obj prop)))
 
 (defun save-database (&optional time-units)
-  (message "Saving database~@[ (after ~as)~]."
-           (/ time-units internal-time-units-per-second))
+  (message "Saving database~@[ (after ~fs)~]."
+           (float (/ time-units internal-time-units-per-second)))
   (kv.sync (kv))
   (values))
 
