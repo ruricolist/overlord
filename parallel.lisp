@@ -1,6 +1,7 @@
 (defpackage :overlord/parallel
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/message #:message)
+  (:import-from #:overlord/specials #:use-threads?)
   (:import-from #:lparallel
     #:*kernel*
     #:make-kernel
@@ -23,9 +24,15 @@
 (defvar-unbound *our-kernel*
   "Lparallel kernel for Overlord.")
 
+(defun call/our-kernel (thunk)
+  (if (use-threads?)
+      (let ((*kernel* (ensure-our-kernel)))
+        (funcall thunk))
+      (funcall thunk)))
+
 (defmacro with-our-kernel ((&key) &body body)
-  `(let ((*kernel* (ensure-our-kernel)))
-     ,@body))
+  (with-thunk (body)
+    `(call/our-kernel ,body)))
 
 (defun ensure-our-kernel ()
   (start-our-kernel)
