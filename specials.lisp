@@ -57,7 +57,7 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defun db-version ()
   (assure db-version *db-version*))
 
-(defvar *use-threads* t
+(defvar *use-threads* nil
   "Whether to allow parallelism.")
 
 (defun use-threads? ()
