@@ -19,7 +19,6 @@
     :locate-dominating-file)
   (:export
    :current-dir!
-   :build-env :build-env-case
    :*base* :base
    :set-package-base
    :base-relative-pathname
@@ -80,20 +79,6 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
   (with-thunk (body)
     `(call/current-dir ,body ,dir)))
 
-(deftype build-env ()
-  '(member :cli :repl :compile :load))
-
-(defun build-env ()
-  (assure build-env
-    (cond (*cli* :cli)
-          (*compile-file-truename* :compile)
-          (*load-truename* :load)
-          (t :repl))))
-
-(defmacro build-env-case (&body clauses)
-  `(ecase-of build-env (build-env)
-     ,@clauses))
-
 (defun ensure-absolute (pathname)
   (assure absolute-pathname
     (etypecase pathname
@@ -127,9 +112,7 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
             *load-truename*)
   (absolute-directory-pathname
    (if (boundp '*base*) *base*
-       (build-env-case
-         ((:cli :repl) (current-dir!))
-         ((:compile :load) (infer-base-from-package))))))
+       (infer-base-from-package))))
 
 (defun infer-base-1 (&key (errorp t))
   (or (gethash *package* *package-bases*)
