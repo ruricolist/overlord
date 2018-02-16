@@ -45,6 +45,7 @@
           (if (directory-pathname-p x) x
               (pathname-directory-pathname x))))))
 
+(-> current-dir! () absolute-directory-pathname)
 (defun current-dir! ()
   "Return the current directory.
 
