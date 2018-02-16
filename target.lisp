@@ -957,14 +957,10 @@ Works for SBCL, at least."
 
 (defmethod target-default-build-script (target)
   (check-not-frozen)
-  ;; TODO Alternately, instead of trivial-target for the script, you
-  ;; could actually use define-script-for and depend on those scripts.
-  ;; But: that would create serious bootstrapping issues.
   (assure task
     (etypecase-of target target
-      ((or pathname bindable-symbol phony-target)
-       (impossible-task target))
-      ((or impossible-target trivial-target oracle)
+      ((or pathname bindable-symbol phony-target
+           impossible-target trivial-target oracle)
        (trivial-task target))
       (root-target
        (task target
