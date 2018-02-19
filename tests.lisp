@@ -458,3 +458,9 @@
   (with-imports* (m :from #1# :binding (#'inc-count))
     (is (= (inc-count) 0))))
 
+
+
+;;; Sanity checks.
+
+(test db-exists
+  (is-true (file-exists-p (overlord/db::log-file-path))))
