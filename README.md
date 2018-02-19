@@ -183,6 +183,12 @@ manages the state stored by Lisp itself, in symbols, and provides ways
 to manage other kinds of state. This generalized build system is
 modeled on Redo.
 
+Note that, like Redo, but unlike ASDF or Make, Overlord does not care
+about the ordering of timestamps. Timestamps (along with other
+metadata) are stored in the database, and a file or other target is
+considered changed as long as the timestamp is *different*, regardless
+of whether it is newer or older than other timestamps.
+
 ## CLI
 
 Overlord has basic integration with the command line.
