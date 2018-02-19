@@ -4,6 +4,8 @@
     :overlord/redo
     :overlord/db
     :overlord/types)
+  (:import-from :overlord/parallel
+    :end-our-kernel)
   (:export
    :freeze :freeze-policy
    :unfreeze
@@ -57,6 +59,7 @@ distributed."
 
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
+  (end-our-kernel)
   (unless (frozen?)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
@@ -74,9 +77,9 @@ distributed."
                (dolist (fn *freeze-fmakunbound-hit-list*)
                  (fmakunbound fn))))
       (ecase-of freeze-policy *freeze-policy*
-        ((nil))
-        ((t) (freeze))
-        (:hard (hard-freeze))))))
+                ((nil))
+                ((t) (freeze))
+                (:hard (hard-freeze))))))
 
 (uiop:register-image-dump-hook 'freeze)
 

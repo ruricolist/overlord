@@ -8,7 +8,8 @@
     #:end-kernel
     #:pmap)
   (:export
-   #:with-our-kernel))
+   #:with-our-kernel
+   #:end-our-kernel))
 (in-package :overlord/parallel)
 
 (def nprocs
@@ -54,6 +55,3 @@
       (when-let (*kernel* (bound-value '*our-kernel*))
         (message "Terminating Overlord thread pool")
         (end-kernel :wait t)))))
-
-(uiop:register-image-dump-hook 'end-our-kernel)
-
