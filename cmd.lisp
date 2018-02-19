@@ -1,7 +1,7 @@
 (cl:defpackage :overlord/cmd
   (:use :cl :alexandria :serapeum)
   (:shadowing-import-from :serapeum :collecting :summing :in)
-  (:import-from :overlord/specials :use-threads?)
+  (:import-from :overlord/specials :use-threads-p)
   (:import-from :overlord/base :base :current-dir!)
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream*)
@@ -41,7 +41,7 @@
 The OS-level current directory is per-process, not per thread. Using
 `chdir' could lead to race conditions. Instead, we arrange for the new
 process to change its own working directory."
-  (if (not (use-threads?)) tokens
+  (if (not (use-threads-p)) tokens
       (destructuring-bind (command . args) tokens
         (let ((dir (escape-pathname (current-dir!))))
           (if (not (os-windows-p))

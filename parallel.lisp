@@ -1,7 +1,7 @@
 (defpackage :overlord/parallel
   (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/message #:message)
-  (:import-from #:overlord/specials #:use-threads?)
+  (:import-from #:overlord/specials #:use-threads-p)
   (:import-from #:lparallel
     #:*kernel*
     #:make-kernel
@@ -25,7 +25,7 @@
   "Lparallel kernel for Overlord.")
 
 (defun call/our-kernel (thunk)
-  (if (use-threads?)
+  (if (use-threads-p)
       (let ((*kernel* (ensure-our-kernel)))
         (funcall thunk))
       (funcall thunk)))

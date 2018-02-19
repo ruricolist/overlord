@@ -20,14 +20,14 @@
     :write-file-if-changed
     :copy-file-if-changed)
   (:import-from :overlord/specials
-    :*use-threads*)
+    :use-threads-p)
   (:export
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
    :ensure-file-package :reset-file-package
    :message :*message-handler*
    :write-file-if-changed :copy-file-if-changed
-   :*use-threads*)
+   :use-threads-p)
   (:use-reexport
    :overlord/base
    :overlord/target
