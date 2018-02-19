@@ -199,10 +199,11 @@
             (finish-output out)))))))
 
 (defun strip-tombstones (map)
-  (let ((out (fset:empty-map)))
-    (fset:do-map (k v map out)
-      (unless (eq v tombstone)
-        (withf out k v)))))
+  (let ((out map))
+    (fset:do-map (k v map)
+      (when (eq v tombstone)
+        (lessf out k)))
+    out))
 
 (defun log.load (log)
   (declare (optimize safety debug))
