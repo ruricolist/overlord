@@ -68,12 +68,12 @@
   ((key :initarg :key
         :accessor oracle.key)))
 
-(defun depends-on-oracle (oracle)
-  (check-type oracle oracle)
-  (if (oracle-exists? oracle)
-      (redo-ifchange oracle)
-      (redo-ifcreate oracle))
-  (oracle-value oracle))
+(defun depends-on-oracle (&rest oracles)
+  (do-each (oracle (reshuffle oracles))
+    (if (oracle-exists? oracle)
+        (redo-ifchange oracle)
+        (redo-ifcreate oracle)))
+  (values))
 
 (defmethods oracle (self key)
   (:method make-load-form (self &optional env)
