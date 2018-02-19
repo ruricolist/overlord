@@ -360,10 +360,23 @@ reloaded on demand."
 (defun delete-prop (obj prop)
   (kv.del (kv) (prop-key obj prop)))
 
+(defun save-database-message (time-units)
+  (let ((seconds (save-database-seconds? time-units)))
+    (message "Saving database~@[ (after ~as)~]."
+             seconds)))
+
+(defun time-units->seconds (time-units)
+  (/ time-units
+     internal-time-units-per-second))
+
+(defun save-database-seconds? (time-units)
+  (when time-units
+    (let ((seconds (float (time-units->seconds time-units))))
+      (when (> seconds 0)
+        seconds))))
+
 (defun save-database (&optional time-units)
-  (message "Saving database~@[ (after ~as)~]."
-           (and time-units
-                (float (/ time-units internal-time-units-per-second))))
+  (save-database-message time-units)
   (kv.sync (kv))
   (values))
 
