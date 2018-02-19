@@ -439,7 +439,6 @@ system that is very likely to change.
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
 - Multiple database backends.
 - Use Overlord to build ASDF systems more correctly.
-- Use Overlord to build ASDF systems in parallel.
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
