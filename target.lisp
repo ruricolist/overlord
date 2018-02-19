@@ -1225,24 +1225,38 @@ value and NEW do not match under TEST."
 (defun build (&rest targets)
   (redo-all targets))
 
+(defun depends-on-all (targets)
+  (redo-ifchange-all targets))
+
+(defun depends-on-all* (targets)
+  (map nil #'redo-ifchange targets))
+
 (defun depends-on (&rest targets)
-  (apply #'redo-ifchange targets))
+  (depends-on-all targets))
+
+(defun depends-on* (&rest targets)
+  (depends-on-all* targets))
+
+(defun depends-not-all (targets)
+  (redo-ifcreate-all targets))
 
 (defun depends-not (&rest targets)
-  (apply #'redo-ifcreate targets))
+  (depends-not-all targets))
 
 (defmacro with-script ((&key) &body body)
   `(macrolet ( ;; Depending on things in general.
               (:depends-on (x &rest xs)
-                `(redo-ifchange ,x ,@xs))
+                `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
-                `(:depends-on-all* (list ,x ,@xs)))
+                `(depends-on* ,x ,@xs))
               (:depends-on-all (xs)
-                `(redo-ifchange-all ,xs))
+                `(depends-on-all ,xs))
               (:depends-on-all* (xs)
-                `(map nil #'redo-ifchange ,xs))
+                `(depends-on-all* ,xs))
               (:depends-not (x &rest xs)
-                `(redo-ifcreate ,x ,@xs))
+                `(depends-not ,x ,@xs))
+              (:depends-not-all (xs)
+                `(depends-not-all ,xs))
 
               ;; Things to depend on.
               (:path (path)
