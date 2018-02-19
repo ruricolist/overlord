@@ -45,8 +45,7 @@
         (message "Initializing Overlord thread pool")
         (setf *our-kernel*
               (make-kernel (* nprocs 2)
-                           :name "Overlord worker"
-                           :use-caller t))))))
+                           :name "Overlord worker"))))))
 
 (defun end-our-kernel ()
   "Terminate the Overlord kernel."
