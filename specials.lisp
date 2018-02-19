@@ -58,6 +58,13 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *use-threads* nil
   "Whether to allow parallelism.")
+(declaim (type boolean *use-threads*))
+
+(defun use-threads-p ()
+  *use-threads*)
+
+(defun (setf use-threads-p) (value)
+  (setf *use-threads* (true value)))
 
 (defplace use-threads-p ()
   *use-threads*)
