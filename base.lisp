@@ -5,7 +5,7 @@
     :overlord/types
     :overlord/global-state)
   (:import-from :overlord/specials
-    :*base* :*cli* :*use-threads*)
+    :*base* :*cli* :use-threads-p)
   (:import-from :named-readtables
     :find-readtable)
   (:import-from :uiop
@@ -51,7 +51,7 @@
 If `*default-pathname-defaults*' is an absolute directory pathname, return that.
 
 Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `*default-pathname-defaults*' to the new value, and return the new value."
-  (if *use-threads*
+  (if (use-threads-p)
       (let ((dpd *default-pathname-defaults*))
         (if (absolute-directory-pathname? dpd) dpd
             (setf *default-pathname-defaults*
@@ -64,7 +64,7 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
 (defun (setf current-dir!) (dir)
   (lret ((dir (absolute-directory-pathname dir)))
     (ensure-directories-exist dir)
-    (unless *use-threads*
+    (unless (use-threads-p)
       (unless (pathname-equal dir (getcwd))
         (chdir dir)))
     (unless (pathname-equal dir *default-pathname-defaults*)

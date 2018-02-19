@@ -146,7 +146,7 @@
                   (setf (target-up-to-date? target) t)))))))
    (if (single targets)
        (redo (elt targets 0))
-       (funcall (if *use-threads* #'pmap #'map)
+       (funcall (if (use-threads-p) #'pmap #'map)
                 nil
                 (dynamic-closure *specials* #'redo)
                 (reshuffle targets)))))
