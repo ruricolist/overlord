@@ -204,7 +204,8 @@ A name is extracted using `named-readtable:readtable-name'."))
   (:method oracle= (self (other env-oracle))
     (equal name (env-oracle.name other))))
 
-(defun use-env (name)
-  (check-type name string)
-  (depends-on-oracle
-   (make 'env-oracle :name name)))
+(defun use-env (&rest names)
+  (let ((oracles
+          (mapcar (op (make 'env-oracle :name _))
+                  names)))
+    (apply #'depends-on-oracle oracles)))
