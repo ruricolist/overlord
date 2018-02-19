@@ -1243,8 +1243,6 @@ value and NEW do not match under TEST."
                 `(map nil #'redo-ifchange ,xs))
               (:depends-not (x &rest xs)
                 `(redo-ifcreate ,x ,@xs))
-              (:depends-not* (xs)
-                `(redo-ifcreate-all ,xs))
 
               ;; Things to depend on.
               (:path (path)
