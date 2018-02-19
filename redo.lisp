@@ -217,9 +217,8 @@
   (redo-ifcreate-all targets))
 
 (defun redo-ifcreate-all (targets)
-  (with-our-kernel ()
-    (when-let (i (some #'target-exists? targets))
-      (error* "Non-existent prerequisite ~a already exists" i)))
+  (when-let (i (some #'target-exists? targets))
+    (error* "Non-existent prerequisite ~a already exists" i))
   (do-each (i (reshuffle targets))
     (record-prereqne i)))
 
