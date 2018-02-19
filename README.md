@@ -6,14 +6,14 @@ inspired by [Redo][] and [Racket][].
 Overlord addresses three problems which might seem unrelated, but
 which, on closer examination, turn out to the same problem:
 
-1. It provides a module system for implementing *languages as
-   libraries* (inspired by [Racket][]).
+1. It lets you reproducibly specify the desired state of a Lisp system
+   which is to be saved as an image.
 
 2. It provides a general-purpose build system (a superset of [Make][],
    inspired by [Redo][]).
 
-3. It lets you reproducibly specify the desired state of a Lisp system
-   which is to be saved as an image.
+3. It provides a module system for implementing *languages as
+   libraries* (inspired by [Racket][]).
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
@@ -42,7 +42,6 @@ which, on closer examination, turn out to the same problem:
 
 <!-- markdown-toc end -->
 
-
 ## Advice for users
 
 *Overlord is experimental*. For the most part, trying to document the
@@ -50,8 +49,14 @@ API at this stage would be futile. Instead, this README discusses the
 concepts behind Overlord. If you’re looking for the current syntax,
 consult the [test suite](tests.lisp) and the [files it uses](tests/).
 
-(If you are interested in reading the code, the substance is
-in [target.lisp](target.lisp); the rest is support.)
+(If you are interested in reading the code, here are the more
+interesting parts:
+
+- [redo.lisp](redo.lisp) has the logic of the build system.
+- [target.lisp](target.lisp) implements different kinds of targets.
+- [db.lisp](db.lisp) implements the database.
+
+The rest is support.)
 
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
@@ -62,10 +67,24 @@ download [Core Lisp][], and, if not on Windows, you must have the
 used instead).
 
 Overlord stores its persistent data structures in a cache directory.
-On Linux, this is `~/.cache/overlord/`. The data structures stored
-there are versioned. Since this version number is increasing rapidly,
-it might worth checking the cache directory from time to time to
-delete obsolete files.
+On Linux, this is `$XDG_CACHE_HOME/overlord`. The data structures
+stored there are versioned. Since this version number is increasing
+rapidly, it might worth checking the cache directory from time to time
+to delete obsolete files.
+
+Overlord is developed and tested on Clozure and SBCL. In the future it
+may support other Lisp implementations, but that is not a priority.
+Lisp implementations that do not support image-based persistence (e.g.
+ECL) are unlikely to receive support.
+
+Overlord supports building in parallel using threads. This feature is
+not on by default. If you want to try building in parallel, execute:
+
+    (setf (overlord:use-threads-p) t)
+
+At this time building with threads on SBCL is not recommended. (In
+particular, code that calls the Lisp compiler from multiple threads
+may deadlock – this includes compiling modules.)
 
 When I say “experimental”, I mean it. Anything may change at any time.
 
@@ -177,9 +196,10 @@ syntax.
 
 One thing that might not be obvious about Redo-style build systems is
 that they afford unusually good opportunities for parallelism.
-Although Overlord does not (yet) support parallelism, it tries to
-discourage reliance on side effects by, whenever possible, randomizing
-the order in which targets are built.
+Overlord (conditionally) supports parallelism, but even when
+parallelism is disabled, it tries to discourage reliance on side
+effects by, whenever possible, randomizing the order in which targets
+are built.
 
 # Overlord and Lisp images
 
@@ -410,14 +430,16 @@ system that is very likely to change.
 
 # Future work
 
-- Lots of tests.
-- More portability testing.
+- Lots more tests.
 - Multiple outputs from one target.
-- Source locations for functions in embedded languages.
-- Thread safety (and eventually parallelism).
+- Use sub-second timestamps on file systems that support them.
+- Better source locations for functions in embedded languages.
+- Better support parallelism on SBCL.
 - Improve the Emacs integration ([Prototype](elisp/overlord.el)).
 - Improve the CLI. (Look in roswell/ and cl-launch/ for prototypes.)
-- Use sub-second timestamps on file systems that support them.
+- Multiple database backends.
+- Use Overlord to build ASDF systems more correctly.
+- Use Overlord to build ASDF systems in parallel.
 
 Things I might or might not do, but sure would like to link to if
 someone else did them.
