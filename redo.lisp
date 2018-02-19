@@ -190,19 +190,18 @@
 ;;; Should be (target).
 (-> changed? (t) boolean)
 (defun changed? (target)
-  (with-our-kernel ()
-    (let* ((prereqsne (target-saved-prereqsne target))
-           (prereqs (target-saved-prereqs target))
-           (target-does-not-exist? (not (target-exists? target)))
-           (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
-           (regular-prereqs-changed?
-             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
-                    (outdated (filter #'changed? reqs)))
-               (redo-all outdated)
-               (notevery #'unchanged? prereqs))))
-      (or target-does-not-exist?
-          non-existent-prereqs-exist?
-          regular-prereqs-changed?))))
+  (let* ((prereqsne (target-saved-prereqsne target))
+         (prereqs (target-saved-prereqs target))
+         (target-does-not-exist? (not (target-exists? target)))
+         (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
+         (regular-prereqs-changed?
+           (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
+                  (outdated (filter #'changed? reqs)))
+             (redo-all outdated)
+             (notevery #'unchanged? prereqs))))
+    (or target-does-not-exist?
+        non-existent-prereqs-exist?
+        regular-prereqs-changed?)))
 
 (defun redo-ifchange (&rest args)
   (redo-ifchange-all args))
