@@ -77,9 +77,9 @@ distributed."
                (dolist (fn *freeze-fmakunbound-hit-list*)
                  (fmakunbound fn))))
       (ecase-of freeze-policy *freeze-policy*
-                ((nil))
-                ((t) (freeze))
-                (:hard (hard-freeze))))))
+        ((nil))
+        ((t) (freeze))
+        (:hard (hard-freeze))))))
 
 (uiop:register-image-dump-hook 'freeze)
 
