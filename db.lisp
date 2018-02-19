@@ -164,16 +164,22 @@
     (local-time:enable-read-macros)))
 
 (defun call/standard-io-syntax (fn)
-  (with-standard-io-syntax
-    ;; It's possible a writer may look at the current readtable.
-    (handler-bind ((serious-condition
-                     (lambda (e) (declare (ignore e))
-                       ;; Mutate the local binding only.
-                       (setq *print-readably* nil))))
-      (funcall fn))))
+  "Like `with-standard-io-syntax', but if there is an error, unwind
+the stack so the error itself can be printed."
+  (values-list
+   (funcall
+    (block escape
+      (handler-bind ((serious-condition
+                       (lambda (e)
+                         ;; Mutate the local binding only.
+                         (return-from escape
+                           (lambda ()
+                             (error e))))))
+        (with-standard-io-syntax
+          (constantly (multiple-value-list (funcall fn)))))))))
 
 (defmacro with-standard-io-syntax* (&body body)
-  "Like `with-standard-io-syntax', but escape before signaling an error."
+  "Macro wrapper for `call/standard-io-syntax'."
   (with-thunk (body)
     `(call/standard-io-syntax ,body)))
 
