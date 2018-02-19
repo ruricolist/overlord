@@ -61,9 +61,9 @@ process to change its own working directory."
                 ,@args)
               ;; This looks weird, but it actually works, because the
               ;; Windows API to start a process is called with a
-              ;; string rather than an array. We still want to pass a
-              ;; list of arguments, though, rather than concatenating
-              ;; them ourselves, to evade responsibility for escaping.
+              ;; string rather than an array. We could just as well
+              ;; pass a string, but then we would have to do our own
+              ;; escaping.
               `("cmd"
                 "/c"
                 "cd" ,dir
