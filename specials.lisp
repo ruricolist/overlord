@@ -16,7 +16,6 @@
            #:*source*
            #:*db-version*
            #:db-version
-           #:use-threads-p
            #:*building-root*
            #:*save-pending*
            #:use-threads-p))
