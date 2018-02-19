@@ -17,7 +17,7 @@
         (string
          (qconc tokens (tokens arg)))
         (pathname
-         (enq (escape-pathname arg) tokens))
+         (enq (stringify-pathname arg) tokens))
         (plist
          (qappend plist arg))
         ((list-of string)
@@ -26,7 +26,7 @@
     (values (qlist tokens)
             (qlist plist))))
 
-(defun escape-pathname (arg)
+(defun stringify-pathname (arg)
   (lret ((string (uiop:native-namestring arg)))
     (when (string^= "-" string)
       ;; Should we ignore the unsafe file names if `--' or
@@ -43,7 +43,7 @@ The OS-level current directory is per-process, not per thread. Using
 process to change its own working directory."
   (if (not (use-threads-p)) tokens
       (destructuring-bind (command . args) tokens
-        (let ((dir (escape-pathname (current-dir!))))
+        (let ((dir (stringify-pathname (current-dir!))))
           (if (not (os-windows-p))
               `("/bin/sh"
                 "-c"
