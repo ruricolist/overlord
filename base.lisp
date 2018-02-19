@@ -38,7 +38,7 @@
 
 (defun absolute-directory-pathname (x)
   "Resolve X as an absolute directory pathname."
-  (assure (and absolute-pathname directory-pathname)
+  (assure absolute-directory-pathname
     (if (absolute-directory-pathname? x) x
         (let ((x (truename x)))
           (if (directory-pathname-p x) x
