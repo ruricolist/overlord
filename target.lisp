@@ -976,7 +976,7 @@ Works for SBCL, at least."
                ;; persistent; we only want to build the targets that
                ;; have been defined in this image.
                (let ((*building-root* t))
-                 (redo-ifchange-all (list-top-level-targets))))
+                 (depends-on-all (list-top-level-targets))))
              trivial-target))
       (pattern-ref
        (let* ((input (pattern-ref.input target))
@@ -987,7 +987,7 @@ Works for SBCL, at least."
                  (let ((*input* input)
                        (*output* output))
                    (let ((*base* (pathname-directory-pathname input)))
-                     (redo-ifchange input))
+                     (depends-on input))
                    (pattern-build pattern)))
                (pattern.script pattern))))
       (directory-ref
@@ -1013,7 +1013,7 @@ Works for SBCL, at least."
                  (lambda ()
                    (let ((*base* (pathname-directory-pathname source)))
                      ;; Depend on the source file.
-                     (redo-ifchange source)
+                     (depends-on source)
                      ;; Let the language tell you what to depend on.
                      (lang-deps lang source))
 
@@ -1035,7 +1035,7 @@ Works for SBCL, at least."
 (defun run-save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
   (save-task target thunk script)
-  (redo-ifchange target))
+  (depends-on target))
 
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
@@ -1405,7 +1405,7 @@ rebuilt."
     `(progn
        (var-target ,name ,expr
          ,@deps)
-       (redo-ifchange ',name)
+       (depends-on ',name)
        ,@(unsplice
           (when (stringp docstring)
             `(setf (documentation ',name 'variable)
@@ -1443,7 +1443,7 @@ rebuilt."
            (script-thunk (eval* `(script-thunk ,@script)))
            (script-thunk (rebuild-symbol name script-thunk)))
       (save-task name script-thunk))
-    (redo-ifchange name))
+    (depends-on name))
   (let ((init (symbol-value name))
         (timestamp (target-timestamp name)))
     `(progn
@@ -1453,7 +1453,7 @@ rebuilt."
              ',init))
        (save-task ',name
                   (rebuild-symbol ',name (script-thunk ,@script)))
-       (redo-ifchange ',name)
+       (depends-on ',name)
        ',name)))
 
 
@@ -1769,7 +1769,7 @@ if it does not exist."
         (assure pathname
           (or (truename* path)
               (or (progn
-                    (redo path)
+                    (build path)
                     (truename* path))
                   (error "Cannot resolve pathname ~a" path)))))
   (mvlet* ((key (cons lang path))
@@ -1809,7 +1809,7 @@ if it does not exist."
         (synchronized (cell)
           (or module
               (progn
-                (redo (module-cell-spec cell))
+                (build (module-cell-spec cell))
                 module))))))
 
 
@@ -1839,7 +1839,7 @@ if it does not exist."
     (dynamic-unrequire-as lang source))
   (assure (not module-cell)
     (let ((spec (module-spec lang source)))
-      (redo-ifchange spec)
+      (depends-on spec)
       (module-cell.module
        (module-spec-cell spec)))))
 
@@ -1997,7 +1997,7 @@ interoperation with Emacs."
                (list ',load ,source))
              (defmethod lang-deps :after ((self (eql ,keyword)) source)
                (declare (ignore source))
-               (redo-ifchange ',script))))))))
+               (depends-on ',script))))))))
 
 (defun loader-language-table (val)
   (lambda (module key)
@@ -2013,13 +2013,13 @@ interoperation with Emacs."
       (recompile-object-file ()
         :report "Recompile the object file."
         (delete-file-if-exists object-file)
-        (redo (module-spec lang source))
+        (build (module-spec lang source))
         (load-fasl-lang lang source)))))
 
 (defmethod lang-deps ((lang package) (source cl:pathname))
   (let* ((pat (fasl-lang-pattern lang source))
          (ref (pattern-ref pat source)))
-    (redo-ifchange ref)))
+    (depends-on ref)))
 
 (defmethod unbuild-lang-deps ((lang package) (source cl:pathname))
   (delete-file-if-exists (faslize lang source)))
@@ -2049,7 +2049,7 @@ interoperation with Emacs."
            ;; Must be bound here for macros that intern
            ;; symbols.
            (*package* (user-package (resolve-package lang))))
-      (redo-ifchange *source*)
+      (depends-on *source*)
       (compile-to-file
        (wrap-current-module
         (expand-module lang *input*)
@@ -2587,7 +2587,7 @@ actually exported by the module specified by LANG and SOURCE."
             (let ((object-file (faslize lang source))
                   (target (module-spec lang source)))
               (delete-file-if-exists object-file)
-              (redo target)
+              (build target)
               (check-static-bindings lang source bindings)))))))
 
 (defmacro declaim-module (as from)
