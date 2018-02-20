@@ -1543,7 +1543,7 @@ specify the dependencies you want on build."
 (defmethod print-pattern-ref ((pattern pattern)
                               (ref pattern-ref)
                               stream)
-  (with-slots (input output) ref
+  (with-slots ((input name) output) ref
     (let ((pattern-name
             (assure symbol
               (if (symbolp pattern)
