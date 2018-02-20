@@ -86,7 +86,9 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       (relative-pathname
        (merge-pathnames* pathname (base))))))
 
-(define-global-state *package-bases* (make-hash-table))
+(define-global-state *package-bases*
+    (dict* (make-hash-table)
+           (find-package :cl-user) (user-homedir-pathname)))
 
 (defun set-package-base* (base &optional (system nil system-supplied?))
   "Set the base for the current package.
