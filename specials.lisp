@@ -66,9 +66,6 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defun (setf use-threads-p) (value)
   (setf *use-threads* (true value)))
 
-(defplace use-threads-p ()
-  *use-threads*)
-
 (defvar *building-root* nil)
 (declaim (type boolean *building-root*))
 
