@@ -84,6 +84,11 @@ enabled by default. If you want to try building in parallel, execute:
 
     (setf (overlord:use-threads-p) t)
 
+It is not recommended that you try parallelizing targets that call the
+Lisp compiler. (This includes importing modules.) On SBCL the Lisp
+compiler is protected by a global lock, and trying to use it from
+multiple threads can result in deadlock.
+
 When I say “experimental”, I mean it. Anything may change at any time.
 
 ### About Quicklisp
