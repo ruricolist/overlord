@@ -125,7 +125,13 @@
    :build
    :run
    :depends-on
+   :depends-on*
+   :pdepends-on
+   :depends-on-all
+   :depends-on-all*
+   :pdepends-on-all
    :depends-not
+   :depends-not-all
    :with-script))
 
 (in-package :overlord/target)
@@ -1231,11 +1237,17 @@ value and NEW do not match under TEST."
 (defun depends-on-all* (targets)
   (map nil #'redo-ifchange targets))
 
+(defun pdepends-on-all (targets)
+  (redo-ifchange/parallel targets))
+
 (defun depends-on (&rest targets)
   (depends-on-all targets))
 
 (defun depends-on* (&rest targets)
   (depends-on-all* targets))
+
+(defun pdepends-on (&rest targets)
+  (pdepends-on-all targets))
 
 (defun depends-not-all (targets)
   (redo-ifcreate-all targets))
@@ -1249,10 +1261,14 @@ value and NEW do not match under TEST."
                 `(depends-on ,x ,@xs))
               (:depends-on* (x &rest xs)
                 `(depends-on* ,x ,@xs))
+              (:pdepends-on (x &rest xs)
+                `(pdepends-on ,x ,@xs))
               (:depends-on-all (xs)
                 `(depends-on-all ,xs))
               (:depends-on-all* (xs)
                 `(depends-on-all* ,xs))
+              (:pdepends-on-all (xs)
+                `(pdepends-on-all ,xs))
               (:depends-not (x &rest xs)
                 `(depends-not ,x ,@xs))
               (:depends-not-all (xs)

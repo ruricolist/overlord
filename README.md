@@ -77,14 +77,12 @@ may support other Lisp implementations, but that is not a priority.
 Lisp implementations that do not support image-based persistence (e.g.
 ECL) are unlikely to receive support.
 
-Overlord supports building in parallel using threads. This feature is
-not on by default. If you want to try building in parallel, execute:
+Overlord supports building in parallel using threads. Targets can
+request that their dependencies be built in parallel by using
+`pdepends-on` instead of `depends-on`. However, threads are not
+enabled by default. If you want to try building in parallel, execute:
 
     (setf (overlord:use-threads-p) t)
-
-At this time building with threads on SBCL is not recommended. (In
-particular, code that calls the Lisp compiler from multiple threads
-may deadlock – this includes compiling modules.)
 
 When I say “experimental”, I mean it. Anything may change at any time.
 
@@ -202,8 +200,8 @@ syntax.
 
 One thing that might not be obvious about Redo-style build systems is
 that they afford unusually good opportunities for parallelism.
-Overlord (conditionally) supports parallelism, but even when
-parallelism is disabled, it tries to discourage reliance on side
+Overlord only uses parallelism when it is explicitly requested, but
+even without parallelism, it tries to discourage reliance on side
 effects by, whenever possible, randomizing the order in which targets
 are built.
 

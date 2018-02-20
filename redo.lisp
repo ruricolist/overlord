@@ -16,8 +16,10 @@
   (:export
    #:redo
    #:redo-all
+   #:redo/parallel
    #:redo-ifchange
    #:redo-ifchange-all
+   #:redo-ifchange/parallel
    #:redo-ifcreate
    #:redo-ifcreate-all
    #:redo-always
@@ -125,31 +127,41 @@
   "Special variables whose bindings, if any, should be propagated into
   subthreads.")
 
+(defun walk-targets (fn seq)
+  (let ((seq (reshuffle seq))
+        (fn (ensure-function fn)))
+    (if (use-threads-p)
+        (with-our-kernel ()
+          (pmap nil (dynamic-closure *specials* fn)
+                seq))
+        (map nil fn seq))))
+
+(defun redo-target (target)
+  (with-target-locked (target)
+    (when (member target *parents* :test #'target=)
+      (error* "Recursive dependency: ~a depends on itself" target))
+    (when (target? target)
+      (clear-temp-prereqs target)
+      (clear-temp-prereqsne target)
+      (let ((build-script (resolve-build-script target)))
+        (nix (target-up-to-date? target))
+        (unwind-protect
+             (let ((*parents* (cons target *parents*)))
+               (run-script build-script))
+          (save-temp-prereqs target)
+          (save-temp-prereqsne target))
+        (setf (target-up-to-date? target) t)))))
+
+(defun redo/parallel (targets)
+  (saving-database
+    (if (single targets)
+        (redo-all targets)
+        (walk-targets #'redo-target targets))))
+
 (defun redo-all (targets)
-  (nest
-   (with-our-kernel ())
-   (saving-database)
-   (flet ((redo (target)
-            (with-target-locked (target)
-              (when (member target *parents* :test #'target=)
-                (error* "Recursive dependency: ~a depends on itself" target))
-              (when (target? target)
-                (clear-temp-prereqs target)
-                (clear-temp-prereqsne target)
-                (let ((build-script (resolve-build-script target)))
-                  (nix (target-up-to-date? target))
-                  (unwind-protect
-                       (let ((*parents* (cons target *parents*)))
-                         (run-script build-script))
-                    (save-temp-prereqs target)
-                    (save-temp-prereqsne target))
-                  (setf (target-up-to-date? target) t)))))))
-   (if (single targets)
-       (redo (elt targets 0))
-       (funcall (if (use-threads-p) #'pmap #'map)
-                nil
-                (dynamic-closure *specials* #'redo)
-                (reshuffle targets)))))
+  (saving-database
+    (do-each (target (reshuffle targets))
+      (redo-target target))))
 
 (defun target-build-script-target (target)
   (build-script-target
@@ -206,11 +218,20 @@
 (defun redo-ifchange (&rest args)
   (redo-ifchange-all args))
 
+(defun redo-ifchange-target (target)
+  (when (changed? target)
+    (redo target))
+  (record-prereq target))
+
 (defun redo-ifchange-all (args)
   (do-each (i (reshuffle args))
-    (when (changed? i)
-      (redo i))
-    (record-prereq i)))
+    (redo-ifchange-target i)))
+
+(defun redo-ifchange/parallel (targets)
+  (if (single targets)
+      (redo-ifchange-all targets)
+      (walk-targets #'redo-ifchange-target
+                    targets)))
 
 (defun redo-ifcreate (&rest targets)
   (redo-ifcreate-all targets))
