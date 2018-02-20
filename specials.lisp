@@ -2,7 +2,7 @@
 
 (defpackage #:overlord/specials
   (:use #:cl :overlord/types)
-  (:import-from :serapeum :defvar-unbound :assure :~> :defplace)
+  (:import-from :serapeum :defvar-unbound :assure :~> :true)
   (:import-from :alexandria :read-file-into-string)
   (:export #:*base*
            #:*cli*
