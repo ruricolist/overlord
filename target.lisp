@@ -189,8 +189,11 @@ Works for SBCL, at least."
 (defconst uptodate       :uptodate)
 
 (defun safe-symbol (symbol)
-  (if (built-in-symbol? symbol) symbol
-      (delay-symbol symbol)))
+  (cond ((not (symbolp symbol))
+         symbol)
+        ((built-in-symbol? symbol)
+         symbol)
+        (t (delay-symbol symbol))))
 
 (defun built-in-symbol? (symbol)
   (and (symbolp symbol)
@@ -389,9 +392,19 @@ Works for SBCL, at least."
     (merge-pathnames (pattern.output-defaults pattern)
                      input)))
 
-(defgeneric print-pattern-ref (pattern ref stream)
-  (:method ((pattern symbol) ref stream)
-    (print-pattern-ref (find-pattern pattern) ref stream)))
+(defun print-pattern-ref (pattern ref stream)
+  (let* ((input (pattern-ref.input ref))
+         (pattern (find-pattern pattern))
+         (pattern-name (pattern-name pattern)))
+    (if *print-escape*
+        (format stream "~a~s"
+                (read-eval-prefix ref stream)
+                `(pattern-ref ,(safe-symbol pattern-name)
+                              ,input))
+        (print-unreadable-object (ref stream :type t)
+          (format stream "~a (~a)"
+                  pattern-name
+                  input)))))
 
 (defmethods pattern-ref (self (input name) output pattern)
   (:method initialize-instance :after (self &key)
@@ -1471,6 +1484,10 @@ specify the dependencies you want on build."
 
 ;;; A pattern is an abstract relationship between two files.
 
+(defgeneric pattern-name (pattern)
+  (:method ((pattern symbol))
+    pattern))
+
 (defclass pattern (externalizable)
   ((input-defaults
     :initarg :input-defaults
@@ -1492,45 +1509,19 @@ specify the dependencies you want on build."
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
 
-(defmethod print-pattern-ref ((pattern pattern)
-                              (ref pattern-ref)
-                              stream)
-  (with-slots ((input name)) ref
-    (let ((pattern-name
-            (assure symbol
-              (if (symbolp pattern)
-                  pattern
-                  (class-name-of pattern)))))
-      (print-pattern-ref-name pattern-name
-                              ref
-                              input
-                              stream))))
+(defmethod pattern-name ((self pattern))
+  (class-name-of self))
 
-(defmethod print-pattern-ref ((pattern delayed-symbol)
-                              (ref pattern-ref)
-                              stream)
-  (with-slots ((input name)) ref
-    (print-pattern-ref-name pattern
-                            ref
-                            input
-                            stream)))
-
-(defun print-pattern-ref-name (pattern-name ref input stream)
-  (if *print-escape*
-      (format stream "~a~s"
-              (read-eval-prefix ref stream)
-              `(pattern-ref ,(safe-symbol pattern-name)
-                            ,input))
-      (print-unreadable-object (ref stream :type t)
-        (format stream "~a (~a)"
-                pattern-name
-                input))))
+(defclass unloaded-pattern (pattern)
+  ((name :initarg :name
+         :type delayed-symbol
+         :reader pattern-name)))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
     (etypecase-of (or symbol delayed-symbol pattern) pattern
       (pattern pattern)
-      (delayed-symbol (find-pattern (force-symbol pattern)))
+      (delayed-symbol (make 'unloaded-pattern :name pattern))
       (symbol
        (cond ((subtypep pattern 'pattern)
               (make pattern))
@@ -2009,6 +2000,11 @@ interoperation with Emacs."
   (:method pattern.output-defaults (self)
     (faslize lang source))
 
+  (:method pattern-name (self)
+    `(fasl-lang-pattern
+      ,(safe-symbol (lang-name lang))
+      ,source))
+
   (:method pattern-build (self)
     (let* ((*source* *input*)
            (lang (lang-name lang))
@@ -2023,16 +2019,7 @@ interoperation with Emacs."
         lang *input*)
        (ensure-directories-exist *output*)
        :top-level (package-compile-top-level? lang)
-       :source *source*)))
-
-  (:method print-pattern-ref (self (ref pattern-ref) stream)
-    (with-slots ((input name)) ref
-      (format stream "~a~s"
-              (read-eval-prefix self stream)
-              `(pattern-ref (fasl-lang-pattern
-                             ,(safe-symbol (lang-name lang))
-                             ,source)
-                            ,input)))))
+       :source *source*))))
 
 (defun fasl-lang-pattern (lang source)
   (let ((lang (force-symbol lang)))
