@@ -54,7 +54,8 @@
    #:non-keyword
    #:db-version
    #:qualified-symbol
-   #:delayed-symbol=))
+   #:delayed-symbol=
+   #:cl-symbol-p))
 
 (in-package :overlord/types)
 
@@ -240,7 +241,7 @@ If the value of `*default-pathname-defaults*' and a call to
       (when (constantp s)
         (collect s)))))
 
-(defun cl-symbol? (x)
+(defun cl-symbol-p (x)
   (and (symbolp x)
        (eql (symbol-package x)
             (find-package :cl))))
@@ -248,7 +249,7 @@ If the value of `*default-pathname-defaults*' and a call to
 (deftype cl-symbol ()
   '(and symbol
     (not keyword)
-    (satisfies cl-symbol?)))
+    (satisfies cl-symbol-p)))
 
 (deftype bindable-symbol ()
   "To a rough approximation, a symbol that can/should be bound."
