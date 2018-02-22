@@ -319,7 +319,7 @@ Works for SBCL, at least."
     (unless (slot-boundp self 'name)
       (error* "No name")))
 
-  (:method load-form-slots append (self)
+  (:method load-form-slot-names append (self)
     '(name))
 
   (:method fset:compare (self (other ref))
