@@ -405,8 +405,7 @@ Works for SBCL, at least."
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
                         #'pattern-ref.input
-                        #'pattern-ref.pattern
-                        #'pattern-ref.output)))
+                        #'pattern-ref.pattern)))
 
 (defun pattern-ref (pattern file)
   "Make a pattern reference, or a list of pattern references."
@@ -709,8 +708,7 @@ Works for SBCL, at least."
     (pattern-ref
      (and (typep y 'pattern-ref)
           (and (compare #'equal #'pattern-ref.input    x y)
-               (compare #'eql   #'pattern-ref.pattern  x y)
-               (compare #'equal #'pattern-ref.output   x y))))))
+               (compare #'eql   #'pattern-ref.pattern  x y))))))
 
 (deftype hash-friendly-target ()
   '(or root-target
