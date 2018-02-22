@@ -351,30 +351,6 @@ Works for SBCL, at least."
     (string (directory-ref (ensure-pathname name :want-pathname t)))
     (directory-pathname (make 'directory-ref :name name))))
 
-(defclass package-ref (ref)
-  ((name :type string)
-   (nicknames
-    :type list
-    :initarg :nicknames
-    :reader package-ref.nicknames)
-   (use-list
-    :type list
-    :initarg :use
-    :reader package-ref.use-list))
-  (:documentation "A reference to a package.")
-  (:default-initargs
-   :nicknames nil
-   :use-list nil))
-
-(defmethods package-ref (self name nicknames use-list)
-  (:method load-form-slot-names append (self)
-    '(nicknames use-list)))
-
-(defun package-ref (name &key nicknames use-list)
-  (make 'package-ref :name (string name)
-                     :nicknames nicknames
-                     :use-list use-list))
-
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
   ;; either a symbol or an instance of `pattern', which is not yet
@@ -522,7 +498,6 @@ Works for SBCL, at least."
     bindable-symbol
     delayed-symbol
     pathname
-    package-ref
     directory-ref
     pattern-ref
     module-spec
@@ -555,11 +530,6 @@ Works for SBCL, at least."
      (bindable-symbol (boundp target))
      (delayed-symbol (target-exists? (force-symbol target)))
      (pathname (pathname-exists? target))
-     (package-ref
-      (~> target
-          ref.name
-          string
-          find-package))
      (directory-ref
       (~> target
           ref.name
@@ -592,10 +562,6 @@ Works for SBCL, at least."
      (if (pathname-exists? target)
          (file-mtime target)
          never))
-    (package-ref
-     (let* ((name (ref.name target))
-            (package (find-package (string name))))
-       (if package far-future never)))
     (directory-ref
      (let ((dir (resolve-target (ref.name target) (base))))
        (if (directory-exists-p dir)
@@ -639,7 +605,7 @@ Works for SBCL, at least."
            ;; TODO Ditto.
            (error* "Cannot set directory timestamps (yet).")
            (ensure-directories-exist dir))))
-    ((or pattern-ref package-ref oracle)
+    ((or pattern-ref oracle)
      ;; TODO Or does it?
      (error* "Setting the timestamp of ~s does not make sense."))
     (module-spec
@@ -660,7 +626,7 @@ Works for SBCL, at least."
     (simple-style-warning "Base looks like a temporary file: ~a" base))
   (etypecase-of target target
     ((or root-target impossible-target trivial-target
-         bindable-symbol package-ref delayed-symbol
+         bindable-symbol delayed-symbol
          phony-target
          oracle)
      target)
@@ -701,7 +667,6 @@ Works for SBCL, at least."
      'bindable-symbol)
     (pathname 'pathname)
     (module-spec 'module-spec)
-    (package-ref 'package-ref)
     (directory-ref 'directory-ref)
     (pattern-ref 'pattern-ref)
     (phony-target 'phony-target)
@@ -736,9 +701,6 @@ Works for SBCL, at least."
          (module-spec lang2 path2))
         (and (eql lang1 lang2)
              (pathname-equal path1 path2)))))
-    (package-ref
-     (and (typep y 'package-ref)
-          (compare #'string= #'ref.name x y)))
     (directory-ref
      (and (typep y 'directory-ref)
           (compare #'pathname-equal #'ref.name x y)))
@@ -991,15 +953,6 @@ Works for SBCL, at least."
                  (let ((dir (resolve-target dir (base))))
                    (ensure-directories-exist dir)))
                trivial-target)))
-      (package-ref
-       (with-slots (name use-list nicknames) target
-         (task target
-               (lambda ()
-                 (or (find-package name)
-                     (make-package name
-                                   :use use-list
-                                   :nicknames nicknames)))
-               trivial-target)))
       (module-spec
        (let ((cell (module-spec-cell target)))
          (with-slots (lang source) cell
@@ -1036,7 +989,7 @@ Works for SBCL, at least."
   (etypecase-of target target
     ((or root-target trivial-target impossible-target
          module-spec
-         directory-ref package-ref pattern-ref
+         directory-ref pattern-ref
          oracle)
      (error* "Task for ~a cannot be redefined." target))
     ((or bindable-symbol delayed-symbol pathname)
@@ -1087,9 +1040,6 @@ Works for SBCL, at least."
       (directory-ref
        (let ((name (ref.name target)))
          (fmt "directory ~a" name)))
-      (package-ref
-       (let ((name (ref.name target)))
-         (fmt "package ~a" name)))
       (phony-target
        (let ((name (phony-target-name target)))
          (fmt "phony target ~a" name)))
@@ -1113,7 +1063,6 @@ Works for SBCL, at least."
            impossible-target
            bindable-symbol
            delayed-symbol
-           package-ref
            pattern-ref
            ;; TODO?
            directory-ref
@@ -1276,8 +1225,6 @@ value and NEW do not match under TEST."
                   (path path)))
               (:file (file)
                 `(:path ,file))
-              (:package-exists (name &key use nicknames)
-                `(package-ref ,name :use ,use :nicknames ,nicknames))
               (:directory-exists (name)
                 `(directory-ref ,name))
               (:pattern (name input)
