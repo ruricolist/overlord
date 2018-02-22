@@ -389,23 +389,7 @@ reloaded on demand."
 (defun delete-prop (obj prop)
   (kv.del (kv) (prop-key obj prop)))
 
-(defun save-database-message (time-units)
-  (let ((seconds (save-database-seconds? time-units)))
-    (message "Saving database~@[ (after ~as)~]."
-             seconds)))
-
-(defun time-units->seconds (time-units)
-  (/ time-units
-     internal-time-units-per-second))
-
-(defun save-database-seconds? (time-units)
-  (when time-units
-    (let ((seconds (float (time-units->seconds time-units))))
-      (when (> seconds 0)
-        seconds))))
-
-(defun save-database (&optional time-units)
-  (save-database-message time-units)
+(defun save-database ()
   (kv.sync (kv))
   (values))
 
@@ -417,12 +401,10 @@ reloaded on demand."
 (defun call/saving-database (thunk)
   (if *save-pending*
       (funcall thunk)
-      (let ((*save-pending* t)
-            (start (get-internal-real-time)))
+      (let ((*save-pending* t))
         (unwind-protect
              (funcall thunk)
-          (let ((end (get-internal-real-time)))
-            (save-database (- end start)))))))
+          (save-database)))))
 
 (defmacro saving-database (&body body)
   (with-thunk (body)
