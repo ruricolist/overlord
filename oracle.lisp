@@ -23,7 +23,8 @@
    :oracle=
    :hash-oracle
    :use-var
-   :use-env))
+   :use-env
+   :oracle-name))
 (in-package :overlord/oracle)
 
 ;;; Oracles. Oracles let you depend on the environment: either the
@@ -66,7 +67,8 @@
 
 (defclass oracle ()
   ((key :initarg :key
-        :accessor oracle.key)))
+        :accessor oracle.key
+        :reader oracle-name)))
 
 (defun depends-on-oracle (&rest oracles)
   (do-each (oracle (reshuffle oracles))

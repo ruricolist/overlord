@@ -1049,45 +1049,44 @@ Works for SBCL, at least."
          system)))
 
 (defun print-target-being-built (target)
-  "Print the target being built.
-The idea here (borrowed from Apenwarr redo) is that the user should be
-able to simply evaluate the form for a given target to pick up
-building from there."
+  "Print some information about the target being built."
   (let* ((depth (max 0 (1- (length *parents*))))
          (spaces (make-string depth :initial-element #\Space)))
-    (message "~a~s"
+    (message "~aBuilding ~a"
              spaces
-             `(build ,(dump-target/pretty target)))))
+             (target-being-built-string target))))
 
-(defun dump-target/pretty (target)
-  "Return a form which, when evaluated, returns a target equivalent to
-TARGET."
-  (etypecase-of target target
-    (pathname target)
-    (bindable-symbol `(quote ,target))
-    (delayed-symbol (dump-target/pretty (force-symbol target)))
-    (root-target 'root-target)
-    (trivial-target 'trivial-target)
-    (impossible-target 'impossible-target)
-    (module-spec
-     (let-match1 (module-spec lang path) target
-       `(module-spec ,lang ,path)))
-    (directory-ref
-     `(directory-ref ,(ref.name target)))
-    (package-ref
-     `(package-ref ,(ref.name target)
-                   :nicknames ,(package-ref.nicknames target)
-                   :use-list ,(package-ref.use-list target)))
-    (pattern-ref
-     (let* ((pattern (pattern-ref.pattern target))
-            (input (pattern-ref.input target))
-            (pattern-name (class-name-of pattern)))
-       `(pattern-ref (find-pattern ',pattern-name)
-                     ,input)))
-    (oracle
-     (make-load-form target))
-    (phony-target
-     `(phony-target ,@(multiple-value-list (deconstruct target))))))
+(defun target-being-built-string (target)
+  (assure string
+    (etypecase-of target target
+      (pathname (native-namestring target))
+      (bindable-symbol (fmt "'~s" target))
+      (delayed-symbol
+       (target-being-built-string (force-symbol target)))
+      (root-target "everything")
+      ;; Shouldn't happen
+      (trivial-target "TRIVIAL TARGET")
+      (impossible-target "IMPOSSIBLE TARGET")
+      (module-spec
+       (let-match1 (module-spec lang path) target
+         (let ((path (native-namestring path)))
+           (fmt "~a (#lang ~a)"
+                path (string-downcase lang)))))
+      (directory-ref
+       (let ((name (ref.name target)))
+         (fmt "directory ~a" name)))
+      (package-ref
+       (let ((name (ref.name target)))
+         (fmt "package ~a" name)))
+      (phony-target
+       (let ((name (phony-target-name target)))
+         (fmt "phony target ~a" name)))
+      (pattern-ref
+       (native-namestring
+        (pattern-ref.output target)))
+      (oracle
+       (let ((name (oracle-name target)))
+         (fmt "oracle for ~a" name))))))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
