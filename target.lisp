@@ -366,12 +366,7 @@ Works for SBCL, at least."
     :accessor pattern-ref.input)
    (output
     :type pathname
-    :accessor pattern-ref.output)))
-
-(defgeneric merge-pattern-defaults (pattern input)
-  (:method (pattern input)
-    (values (merge-input-defaults pattern input)
-            (merge-output-defaults pattern input))))
+    :reader pattern-ref.output)))
 
 (defgeneric merge-input-defaults (pattern input)
   (:method (pattern input)
@@ -393,11 +388,17 @@ Works for SBCL, at least."
   (:method initialize-instance :after (self &key)
     ;; Merge in the defaults for inputs and outputs.
     (let ((pattern (find-pattern pattern)))
-      (setf (values input output)
-            (merge-pattern-defaults pattern input))))
+      (setf input
+            (merge-input-defaults pattern input))))
 
   (:method print-object (self stream)
     (print-pattern-ref pattern self stream))
+
+  (:method slot-unbound (class self (slot-name (eql 'output)))
+    (declare (ignore class))
+    ;; Since this is idempotent I see no reason to lock.
+    (let ((abs-output (merge-output-defaults pattern input)))
+      (setf output abs-output)))
 
   (:method load-form-slot-names append (self)
     '(pattern output))
