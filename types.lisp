@@ -176,11 +176,11 @@ If the value of `*default-pathname-defaults*' and a call to
      (if-let (package (find-package package-name))
        (receive (symbol status) (find-symbol symbol-name package)
          (if (null status)
-             (error* "No such symbol as ~a::~a"
+             (error* "Cannot force symbol: no such symbol as ~a::~a"
                      package-name
                      symbol-name)
              symbol))
-       (error* "No such package as ~a" package)))
+       (error* "Cannot force symbol: no such package as ~a" package)))
     (otherwise delay)))
 
 (defun delayed-symbol= (ds1 ds2)
