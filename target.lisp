@@ -193,8 +193,9 @@ Works for SBCL, at least."
       (delay-symbol symbol)))
 
 (defun built-in-symbol? (symbol)
-  (or (keywordp symbol)
-      (cl-symbol-p symbol)))
+  (and (symbolp symbol)
+       (or (keywordp symbol)
+           (cl-symbol-p symbol))))
 
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
   (cons x (assure stamp stamp)))
@@ -405,7 +406,8 @@ Works for SBCL, at least."
   (:method slot-unbound (class self (slot-name (eql 'output)))
     (declare (ignore class))
     ;; Since this is idempotent I see no reason to lock.
-    (let ((abs-output (merge-output-defaults pattern input)))
+    (let* ((pattern (find-pattern pattern))
+           (abs-output (merge-output-defaults pattern input)))
       (setf output abs-output)))
 
   (:method load-form-slot-names append (self)
@@ -1493,22 +1495,36 @@ specify the dependencies you want on build."
 (defmethod print-pattern-ref ((pattern pattern)
                               (ref pattern-ref)
                               stream)
-  (with-slots ((input name) output) ref
+  (with-slots ((input name)) ref
     (let ((pattern-name
             (assure symbol
               (if (symbolp pattern)
                   pattern
                   (class-name-of pattern)))))
-      (if *print-escape*
-          (format stream "~a~s"
-                  (read-eval-prefix ref stream)
-                  `(pattern-ref ,(safe-symbol pattern-name)
-                                ,input))
-          (print-unreadable-object (ref stream :type t)
-            (format stream "~a (~a -> ~a)"
-                    pattern-name
-                    input
-                    output))))))
+      (print-pattern-ref-name pattern-name
+                              ref
+                              input
+                              stream))))
+
+(defmethod print-pattern-ref ((pattern delayed-symbol)
+                              (ref pattern-ref)
+                              stream)
+  (with-slots ((input name)) ref
+    (print-pattern-ref-name pattern
+                            ref
+                            input
+                            stream)))
+
+(defun print-pattern-ref-name (pattern-name ref input stream)
+  (if *print-escape*
+      (format stream "~a~s"
+              (read-eval-prefix ref stream)
+              `(pattern-ref ,(safe-symbol pattern-name)
+                            ,input))
+      (print-unreadable-object (ref stream :type t)
+        (format stream "~a (~a)"
+                pattern-name
+                input))))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern

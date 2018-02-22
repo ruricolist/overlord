@@ -2,7 +2,7 @@
   (:use :cl :alexandria :serapeum :uiop/pathname)
   (:import-from :uiop/stream :default-temporary-directory)
   (:import-from :uiop :getcwd)
-  (:import-from :trivia :match :let-match1
+  (:import-from :trivia :match :let-match1 :ematch
     :multiple-value-ematch)
   (:import-from :fset :compare :compare-slots
     :define-cross-type-compare-methods)
@@ -163,12 +163,16 @@ If the value of `*default-pathname-defaults*' and a call to
   (symbol-name string))
 
 (defun delay-symbol (symbol)
-  (let ((package-name
-          (~> symbol
-              symbol-package
-              package-name))
-        (symbol-name (symbol-name symbol)))
-    (delayed-symbol package-name symbol-name)))
+  (assure delayed-symbol
+    (ematch symbol
+      ((delayed-symbol) symbol)
+      ((and _ (type symbol))
+       (let ((package-name
+               (~> symbol
+                   symbol-package
+                   package-name))
+             (symbol-name (symbol-name symbol)))
+         (delayed-symbol package-name symbol-name))))))
 
 (defun force-symbol (delay)
   (match delay
