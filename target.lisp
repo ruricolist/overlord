@@ -368,10 +368,18 @@ Works for SBCL, at least."
     :type pathname
     :reader pattern-ref.output)))
 
+;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
+;;; pathnames seems to work, as long as we're careful about how we
+;;; merge them. The order is important. We merge the *provided* inputs
+;;; and outputs into the *defaults*, rather than vice-versa. The
+;;; choice of merging algorithm is also important. For
+;;; merge-input-defaults, we want to preserve the host of the provided
+;;; input, so we use uiop:merge-pathnames*. But for
+;;; merge-output-defaults, we want to be able to redirect to the
+;;; output to a different host, so we use good old cl:merge-pathnames.
+
 (defgeneric merge-input-defaults (pattern input)
   (:method (pattern input)
-    ;; Note that we're merging the *provided* inputs and
-    ;; outputs into the defaults, rather than vice-versa.
     (merge-pathnames* (pattern.input-defaults pattern)
                       input)))
 
