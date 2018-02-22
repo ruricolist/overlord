@@ -188,6 +188,14 @@ Works for SBCL, at least."
 (defconst stamp          :stamp)
 (defconst uptodate       :uptodate)
 
+(defun safe-symbol (symbol)
+  (if (built-in-symbol? symbol) symbol
+      (delay-symbol symbol)))
+
+(defun built-in-symbol? (symbol)
+  (or (keywordp symbol)
+      (cl-symbol-p symbol)))
+
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
   (cons x (assure stamp stamp)))
 
@@ -204,7 +212,7 @@ Works for SBCL, at least."
   (record-parent-prereq parent target))
 
 (defmethod record-prereq ((target symbol))
-  (record-prereq (delay-symbol target)))
+  (record-prereq (safe-symbol target)))
 
 (defun record-parent-prereq (parent target)
   (check-type target target)
@@ -217,7 +225,7 @@ Works for SBCL, at least."
   (record-parent-prereqne parent target))
 
 (defmethod record-prereqne ((target symbol))
-  (record-prereqne (delay-symbol target)))
+  (record-prereqne (safe-symbol target)))
 
 (defun record-parent-prereqne (parent target)
   (check-type target target)
@@ -374,7 +382,7 @@ Works for SBCL, at least."
   ;; later when we bootstrap support for languages.
   ((pattern
     :initarg :pattern
-    :type (or symbol standard-object)
+    :type (or symbol standard-object delayed-symbol)
     :accessor pattern-ref.pattern)
    (name
     :type pathname
@@ -1540,7 +1548,7 @@ specify the dependencies you want on build."
       (if *print-escape*
           (format stream "~a~s"
                   (read-eval-prefix ref stream)
-                  `(pattern-ref ',pattern-name
+                  `(pattern-ref ,(safe-symbol pattern-name)
                                 ,input))
           (print-unreadable-object (ref stream :type t)
             (format stream "~a (~a -> ~a)"
@@ -1550,8 +1558,9 @@ specify the dependencies you want on build."
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
-    (etypecase-of (or symbol pattern) pattern
+    (etypecase-of (or symbol delayed-symbol pattern) pattern
       (pattern pattern)
+      (delayed-symbol (find-pattern (force-symbol pattern)))
       (symbol
        (cond ((subtypep pattern 'pattern)
               (make pattern))
@@ -2051,12 +2060,13 @@ interoperation with Emacs."
       (format stream "~a~s"
               (read-eval-prefix self stream)
               `(pattern-ref (fasl-lang-pattern
-                             ,(lang-name lang)
+                             ,(safe-symbol (lang-name lang))
                              ,source)
                             ,input)))))
 
 (defun fasl-lang-pattern (lang source)
-  (make 'fasl-lang-pattern :lang lang :source source))
+  (let ((lang (force-symbol lang)))
+    (make 'fasl-lang-pattern :lang lang :source source)))
 
 (defun fasl-lang-pattern-ref (lang source)
   (pattern-ref (fasl-lang-pattern lang source) source))
