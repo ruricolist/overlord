@@ -386,10 +386,10 @@ Works for SBCL, at least."
 
 (defmethods pattern-ref (self (input name) output pattern)
   (:method initialize-instance :after (self &key)
-    ;; Merge in the defaults for inputs and outputs.
-    (let ((pattern (find-pattern pattern)))
-      (setf input
-            (merge-input-defaults pattern input))))
+    (unless (absolute-pathname-p input)
+      (let* ((pattern (find-pattern pattern))
+             (abs-input (merge-input-defaults pattern input)))
+        (setf input abs-input))))
 
   (:method print-object (self stream)
     (print-pattern-ref pattern self stream))
