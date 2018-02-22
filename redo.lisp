@@ -51,7 +51,8 @@
    #:save-temp-prereqsne
    #:clear-temp-prereqsne
    #:generate-impossible-target
-   #:call-with-target-locked))
+   #:call-with-target-locked
+   #:target-tree))
 (in-package #:overlord/redo)
 
 ;;; NB This file is only concerned with the logic of the build system.
@@ -244,3 +245,13 @@
 
 (defun redo-always ()
   (record-prereq (generate-impossible-target)))
+
+(defun target-tree (&optional (target (root-target)))
+  "Return a list of (target . deps), where each dep is of the same
+type."
+  (when (target? target)
+    (let* ((saved-prereqs (target-saved-prereqs target))
+           (targets (mapcar #'saved-prereq-target saved-prereqs)))
+      (cons
+       target
+       (mapcar #'target-tree targets)))))
