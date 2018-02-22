@@ -134,7 +134,9 @@
    :guess-source
    :guess-lang+pos
    :resolve-lang
-   :module-spec))
+   :module-spec
+   :ensure-target-recorded
+   :load-module/lazy))
 
 (in-package :overlord/target)
 (in-readtable :standard)
