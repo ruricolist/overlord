@@ -199,6 +199,9 @@ Works for SBCL, at least."
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
 
+(defmethod record-prereq ((target symbol))
+  (record-prereq (delay-symbol target)))
+
 (defun record-parent-prereq (parent target)
   (check-type target target)
   (unless (root-target? parent)
@@ -208,6 +211,9 @@ Works for SBCL, at least."
 
 (defmethod record-prereqne (target &aux (parent (current-parent)))
   (record-parent-prereqne parent target))
+
+(defmethod record-prereqne ((target symbol))
+  (record-prereqne (delay-symbol target)))
 
 (defun record-parent-prereqne (parent target)
   (check-type target target)
@@ -502,6 +508,7 @@ Works for SBCL, at least."
     trivial-target
     phony-target
     bindable-symbol
+    delayed-symbol
     pathname
     package-ref
     directory-ref
@@ -534,6 +541,7 @@ Works for SBCL, at least."
      ((or root-target trivial-target) t)
      ((or impossible-target phony-target) nil)
      (bindable-symbol (boundp target))
+     (delayed-symbol (target-exists? (force-symbol target)))
      (pathname (pathname-exists? target))
      (package-ref
       (~> target
@@ -566,6 +574,8 @@ Works for SBCL, at least."
            (ensure2 (gethash target *symbol-timestamps*)
              now))
          never))
+    (delayed-symbol
+     (target-timestamp (force-symbol target)))
     (pathname
      (if (pathname-exists? target)
          (file-mtime target)
@@ -597,6 +607,9 @@ Works for SBCL, at least."
     (root-target (error* "Cannot set timestamp of root target."))
     ((or impossible-target trivial-target phony-target)
      (error* "Cannot set timestamp for ~a" target))
+    (delayed-symbol
+     (let ((target (force-symbol target)))
+       (setf (target-timestamp target) timestamp)))
     (bindable-symbol
      ;; Configurations need to set the timestamp while unbound
      #+ () (unless (boundp target)
@@ -635,7 +648,7 @@ Works for SBCL, at least."
     (simple-style-warning "Base looks like a temporary file: ~a" base))
   (etypecase-of target target
     ((or root-target impossible-target trivial-target
-         bindable-symbol package-ref
+         bindable-symbol package-ref delayed-symbol
          phony-target
          oracle)
      target)
@@ -672,7 +685,8 @@ Works for SBCL, at least."
     (root-target 'root-target)
     (trivial-target 'trivial-target)
     (impossible-target 'impossible-target)
-    (bindable-symbol 'bindable-symbol)
+    ((or bindable-symbol delayed-symbol)
+     'bindable-symbol)
     (pathname 'pathname)
     (module-spec 'module-spec)
     (package-ref 'package-ref)
@@ -698,6 +712,9 @@ Works for SBCL, at least."
                (phony-target-name y))))
     (bindable-symbol
      (eql x y))
+    (delayed-symbol
+     (target= (force-symbol x)
+              (force-symbol y)))
     (pathname
      (and (pathnamep y)
           (pathname-equal x y)))
@@ -720,41 +737,6 @@ Works for SBCL, at least."
           (and (compare #'equal #'pattern-ref.input    x y)
                (compare #'eql   #'pattern-ref.pattern  x y)
                (compare #'equal #'pattern-ref.output   x y))))))
-
-(defun hash-target (target)
-  (declare (optimize (speed 3)
-                     (safety 1)
-                     (debug 0)
-                     (compilation-speed 0)))
-  (etypecase-of target target
-    (root-target
-     (load-time-value (sxhash root-target)))
-    (trivial-target
-     (load-time-value (sxhash trivial-target)))
-    (impossible-target
-     (load-time-value (sxhash impossible-target)))
-    (bindable-symbol (sxhash target))
-    (pathname (sxhash target))
-    (module-spec
-     (let-match1 (module-spec lang path) target
-       (dx-sxhash (list 'module-spec lang path))))
-    (directory-ref
-     (dx-sxhash
-      (list 'directory-ref
-            (ref.name target))))
-    (package-ref
-     (dx-sxhash
-      (list 'package-ref
-            (ref.name target))))
-    (pattern-ref
-     (dx-sxhash
-      (list 'package-ref
-            (ref.name target))))
-    (oracle
-     (hash-oracle target))
-    (phony-target
-     (let ((name (phony-target-name target)))
-       (dx-sxhash `(phony ,name))))))
 
 (deftype hash-friendly-target ()
   '(or root-target
@@ -965,7 +947,7 @@ Works for SBCL, at least."
   (check-not-frozen)
   (assure task
     (etypecase-of target target
-      ((or pathname bindable-symbol phony-target
+      ((or pathname bindable-symbol delayed-symbol phony-target
            impossible-target trivial-target oracle)
        (trivial-task target))
       (root-target
@@ -1045,8 +1027,9 @@ Works for SBCL, at least."
          directory-ref package-ref pattern-ref
          oracle)
      (error* "Task for ~a cannot be redefined." target))
-    ((or bindable-symbol pathname)
-     (let ((task (task target thunk script)))
+    ((or bindable-symbol delayed-symbol pathname)
+     (let* ((target (force-symbol target))
+            (task (task target thunk script)))
        (setf (gethash target *tasks*) task)))
     (phony-target
      (let* ((name (phony-target-name target))
@@ -1082,6 +1065,7 @@ TARGET."
   (etypecase-of target target
     (pathname target)
     (bindable-symbol `(quote ,target))
+    (delayed-symbol (dump-target/pretty (force-symbol target)))
     (root-target 'root-target)
     (trivial-target 'trivial-target)
     (impossible-target 'impossible-target)
@@ -1117,6 +1101,7 @@ TARGET."
            trivial-target
            impossible-target
            bindable-symbol
+           delayed-symbol
            package-ref
            pattern-ref
            ;; TODO?

@@ -4,6 +4,8 @@
   (:import-from :uiop :getcwd)
   (:import-from :trivia :match :let-match1
     :multiple-value-ematch)
+  (:import-from :fset :compare :compare-slots
+    :define-cross-type-compare-methods)
   (:export
    ;; Conditions.
    #:overlord-condition
@@ -168,15 +170,17 @@ If the value of `*default-pathname-defaults*' and a call to
     (delayed-symbol package-name symbol-name)))
 
 (defun force-symbol (delay)
-  (let-match1 (delayed-symbol package-name symbol-name) delay
-    (if-let (package (find-package package-name))
-      (receive (symbol status) (find-symbol symbol-name package)
-        (if (null status)
-            (error* "No such symbol as ~a::~a"
-                    package-name
-                    symbol-name)
-            symbol))
-      (error* "No such package as ~a" package))))
+  (match delay
+    ((delayed-symbol package-name symbol-name) delay
+     (if-let (package (find-package package-name))
+       (receive (symbol status) (find-symbol symbol-name package)
+         (if (null status)
+             (error* "No such symbol as ~a::~a"
+                     package-name
+                     symbol-name)
+             symbol))
+       (error* "No such package as ~a" package)))
+    (otherwise delay)))
 
 (defun delayed-symbol= (ds1 ds2)
   (multiple-value-ematch (values ds1 ds2)
@@ -184,6 +188,13 @@ If the value of `*default-pathname-defaults*' and a call to
       (delayed-symbol p2 s2))
      (and (equal p1 p2)
           (equal s1 s2)))))
+
+(defmethod compare ((ds1 delayed-symbol) (ds2 delayed-symbol))
+  (fset:compare-slots ds1 ds1
+                      #'delayed-symbol-package-name
+                      #'delayed-symbol-symbol-name))
+
+(define-cross-type-compare-methods delayed-symbol)
 
 
 ;;; Pathname types.
