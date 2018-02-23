@@ -313,7 +313,10 @@ Works for SBCL, at least."
   (:method-combination append))
 
 (defclass externalizable ()
-  ())
+  ()
+  (:documentation "A class that can be externalized. Subclasses
+inherit a method on `make-load-form', and need only specialize
+`load-form-slot-names' (using the `append' method combination)."))
 
 (defmethod make-load-form ((self externalizable) &optional env)
   (make-load-form-saving-slots self
@@ -1504,7 +1507,8 @@ specify the dependencies you want on build."
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
-   :script trivial-target))
+   :script trivial-target)
+  (:documentation "A file-to-file build pattern."))
 
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
@@ -1515,7 +1519,11 @@ specify the dependencies you want on build."
 (defclass unloaded-pattern (pattern)
   ((name :initarg :name
          :type delayed-symbol
-         :reader pattern-name)))
+         :reader pattern-name))
+  (:documentation "Encapsulates a pattern that has not been loaded in this session."))
+
+(defmethod load-form-slot-names append ((self unloaded-pattern))
+  '(name))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
@@ -1994,7 +2002,9 @@ interoperation with Emacs."
 (defclass fasl-lang-pattern (pattern)
   ((lang :initarg :lang
          :initform (required-argument :lang))
-   (source :initarg :source)))
+   (source :initarg :source))
+  (:documentation "Pattern for building a fasl from a file. Note that
+instances of this pattern must be parameterized with a language."))
 
 (defmethods fasl-lang-pattern (self lang source)
   (:method pattern.output-defaults (self)
