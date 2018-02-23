@@ -1719,16 +1719,19 @@ resolved at load time."
           (validate-module
            (load-module (module-cell.lang cell)
                         (module-cell.source cell)))))
+    (unload-module-cell cell)
     (setf
      (module-cell.module cell) module
      (module-cell.timestamp cell) (now))))
 
+(defun unload-module-cell (cell)
+  (with-slots (timestamp module) cell
+    (reset-inline-caches (nix module))
+    (setf timestamp never)))
+
 (defun unload-module (lang source)
   (declare (notinline module-cell))
-  (lret ((m (module-cell lang source)))
-    (with-slots (timestamp module) m
-      (setf timestamp never)
-      (nix module))))
+  (unload-module-cell (module-cell lang source)))
 
 (defun %ensure-module-cell (lang path)
   "Get the module cell for LANG and PATH, creating and interning one

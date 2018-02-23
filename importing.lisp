@@ -30,15 +30,6 @@
 ;;; can do so simply by shadowing the relevant definition forms with
 ;;; `macrolet', instead of having to re-implement everything.
 
-
-(define-global-state *always-import-values* nil
-  "Flag to control importing behavior.
-When this is T, imports should always be values, never bindings.
-
-This is intended to be used when saving an image, where you don't care
-about ease of development or debugging, only speed.")
-(declaim (type boolean *always-import-values*))
-
 (defcondition bad-macro-import (overlord-error)
   ((name :initarg :name :type symbol
          :documentation "The name of the macro."))
@@ -201,12 +192,7 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                (apply-prefix prefix))))
     (let ((bindings (expand bindings))
           (values (expand values)))
-      (if *always-import-values*
-          ;; Macros cannot be imported as values.
-          (let* ((macros (filter (of-type 'macro-alias) bindings))
-                 (bindings (set-difference bindings macros)))
-            (values macros (append bindings values)))
-          (values bindings values)))))
+      (values bindings values))))
 
 (defmacro check-static-bindings-now (lang source bindings)
   "Wrapper around check-static-bindings to force evaluation at compile time.
@@ -411,9 +397,9 @@ actually exported by the module specified by LANG and SOURCE."
     (let* ((key (import-keyword import))
            (ref
              (etypecase-of import-alias alias
-               (var-alias `(module-ref* ,module ',key))
+               (var-alias `(module-ref/inline-cache ,module ',key))
                ((or function-alias macro-alias)
-                `(module-fn-ref ,module ',key)))))
+                `(module-fn-ref/inline-cache ,module ',key)))))
       (values import alias ref))))
 
 (defun import-keyword (import)
