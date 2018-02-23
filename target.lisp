@@ -349,6 +349,7 @@ inherit a method on `make-load-form', and need only specialize
 (defclass directory-ref (ref)
   ((name
     :initarg :path
+    :reader directory-ref.path
     :type (and absolute-pathname directory-pathname)))
   (:documentation "A reference to a directory."))
 
@@ -356,7 +357,7 @@ inherit a method on `make-load-form', and need only specialize
   "Wrap NAME as a directory reference."
   (etypecase-of (or string directory-pathname) name
     (string (directory-ref (ensure-pathname name :want-pathname t)))
-    (directory-pathname (make 'directory-ref :name name))))
+    (directory-pathname (make 'directory-ref :path name))))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -558,7 +559,7 @@ inherit a method on `make-load-form', and need only specialize
      (pathname (pathname-exists? target))
      (directory-ref
       (~> target
-          ref.name
+          directory-ref.path
           (resolve-target (base))
           directory-exists-p))
      (pattern-ref
@@ -589,7 +590,8 @@ inherit a method on `make-load-form', and need only specialize
          (file-mtime target)
          never))
     (directory-ref
-     (let ((dir (resolve-target (ref.name target) (base))))
+     (let* ((dir (directory-ref.path target))
+            (dir (resolve-target dir (base))))
        (if (directory-exists-p dir)
            far-future
            never)))
@@ -626,7 +628,7 @@ inherit a method on `make-load-form', and need only specialize
          (error* "Cannot set pathname timestamps (yet).")
          (open target :direction :probe :if-does-not-exist :create)))
     (directory-ref
-     (let ((dir (ref.name target)))
+     (let ((dir (directory-ref.path target)))
        (if (directory-exists-p dir)
            ;; TODO Ditto.
            (error* "Cannot set directory timestamps (yet).")
@@ -666,9 +668,10 @@ inherit a method on `make-load-form', and need only specialize
                   (merge-pathnames* (pattern-ref.input target) base)))
     (directory-ref
      (directory-ref
-      ;; Could this be wild?
       (assure tame-pathname
-        (merge-pathnames* (ref.name target) base))))
+        (~> target
+            directory-ref.path
+            (merge-pathnames* base)))))
     (module-spec
      (let-match1 (module-spec lang source) target
        (module-spec lang
@@ -729,7 +732,7 @@ inherit a method on `make-load-form', and need only specialize
              (pathname-equal path1 path2)))))
     (directory-ref
      (and (typep y 'directory-ref)
-          (compare #'pathname-equal #'ref.name x y)))
+          (compare #'pathname-equal #'directory-ref.path x y)))
     (oracle
      (oracle= x y))
     (pattern-ref
@@ -972,7 +975,7 @@ inherit a method on `make-load-form', and need only specialize
                    (pattern-build pattern)))
                (pattern.script pattern))))
       (directory-ref
-       (let ((dir (ref.name target)))
+       (let ((dir (directory-ref.path target)))
          (task target
                (lambda ()
                  (let ((dir (resolve-target dir (base))))
@@ -1063,7 +1066,7 @@ inherit a method on `make-load-form', and need only specialize
            (fmt "~a (#lang ~a)"
                 path (string-downcase lang)))))
       (directory-ref
-       (let ((name (ref.name target)))
+       (let ((name (directory-ref.path target)))
          (fmt "directory ~a" name)))
       (phony-target
        (let ((name (phony-target-name target)))
