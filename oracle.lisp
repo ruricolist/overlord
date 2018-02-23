@@ -13,7 +13,8 @@
     :delayed-symbol
     :delayed-symbol=
     :force-symbol
-    :delay-symbol)
+    :delay-symbol
+    :overlord-error)
   (:import-from :overlord/digest
     :digest-string)
   (:export
