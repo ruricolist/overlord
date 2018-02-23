@@ -24,14 +24,12 @@
 ;;; Importing.
 
 ;;; Note that the import macros defined here expand into definition
-;;; forms from overlord/shadows rather than from cl proper. (E.g.
-;;; `overlord/shadows:defun' rather than `cl:defun'.) This is so
+;;; forms from overlord/cl rather than from cl proper. (E.g.
+;;; `overlord/cl:defun' rather than `cl:defun'.) This is so
 ;;; languages that need to handle imports specially (e.g. Core Lisp)
 ;;; can do so simply by shadowing the relevant definition forms with
 ;;; `macrolet', instead of having to re-implement everything.
 
-;;; Hopefully most, if not all, of this code will be replaced once we
-;;; have a full implementation of import sets.
 
 (define-global-state *always-import-values* nil
   "Flag to control importing behavior.
