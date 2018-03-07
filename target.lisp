@@ -75,6 +75,7 @@
    :file-write-date                     ;Use file-mtime instead.
    :pathname                            ;Use ensure-pathname.
    :multiple-value-bind                 ;Use receive.
+   :defmethod                           ;Require a generic function
    )
   (:export
    ;; Defining and building targets.
@@ -176,6 +177,17 @@ Works for SBCL, at least."
      (cl:defclass ,name ,supers
        ,slots
        ,@options)))
+
+(defun check-generic-function (method-name)
+  (unless (and (fboundp method-name)
+               (typep (fdefinition method-name)
+                      'generic-function))
+    (error "No generic function for ~a" method-name)))
+
+(defmacro defmethod (name &body body)
+  `(progn
+     (check-generic-function ',name)
+     (cl:defmethod ,name ,@body)))
 
 
 ;;; Auxiliary functions for Redo.
