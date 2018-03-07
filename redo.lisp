@@ -53,7 +53,8 @@
       ;; because the database is cleared every time Overlord, or the
       ;; underlying Lisp, is upgraded. Instead, what makes something a
       ;; target is that it has a build script. (This idea comes from
-      ;; Gup).
+      ;; Gup). However (see `changed?' below) a target is still
+      ;; considered out of date if it has no presence in the DB.
       (target-has-build-script? target)))
 
 (defun redo (&rest args)
@@ -153,18 +154,20 @@
 ;;; Should be (target).
 (-> changed? (t) boolean)
 (defun changed? (target)
-  (let* ((prereqsne (target-saved-prereqsne target))
-         (prereqs (target-saved-prereqs target))
-         (target-does-not-exist? (not (target-exists? target)))
-         (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
-         (regular-prereqs-changed?
-           (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
-                  (outdated (filter #'changed? reqs)))
-             (redo-all outdated)
-             (notevery #'unchanged? prereqs))))
+  (mvlet* ((prereqsne (target-saved-prereqsne target))
+           (prereqs (target-saved-prereqs target))
+           (target-does-not-exist? (not (target-exists? target)))
+           (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
+           (regular-prereqs-changed?
+            (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
+                   (outdated (filter #'changed? reqs)))
+              (redo-all outdated)
+              (notevery #'unchanged? prereqs)))
+           (not-in-db? (not (target-in-db? target))))
     (or target-does-not-exist?
         non-existent-prereqs-exist?
-        regular-prereqs-changed?)))
+        regular-prereqs-changed?
+        not-in-db?)))
 
 (defun redo-ifchange (&rest args)
   (redo-ifchange-all args))
