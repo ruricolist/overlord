@@ -97,28 +97,29 @@
   (flet ((resolve-source (source)
            (merge-pathnames* (ensure-pathname source :want-pathname t)
                              base)))
-    (cond
+    (econd
       ;; We have the source and the language.
       ((and source lang)
        (values (resolve-lang lang)
                (resolve-source source)))
       ;; We have the source, but not the language.
-      (source
+      ((and source (no lang))
        (let ((source (resolve-source source)))
          (values (resolve-lang
                   (or (guess-lang+pos source)
                       (required-argument :as)))
                  source)))
       ;; We have the language, but not the source.
-      (lang
+      ((and lang (no source))
        (values (resolve-lang lang)
                (resolve-source
                 (or (guess-source lang module)
                     (required-argument :from)))))
       ;; We have neither the language nor the source.
-      (t (whichever
-          (required-argument :as)
-          (required-argument :from))))))
+      ((nor lang source)
+       (whichever
+        (required-argument :as)
+        (required-argument :from))))))
 
 (defun resolve-import-spec
     (&key lang source bindings values module (base (base)) env prefix)
