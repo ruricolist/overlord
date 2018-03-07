@@ -30,19 +30,6 @@
 ;;; can do so simply by shadowing the relevant definition forms with
 ;;; `macrolet', instead of having to re-implement everything.
 
-(defcondition bad-macro-import (overlord-error)
-  ((name :initarg :name :type symbol
-         :documentation "The name of the macro."))
-  (:documentation "Invalid attempt to import something as a macro."))
-
-(defcondition macro-as-value (bad-macro-import)
-  ()
-  (:documentation "Attempt to import a macro as a value.")
-  (:report (lambda (c s)
-             (with-slots (name) c
-               (format s "Cannot import a macro as a value: ~a."
-                       name)))))
-
 (defun expand-binding-spec (spec lang source)
   (setf source (merge-pathnames source (base))
         lang (lang-name lang))
@@ -122,21 +109,21 @@
         (required-argument :from))))))
 
 (defun resolve-import-spec
-    (&key lang source bindings values module (base (base)) env prefix)
+    (&key lang source bindings module (base (base)) env prefix)
   (check-type base absolute-pathname)
   (check-type prefix string-designator)
   (mvlet* ((lang source (lang+source lang source module base env))
-           (bindings values (bindings+values bindings values
-                                             :lang lang
-                                             :source source
-                                             :prefix prefix)))
-    (values lang source bindings values)))
+           (bindings (expand-bindings bindings
+                                      :lang lang
+                                      :source source
+                                      :prefix prefix)))
+    (values lang source bindings)))
 
 (defmacro import (module &body (&key
                                   ((:as lang))
                                   ((:from source))
                                   ((:binding bindings))
-                                  values
+                                  ((:lazy lazy?) t)
                                   prefix
                                   function-wrapper)
                   &environment env)
@@ -144,54 +131,48 @@
 
 Note you can do (import #'foo ...), and the module will be bound as a function."
   ;; Ensure we have both the lang and the source.
-  (receive (lang source bindings values)
+  (receive (lang source bindings)
       (resolve-import-spec :lang lang
                            :source source
                            :module module
                            :bindings bindings
-                           :values values
                            :prefix prefix
                            :env env)
     ;; Warn if MODULE is already in use with an incompatible language
     ;; and source.
     (claim-module-name module lang source)
-    (let ((lazy? (null values)))
-      `(progn
-         ;; Importing modules non-lazily has a speed advantage when
-         ;; there are no bindings, but it also makes maintenance more
-         ;; complex to have two import forms. For now, just use lazy
-         ;; imports; maybe re-enable eager loading later.
+    `(progn
+       ;; Importing modules non-lazily has a speed advantage when
+       ;; there are no bindings, but it also makes maintenance more
+       ;; complex to have two import forms. For now, just use lazy
+       ;; imports; maybe re-enable eager loading later.
 
-         ;; Also: while it happens to be the case that Serapeum's `def'
-         ;; expands into a symbol macro definition, so switching between
-         ;; lazy and eager imports works, it is *conceptually* weird
-         ;; that we can just go ahead and redefine a global lexical as a
-         ;; symbol macro.
-         (import-module/lazy ,module :as ,lang :from ,source)
-         #+ () (,(if lazy? 'import-module/lazy 'import-module)
-                ,module :as ,lang :from ,(merge-pathnames* source (base)))
-         ;; We push the check down into a separate macro so we can
-         ;; inspect overall macroexpansion without side effects.
-         (check-static-bindings-now ,lang ,source ,(append bindings values))
-         (macrolet ((function-wrapper (fn)
-                      ,(if function-wrapper
-                           `(list ',function-wrapper fn)
-                           'fn)))
-           (import-bindings ,module ,@bindings)
-           (import-values ,module ,@values))
-         (import-task ,module :as ,lang :from ,source :values ,values :lazy ,lazy?)
-         ;; Strictly for debuggability.
-         (values ',module ',(append bindings values))))))
+       ;; Also: while it happens to be the case that Serapeum's `def'
+       ;; expands into a symbol macro definition, so switching between
+       ;; lazy and eager imports works, it is *conceptually* weird
+       ;; that we can just go ahead and redefine a global lexical as a
+       ;; symbol macro.
+       (import-module/lazy ,module :as ,lang :from ,source)
+       #+ () (,(if lazy? 'import-module/lazy 'import-module)
+              ,module :as ,lang :from ,(merge-pathnames* source (base)))
+       ;; We push the check down into a separate macro so we can
+       ;; inspect overall macroexpansion without side effects.
+       (check-static-bindings-now ,lang ,source ,bindings)
+       (macrolet ((function-wrapper (fn)
+                    ,(if function-wrapper
+                         `(list ',function-wrapper fn)
+                         'fn)))
+         (import-bindings ,module ,@bindings))
+       (import-task ,module :as ,lang :from ,source :lazy ,lazy?)
+       ;; Strictly for debuggability.
+       (values ',module ',bindings))))
 
-(defun bindings+values (bindings values &key lang source prefix)
+(defun expand-bindings (bindings &key lang source prefix)
   ;; Avoid redundant calls to module-static-bindings.
-  (flet ((expand (spec)
-           (~> (expand-binding-spec spec lang source)
-               canonicalize-bindings
-               (apply-prefix prefix))))
-    (let ((bindings (expand bindings))
-          (values (expand values)))
-      (values bindings values))))
+  (~> bindings
+      (expand-binding-spec lang source)
+      canonicalize-bindings
+      (apply-prefix prefix)))
 
 (defmacro check-static-bindings-now (lang source bindings)
   "Wrapper around check-static-bindings to force evaluation at compile time.
@@ -278,7 +259,7 @@ actually exported by the module specified by LANG and SOURCE."
        :from ,from
        :binding ((:default :as ,var)))))
 
-(defmacro import-task (module &key as from values lazy)
+(defmacro import-task (module &key as from lazy)
   (declare (ignorable lazy))
   (let ((task-name
           (etypecase-of import-alias module
@@ -292,32 +273,12 @@ actually exported by the module specified by LANG and SOURCE."
          #+ () ,(let ((req-form `(require-as ',as ,from)))
                   (if lazy
                       req-form
-                      `(setf ,module ,req-form)))
-         (update-value-bindings ,module ,@values)))))
-
-(defmacro update-value-bindings (module &body values)
-  `(progn
-     ,@(collecting
-         (dolist (clause values)
-           (receive (import alias ref) (import+alias+ref clause module)
-             (declare (ignore import))
-             (collect
-                 (etypecase-of import-alias alias
-                   (var-alias `(setf ,alias ,ref))
-                   (function-alias
-                    `(setf (symbol-function ',(second alias)) ,ref))
-                   (macro-alias
-                    ;; TODO Why not? It's just setf of macro-function.
-                    (error 'macro-as-value :name (second alias))))))))))
+                      `(setf ,module ,req-form)))))))
 
 (defmacro import-bindings (module &body bindings &environment env)
   `(progn
      ,@(mapcar (op (import-binding _ module env))
                bindings)))
-
-(defmacro import-values (module &body values)
-  `(progn
-     ,@(mapcar (op (import-value _ module)) values)))
 
 (defun canonicalize-binding (clause)
   (assure canonical-binding
@@ -406,33 +367,30 @@ actually exported by the module specified by LANG and SOURCE."
       (make-keyword import)
       (make-keyword (second import))))
 
-(defmacro import/local (mod &body (&key from as binding values prefix)
+(defmacro import/local (mod &body (&key from as binding prefix)
                         &environment env)
-  (receive (lang source bindings values)
+  (receive (lang source bindings)
       (resolve-import-spec :lang as
                            :source from
                            :prefix prefix
                            :module mod
                            :bindings binding
-                           :values values
                            :env env)
     ;; TODO If we knew that no macros were being imported, we could
     ;; give the module a local binding and not have to look it up
     ;; every time.
     `(progn
        (import-module/lazy ,mod :as ,lang :from ,source)
-       (check-static-bindings-now ,lang ,source ,(append bindings values))
-       (import-bindings ,mod ,@bindings)
-       (import-values ,mod ,@values))))
+       (check-static-bindings-now ,lang ,source ,bindings)
+       (import-bindings ,mod ,@bindings))))
 
-(defmacro with-imports ((mod &key from as binding values prefix) &body body)
+(defmacro with-imports ((mod &key from as binding prefix) &body body)
   "A version of `import' with local scope."
   `(local*
      (import/local ,mod
        :from ,from
        :as ,as
        :binding ,binding
-       :values ,values
        :prefix ,prefix)
      (progn ,@body)))
 
@@ -449,25 +407,22 @@ actually exported by the module specified by LANG and SOURCE."
                              &key ((:as lang))
                                   ((:from source) (guess-source lang package-name))
                                   ((:binding bindings))
-                                  values
                                   prefix
                              &allow-other-keys
                              &environment env)
   "Like `import', but instead of creating bindings in the current
 package, create a new package named PACKAGE-NAME which exports all of
 the symbols bound in the body of the import form."
-  (receive (lang source bindings values)
+  (receive (lang source bindings)
       (resolve-import-spec :lang lang
                            :source source
                            :bindings bindings
-                           :values values
                            :module 'package-module
                            :prefix prefix
                            :env env)
     (declare (ignore source lang))
     (let ((body (list* :binding bindings
-                       :values values
-                       (remove-from-plist body :prefix :binding :values))))
+                       (remove-from-plist body :prefix :binding))))
       `(progn
          (import->defpackage ,package-name ,@body)
          ;; The helper macro must be expanded after package-name has
@@ -478,12 +433,11 @@ the symbols bound in the body of the import form."
                               &body (&rest body
                                      &key
                                        ((:binding bindings))
-                                       values
                                      &allow-other-keys))
   (declare (ignore body))
   `(defpackage ,package-name
      (:use)
-     (:export ,@(nub (loop for (nil alias) in (append bindings values)
+     (:export ,@(nub (loop for (nil alias) in bindings
                            collect (make-keyword
                                     (etypecase-of import-alias alias
                                       (var-alias alias)
@@ -493,7 +447,6 @@ the symbols bound in the body of the import form."
 (defmacro import-as-package-aux (package-name &body
                                                 (&rest body
                                                  &key ((:binding bindings))
-                                                      values
                                                  &allow-other-keys))
   (let ((p (assure package (find-package package-name))))
     (labels ((intern* (sym)
@@ -511,7 +464,6 @@ the symbols bound in the body of the import form."
       (let ((module-binding (symbolicate '%module-for-package- (package-name p))))
         `(import ,module-binding
            :binding ,(intern-spec bindings)
-           :values  ,(intern-spec values)
            ,@body)))))
 
 (defun subpackage-full-name (child-package-name)
