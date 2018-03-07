@@ -81,11 +81,9 @@
   "Table to track claimed modules, so we can warn if they are
   redefined.")
 
-(def module-name-lock (bt:make-recursive-lock "Module name lock"))
-
 (defun claim-module-name (module lang source)
   "Warn if MODULE is already in use with a different LANG and SOURCE."
-  (synchronized (module-name-lock)
+  (synchronized ()
     (let* ((table *claimed-module-names*)
            (old-value (gethash module table))
            (new-value (list lang source)))
