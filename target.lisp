@@ -1331,9 +1331,27 @@ value and NEW do not match under TEST."
        `(with-script ()
           ,@body))))
 
+(defvar *scripts* (make-hash-table)
+  "Set of registered scripts.")
+
+(defun register-script (name)
+  "Register NAME as a script."
+  (setf (gethash (assure symbol name) *scripts*) t))
+
+(defun clear-scripts ()
+  "Nix all symbols registered as script."
+  (let ((scripts (shiftf *scripts* (make-hash-table))))
+    (do-hash-table (k v scripts)
+      (declare (ignore v))
+      (nix (symbol-value k)))))
+
+(add-hook '*before-hard-freeze-hook* 'clear-scripts)
+
 (defmacro define-script (name &body script)
-  `(defconfig ,name ',script
-     :test #'source=))
+  `(progn
+     (register-script ',name)
+     (defconfig ,name ',script
+       :test #'source=)))
 
 (defmacro define-script-for (name &body body)
   `(define-script ,(script-for name)
