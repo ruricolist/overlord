@@ -2025,9 +2025,6 @@ interoperation with Emacs."
          (ref (pattern-ref pat source)))
     (depends-on ref)))
 
-(defmethod unbuild-lang-deps ((lang package) (source cl:pathname))
-  (delete-file-if-exists (faslize lang source)))
-
 (defun lang-name (lang)
   (assure lang-name
     (etypecase-of (or keyword lang-name package) lang
