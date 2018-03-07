@@ -6,8 +6,6 @@
     :local-time)
   (:import-from :overlord/types
     :universal-time)
-  (:import-from :overlord/redo
-    :stamp=)
   (:import-from :overlord/util :compare)
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
@@ -123,7 +121,7 @@
     ((far-future far-future) t)
     ((target-timestamp target-timestamp) nil)))
 
-(defmethod stamp= (s1 s2)
+(defun stamp= (s1 s2)
   (dispatch-case ((s1 stamp)
                   (s2 stamp))
     ((target-timestamp target-timestamp)

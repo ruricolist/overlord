@@ -11,6 +11,8 @@
   (:import-from #:overlord/db #:saving-database)
   (:import-from #:overlord/parallel
     #:with-our-kernel)
+  (:import-from #:overlord/stamp
+    #:stamp=)
   (:import-from #:lparallel #:pmap)
   (:nicknames :redo)
   (:export
@@ -31,7 +33,6 @@
    ;; build systems?
    #:root-target
    #:target-stamp
-   #:stamp=
    #:target-exists?
    #:target=
    #:target-build-script
@@ -61,7 +62,6 @@
 
 (defgeneric root-target ())
 (defgeneric target-stamp (target))
-(defgeneric stamp= (stamp1 stamp2))
 (defgeneric target-exists? (target))
 (defgeneric target= (target1 target2))
 (defgeneric target-build-script (target))
