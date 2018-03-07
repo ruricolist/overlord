@@ -8,8 +8,10 @@
     :uiop/filesystem
     :uiop/pathname
 
-    ;; What we need to implement.
+    ;; The build logic.
     :overlord/redo
+    ;; What we need to implement.
+    :overlord/target-protocol
     ;; Timestamps.
     :overlord/stamp
     ;; Resettable global state.
