@@ -68,4 +68,6 @@
   (:method :around (target)
     (declare (ignore target))
     (assure string
-      (call-next-method))))
+      (call-next-method)))
+  (:method (target)
+    (princ-to-string target)))
