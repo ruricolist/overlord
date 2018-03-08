@@ -55,7 +55,8 @@
    #:db-version
    #:qualified-symbol
    #:delayed-symbol=
-   #:cl-symbol-p))
+   #:cl-symbol-p
+   #:hash-code))
 
 (in-package :overlord/types)
 

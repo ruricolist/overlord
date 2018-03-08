@@ -1,6 +1,7 @@
 (defpackage :overlord/target-protocol
   (:use :cl :alexandria :serapeum)
   (:import-from :overlord/stamp :target-timestamp)
+  (:import-from :overlord/types :hash-code)
   (:import-from :fset :compare :define-cross-type-compare-methods)
   (:export
    #:root-target
@@ -65,8 +66,10 @@ Not every target type supports this."))
 (defgeneric target-exists? (target)
   (:documentation "Does TARGET exists?")
   (:method :around (target)
+    (declare (ignore target))
     (true (call-next-method))))
 
+(-> target= (t t) boolean)
 (defgeneric target= (target1 target2)
   (:documentation "Are TARGET1 and TARGET2 the same?")
   (:method (t1 t2)
@@ -75,6 +78,7 @@ Not every target type supports this."))
     (or (eql t1 t2)
         (call-next-method))))
 
+(-> hash-target (t) hash-code)
 (defgeneric hash-target (target)
   (:documentation "Hash TARGET.
 
