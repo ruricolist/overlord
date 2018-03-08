@@ -42,7 +42,7 @@ Building this builds all targets defined in this session \(not all targets in th
 (defunit trivial-target
   "The target that is never out of date.")
 
-(defmethod compare ((x impossible-target) (y impossible-target)) :equal)
+(defmethod compare ((x root-target) (y root-target)) :equal)
 (defmethod compare ((x trivial-target) (y trivial-target)) :equal)
 (defmethod compare ((x impossible-target) (y impossible-target)) :equal)
 (define-cross-type-compare-methods root-target)

@@ -55,10 +55,6 @@
 
 (defgeneric oracle-value (oracle))
 
-(defgeneric target= (oracle1 oracle2))
-
-(defgeneric hash-target (oracle))
-
 (defclass oracle ()
   ((key :initarg :key
         :accessor oracle.key
