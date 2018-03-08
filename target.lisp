@@ -263,6 +263,10 @@ Works for SBCL, at least."
              prereqsne
              prereqsne-temp))
 
+(defmethod target-in-db? ((target root-target)) t)
+(defmethod target-in-db? ((target impossible-target)) t)
+(defmethod target-in-db? ((target trivial-target)) t)
+
 (defmethod clear-temp-prereqs (target)
   (delete-prop target prereqs-temp))
 
