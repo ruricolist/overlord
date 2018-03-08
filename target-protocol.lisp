@@ -83,7 +83,13 @@ Not every target type supports this."))
   (:documentation "Hash TARGET.
 
 Two targets that are equal under `target=' should always have the same
-hash \(though the reverse is not necessarily true)."))
+hash \(though the reverse is not necessarily true).")
+  (:method :around (target)
+    (declare (ignore target))
+    (assure hash-code
+      (call-next-method)))
+  (:method (target)
+    (sxhash target)))
 
 (defgeneric resolve-target (target base)
   (:documentation "Resolve any relative pathnames in TARGET, using

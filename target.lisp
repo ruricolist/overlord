@@ -754,12 +754,6 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod hash-target ((target impossible-target))
   (load-time-value (sxhash impossible-target)))
 
-(defmethod hash-target ((s symbol))
-  (sxhash s))
-
-(defmethod hash-target ((p cl:pathname))
-  (sxhash p))
-
 (defmethod hash-target ((target module-spec))
   (let-match1 (module-spec lang path) target
     (dx-sxhash (list 'module-spec lang path))))
