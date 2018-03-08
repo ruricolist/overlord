@@ -587,6 +587,16 @@ inherit a method on `make-load-form', and need only specialize
   (thunk function)
   (script target))
 
+(defmethod target-build-script :around ((target t))
+  (check-not-frozen)
+  (assure task
+    (call-next-method)))
+
+(defmethod target-default-build-script :around ((target t))
+  (check-not-frozen)
+  (assure task
+    (call-next-method)))
+
 
 ;;; Manipulating targets.
 
@@ -717,10 +727,6 @@ inherit a method on `make-load-form', and need only specialize
   (when (typep base 'temporary-file)
     (simple-style-warning "Base looks like a temporary file: ~a" base))
   (call-next-method))
-
-(defmethod resolve-target (target base)
-  (declare (ignore base))
-  target)
 
 (defmethod resolve-target ((target cl:pathname) base)
   (let ((path (merge-pathnames* target base)))
@@ -947,11 +953,6 @@ inherit a method on `make-load-form', and need only specialize
         (constantly nil)
         impossible-target))
 
-(defmethod target-build-script :around ((target t))
-  (check-not-frozen)
-  (assure task
-    (call-next-method)))
-
 (defmethod target-build-script ((target t))
   (impossible-task target))
 
@@ -971,11 +972,6 @@ inherit a method on `make-load-form', and need only specialize
          (key `(phony ,name)))
     (or (gethash key *tasks*)
         (impossible-task target))))
-
-(defmethod target-default-build-script :around ((target t))
-  (check-not-frozen)
-  (assure task
-    (call-next-method)))
 
 (defmethod target-default-build-script ((target t))
   (trivial-task target))
@@ -1079,11 +1075,6 @@ inherit a method on `make-load-form', and need only specialize
              spaces
              (target-being-built-string target))))
 
-(defmethod target-being-built-string :around (target)
-  (declare (ignore target))
-  (assure string
-    (call-next-method)))
-
 (defmethod target-being-built-string ((target cl:pathname))
   (native-namestring target))
 
@@ -1121,9 +1112,6 @@ inherit a method on `make-load-form', and need only specialize
   (let ((size (file-size-in-octets file))
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
-
-(defmethod target-stamp (target)
-  (target-timestamp target))
 
 (defmethod target-stamp ((target cl:pathname))
   (cond ((file-exists-p target)
