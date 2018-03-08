@@ -408,7 +408,9 @@ inherit a method on `make-load-form', and need only specialize
                 (ensure-directories-exist dir)))
             trivial-target)))
   (:method target-being-built-string (target)
-    (fmt "directory ~a" path)))
+    (fmt "directory ~a" path))
+  (:method hash-target (target)
+    (dx-sxhash (list 'directory-ref path))))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -770,6 +772,34 @@ inherit a method on `make-load-form', and need only specialize
               (pattern-ref.input y))
        (eql (pattern-ref.pattern x)
             (pattern-ref.pattern y))))
+
+(defmethod hash-target ((target root-target))
+  (load-time-value (sxhash root-target)))
+
+(defmethod hash-target ((target trivial-target))
+  (load-time-value (sxhash trivial-target)))
+
+(defmethod hash-target ((target impossible-target))
+  (load-time-value (sxhash impossible-target)))
+
+(defmethod hash-target ((s symbol))
+  (sxhash s))
+
+(defmethod hash-target ((p cl:pathname))
+  (sxhash p))
+
+(defmethod hash-target ((target module-spec))
+  (let-match1 (module-spec lang path) target
+    (dx-sxhash (list 'module-spec lang path))))
+
+(defmethod hash-target ((target pattern-ref))
+  (dx-sxhash
+   (list 'package-ref
+         (ref.name target))))
+
+(defmethod hash-target ((target phony-target))
+  (let ((name (phony-target-name target)))
+    (dx-sxhash `(phony ,name))))
 
 (defgeneric hash-friendly? (target)
   (:method ((x root-target)) t)

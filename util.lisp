@@ -120,6 +120,8 @@
   "Like SXHASH, but try to stack-allocate EXPR."
   (with-unique-names (temp)
     `(let ((,temp ,expr))
+       (declare (optimize (speed 3) (safety 1) (debug 0)
+                          (compilation-speed 0)))
        (declare (dynamic-extent ,temp))
        (sxhash ,temp))))
 
