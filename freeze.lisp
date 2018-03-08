@@ -9,7 +9,6 @@
   (:export
    :freeze :freeze-policy
    :unfreeze
-   :file
    :check-not-frozen
    :frozen?
    :*before-hard-freeze-hook*))
