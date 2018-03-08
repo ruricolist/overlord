@@ -202,7 +202,7 @@ Works for SBCL, at least."
 (defconst stamp          :stamp)
 (defconst uptodate       :uptodate)
 
-(defun safe-symbol (symbol)
+(defun maybe-delay-symbol (symbol)
   (cond ((not (symbolp symbol))
          symbol)
         ((built-in-symbol? symbol)
@@ -212,7 +212,9 @@ Works for SBCL, at least."
 (defun built-in-symbol? (symbol)
   (and (symbolp symbol)
        (or (keywordp symbol)
-           (cl-symbol-p symbol))))
+           (cl-symbol-p symbol)
+           (eql (symbol-package symbol)
+                #.*package*))))
 
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
   (cons x (assure stamp stamp)))
@@ -230,7 +232,7 @@ Works for SBCL, at least."
   (record-parent-prereq parent target))
 
 (defmethod record-prereq ((target symbol))
-  (record-prereq (safe-symbol target)))
+  (record-prereq (maybe-delay-symbol target)))
 
 (defun record-parent-prereq (parent target)
   (check-type target target)
@@ -243,7 +245,7 @@ Works for SBCL, at least."
   (record-parent-prereqne parent target))
 
 (defmethod record-prereqne ((target symbol))
-  (record-prereqne (safe-symbol target)))
+  (record-prereqne (maybe-delay-symbol target)))
 
 (defun record-parent-prereqne (parent target)
   (check-type target target)
@@ -2047,7 +2049,7 @@ instances of this pattern must be parameterized with a language."))
 
   (:method pattern-name (self)
     `(fasl-lang-pattern
-      ,(safe-symbol (lang-name lang))
+      ,(maybe-delay-symbol (lang-name lang))
       ,source))
 
   (:method pattern-build (self)
