@@ -1,5 +1,6 @@
 (defpackage :overlord/oracle
-  (:use :cl :alexandria :serapeum :trivia)
+  (:use :cl :alexandria :serapeum :trivia
+    :overlord/target-protocol)
   (:shadowing-import-from :trivia :@)
   (:import-from :named-readtables
     :readtable-name)
@@ -19,10 +20,6 @@
     :digest-string)
   (:export
    :oracle
-   :oracle-exists?
-   :oracle-timestamp
-   :oracle=
-   :hash-oracle
    :use-var
    :use-env
    :oracle-name))
@@ -56,15 +53,11 @@
     symbol
     string))
 
-(defgeneric oracle-timestamp (oracle))
-
-(defgeneric oracle-exists? (oracle))
-
 (defgeneric oracle-value (oracle))
 
-(defgeneric oracle= (oracle1 oracle2))
+(defgeneric target= (oracle1 oracle2))
 
-(defgeneric hash-oracle (oracle))
+(defgeneric hash-target (oracle))
 
 (defclass oracle ()
   ((key :initarg :key
@@ -73,7 +66,7 @@
 
 (defun depends-on-oracle (&rest oracles)
   (do-each (oracle (reshuffle oracles))
-    (if (oracle-exists? oracle)
+    (if (target-exists? oracle)
         (redo-ifchange oracle)
         (redo-ifcreate oracle)))
   (values))
@@ -87,17 +80,17 @@
     (format stream "~a~s"
             (read-eval-prefix self stream)
             `(make ',(class-name-of self) :key ,key)))
-  (:method hash-oracle (self)
+  (:method hash-target (self)
     (sxhash (make-load-form self)))
   (:method oracle-value :around (self)
     (assure oracle-value
       (call-next-method)))
-  (:method oracle-timestamp (self)
+  (:method target-stamp (self)
     (let ((value (oracle-value self)))
       (if (stringp value)
           (byte-array-to-hex-string (digest-string value))
           (prin1-to-string (oracle-value self)))))
-  (:method oracle= (self (other oracle))
+  (:method target= (self (other oracle))
     nil))
 
 (defclass var-oracle (oracle)
@@ -116,9 +109,9 @@
     (setf sym (force-symbol var)))
   (:method oracle-value (self)
     (symbol-value sym))
-  (:method oracle-exists? (self)
+  (:method target-exists? (self)
     (boundp sym))
-  (:method oracle= (self (other var-oracle))
+  (:method target= (self (other var-oracle))
     (handler-case
         (eql sym (slot-value other 'sym))
       (overlord-error ()
@@ -142,9 +135,9 @@
     (assert (cl-sym? var)))
   (:method oracle-value (self)
     (symbol-value var))
-  (:method oracle-exists? (self)
+  (:method target-exists? (self)
     (boundp var))
-  (:method oracle= (self (other cl-var-oracle))
+  (:method target= (self (other cl-var-oracle))
     (eql var (slot-value other 'var))))
 
 (defclass name-oracle (oracle)
@@ -155,9 +148,9 @@
 (defmethods name-oracle (self (name key))
   (:method oracle-value (self)
     name)
-  (:method oracle-exists? (self)
+  (:method target-exists? (self)
     t)
-  (:method oracle= (self (other name-oracle))
+  (:method target= (self (other name-oracle))
     (equal name (name-oracle.name other))))
 
 (defclass package-oracle (name-oracle)
@@ -172,7 +165,7 @@
 A name is extracted using `named-readtable:readtable-name'."))
 
 (defmethods readtable-oracle (self (name key))
-  (:method oracle= (self (other readtable-oracle))
+  (:method target= (self (other readtable-oracle))
     (delayed-symbol= name (name-oracle.name other))))
 
 (defun use-var (var)
@@ -197,14 +190,14 @@ A name is extracted using `named-readtable:readtable-name'."))
 (defmethods env-oracle (self (name key))
   (:method oracle-value (self)
     (uiop:getenv name))
-  (:method oracle-timestamp (self)
+  (:method target-stamp (self)
     (~> self
         oracle-value
         digest-string
         byte-array-to-hex-string))
-  (:method oracle-exists? (self)
+  (:method target-exists? (self)
     (uiop:getenvp name))
-  (:method oracle= (self (other env-oracle))
+  (:method target= (self (other env-oracle))
     (equal name (env-oracle.name other))))
 
 (defun use-env (&rest names)
