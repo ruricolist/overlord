@@ -91,7 +91,9 @@
           (byte-array-to-hex-string (digest-string value))
           (prin1-to-string (oracle-value self)))))
   (:method target= (self (other oracle))
-    nil))
+    nil)
+  (:method target-being-built-string (self)
+    (fmt "oracle for ~a" key)))
 
 (defclass var-oracle (oracle)
   ((key :reader var-oracle.var

@@ -525,26 +525,26 @@ inherit a method on `make-load-form', and need only specialize
 
 (fset:define-cross-type-compare-methods phony-target)
 
-(deftype target ()
-  ;; NB Not allowing lists of targets as targets is a conscious
-  ;; decision. It would make things much more complicated. In
-  ;; particular, there would no longer be a single timestamp for a
-  ;; target, because the proper timestamp to use for a list of targets
-  ;; would depend on whether it was being depended on (in which case
-  ;; we want the /newest/ timestamp) or doing the depending (in which
-  ;; case we want the /oldest/ timestamp).
-  '(or
-    root-target
-    impossible-target
-    trivial-target
-    phony-target
-    bindable-symbol
-    delayed-symbol
-    pathname
-    directory-ref
-    pattern-ref
-    module-spec
-    oracle))
+;; (deftype target ()
+;;   ;; NB Not allowing lists of targets as targets is a conscious
+;;   ;; decision. It would make things much more complicated. In
+;;   ;; particular, there would no longer be a single timestamp for a
+;;   ;; target, because the proper timestamp to use for a list of targets
+;;   ;; would depend on whether it was being depended on (in which case
+;;   ;; we want the /newest/ timestamp) or doing the depending (in which
+;;   ;; case we want the /oldest/ timestamp).
+;;   '(or
+;;     root-target
+;;     impossible-target
+;;     trivial-target
+;;     phony-target
+;;     bindable-symbol
+;;     delayed-symbol
+;;     pathname
+;;     directory-ref
+;;     pattern-ref
+;;     module-spec
+;;     oracle))
 
 (defconstructor task
   "A task."
@@ -565,96 +565,129 @@ inherit a method on `make-load-form', and need only specialize
      (or (file-exists-p path)
          (directory-exists-p path)))))
 
-(defmethod target-exists? (target)
-  (true
-   (etypecase-of target target
-     ((or root-target trivial-target) t)
-     ((or impossible-target phony-target) nil)
-     (bindable-symbol (boundp target))
-     (delayed-symbol (target-exists? (force-symbol target)))
-     (pathname (pathname-exists? target))
-     (directory-ref
-      (~> target
-          directory-ref.path
-          (resolve-target (base))
-          directory-exists-p))
-     (pattern-ref
-      (~> target
-          pattern-ref.output
-          pathname-exists?))
-     (module-spec
-      (~> target
-          module-spec-cell
-          module-cell.module))
-     (oracle (oracle-exists? target)))))
+(defmethod target-exists? :around ((target t))
+  (true (call-next-method)))
 
-(defun target-timestamp (target)
-  (etypecase-of target target
-    ((or root-target impossible-target phony-target)
-     never)
-    (trivial-target far-future)
-    (bindable-symbol
-     (if (boundp target)
-         (let ((now (now)))
-           (ensure2 (gethash target *symbol-timestamps*)
-             now))
-         never))
-    (delayed-symbol
-     (target-timestamp (force-symbol target)))
-    (pathname
-     (if (pathname-exists? target)
-         (file-mtime target)
-         never))
-    (directory-ref
-     (let* ((dir (directory-ref.path target))
-            (dir (resolve-target dir (base))))
-       (if (directory-exists-p dir)
-           far-future
-           never)))
-    (pattern-ref
-     (with-accessors ((output pattern-ref.output)) target
-       (if (pathname-exists? output)
-           (file-mtime output)
-           never)))
-    (module-spec
-     (let* ((cell (module-spec-cell target)))
-       (with-slots (module timestamp) cell
-         (if (null module) never timestamp))))
-    (oracle (oracle-timestamp target))))
+(defmethod target-exists? ((target root-target))
+  t)
 
-(defun (setf target-timestamp) (timestamp target)
+(defmethod target-exists? ((target trivial-target))
+  t)
+
+(defmethod target-exists? ((target impossible-target))
+  nil)
+
+(defmethod target-exists? ((target phony-target))
+  nil)
+
+(defmethod target-exists? ((target symbol))
+  (boundp target))
+
+(defmethod target-exists? ((target delayed-symbol))
+  (target-exists? (force-symbol target)))
+
+(defmethod target-exists? ((target cl:pathname))
+  (pathname-exists? target))
+
+(defmethod target-exists? ((target directory-ref))
+  (~> target
+      directory-ref.path
+      (resolve-target (base))
+      directory-exists-p))
+
+(defmethod target-exists? ((target pattern-ref))
+  (~> target
+      pattern-ref.output
+      pathname-exists?))
+
+(defmethod target-exists? ((target module-spec))
+  (~> target
+      module-spec-cell
+      module-cell.module))
+
+(defmethod target-timestamp ((target root-target))
+  never)
+
+(defmethod target-timestamp ((target impossible-target))
+  never)
+
+(defmethod target-timestamp ((target phony-target))
+  never)
+
+(defmethod target-timestamp ((target trivial-target))
+  far-future)
+
+(defmethod target-timestamp ((target symbol))
+  (if (boundp target)
+      (let ((now (now)))
+        (ensure2 (gethash target *symbol-timestamps*)
+          now))
+      never))
+
+(defmethod target-timestamp ((target delayed-symbol))
+  (target-timestamp (force-symbol target)))
+
+(defmethod target-timestamp ((target cl:pathname))
+  (if (pathname-exists? target)
+      (file-mtime target)
+      never))
+
+(defmethod target-timestamp ((target directory-ref))
+  (let* ((dir (directory-ref.path target))
+         (dir (resolve-target dir (base))))
+    (if (directory-exists-p dir)
+        far-future
+        never)))
+
+(defmethod target-timestamp ((target pattern-ref))
+  (with-accessors ((output pattern-ref.output)) target
+    (if (pathname-exists? output)
+        (file-mtime output)
+        never)))
+
+(defmethod target-timestamp ((target module-spec))
+  (let* ((cell (module-spec-cell target)))
+    (with-slots (module timestamp) cell
+      (if (null module) never timestamp))))
+
+(defmethod (setf target-timestamp) :before (timestamp target)
+  (declare (ignore target))
   (check-type timestamp target-timestamp)
-  (check-not-frozen)
-  (etypecase-of target target
-    (root-target (error* "Cannot set timestamp of root target."))
-    ((or impossible-target trivial-target phony-target)
-     (error* "Cannot set timestamp for ~a" target))
-    (delayed-symbol
-     (let ((target (force-symbol target)))
-       (setf (target-timestamp target) timestamp)))
-    (bindable-symbol
-     ;; Configurations need to set the timestamp while unbound
-     #+ () (unless (boundp target)
-             (error* "Trying to set timestamp for unbound symbol ~s"
-                     target))
-     (setf (gethash target *symbol-timestamps*) timestamp))
-    (pathname
-     (if (pathname-exists? target)
-         ;; TODO There must be some portable way to do this.
-         (error* "Cannot set pathname timestamps (yet).")
-         (open target :direction :probe :if-does-not-exist :create)))
-    (directory-ref
-     (let ((dir (directory-ref.path target)))
-       (if (directory-exists-p dir)
-           ;; TODO Ditto.
-           (error* "Cannot set directory timestamps (yet).")
-           (ensure-directories-exist dir))))
-    ((or pattern-ref oracle)
-     ;; TODO Or does it?
-     (error* "Setting the timestamp of ~s does not make sense."))
-    (module-spec
-     (let ((cell (module-spec-cell target)))
-       (setf (module-cell.timestamp cell) timestamp)))))
+  (check-not-frozen))
+
+(defmethod (setf target-timestamp) (timestamp target)
+  (declare (ignore timestamp))
+  (error* "Cannot set timestamp for ~a" target))
+
+(defmethod (setf target-timestamp) (timestamp (target delayed-symbol))
+  (let ((target (force-symbol target)))
+    (setf (target-timestamp target) timestamp)))
+
+(defmethod (setf target-timestamp) (timestamp (target symbol))
+  ;; Configurations need to set the timestamp while unbound
+  #+ () (unless (boundp target)
+          (error* "Trying to set timestamp for unbound symbol ~s"
+                  target))
+  (setf (gethash target *symbol-timestamps*) timestamp))
+
+(defmethod (setf target-timestamp) (timestamp (target cl:pathname))
+  (declare (ignore timestamp))
+  (if (pathname-exists? target)
+      ;; TODO There must be some portable way to do this.
+      (error* "Cannot set pathname timestamps (yet).")
+      (open target :direction :probe :if-does-not-exist :create)))
+
+(defmethod (setf target-timestamp) (timestamp (target directory-ref))
+  (declare (ignore timestamp))
+  (let ((dir (directory-ref.path target)))
+    (if (directory-exists-p dir)
+        ;; TODO Ditto.
+        (error* "Cannot set directory timestamps (yet).")
+        (ensure-directories-exist dir))))
+
+(defmethod (setf target-timestamp) (timestamp (target module-spec))
+  (let ((cell (module-spec-cell target)))
+    (setf (module-cell.timestamp cell) timestamp)))
 
 (defun touch-target (target &optional (date (now)))
   (setf (target-timestamp target) date))
@@ -664,104 +697,80 @@ inherit a method on `make-load-form', and need only specialize
       (delete-directory-tree p)
       (delete-file-if-exists p)))
 
-(defun resolve-target (target base)
+(defmethod resolve-target :around (target base)
+  (declare (ignore target))
   (setf base (pathname-directory-pathname base))
   (when (typep base 'temporary-file)
     (simple-style-warning "Base looks like a temporary file: ~a" base))
-  (etypecase-of target target
-    ((or root-target impossible-target trivial-target
-         bindable-symbol delayed-symbol
-         phony-target
-         oracle)
-     target)
-    (pathname
-     (let ((path (merge-pathnames* target base)))
-       (if (wild-pathname-p path)
-           (directory* path)
-           path)))
-    (pattern-ref
-     (pattern-ref (pattern-ref.pattern target)
-                  (merge-pathnames* (pattern-ref.input target) base)))
-    (directory-ref
-     (directory-ref
-      (assure tame-pathname
-        (~> target
-            directory-ref.path
-            (merge-pathnames* base)))))
-    (module-spec
-     (let-match1 (module-spec lang source) target
-       (module-spec lang
-                    (assure tame-pathname
-                      (merge-pathnames* source base)))))))
+  (call-next-method))
+
+(defmethod resolve-target (target base)
+  (declare (ignore base))
+  target)
+
+(defmethod resolve-target ((target cl:pathname) base)
+  (let ((path (merge-pathnames* target base)))
+    (if (wild-pathname-p path)
+        (directory* path)
+        path)))
+
+(defmethod resolve-target ((target pattern-ref) base)
+  (pattern-ref (pattern-ref.pattern target)
+               (merge-pathnames* (pattern-ref.input target) base)))
+
+(defmethod resolve-target ((target directory-ref) base)
+  (directory-ref
+   (assure tame-pathname
+     (~> target
+         directory-ref.path
+         (merge-pathnames* base)))))
+
+(defmethod resolve-target ((target module-spec) base)
+  (let-match1 (module-spec lang source) target
+    (module-spec lang
+                 (assure tame-pathname
+                   (merge-pathnames* source base)))))
 
 
 ;;; Target table abstract data type.
 
-(defun target-type-of (x)
-  (let ((type (target-type-of x)))
-    ;; Remember that `nil' is a subtype of everything.
-    (assert (subtypep type 'target))
-    type))
+(defmethod target= ((x phony-target) (y phony-target))
+  (eql (phony-target-name x)
+       (phony-target-name y)))
 
-(defun target-type-of-1 (x)
-  (typecase-of target x
-    (root-target 'root-target)
-    (trivial-target 'trivial-target)
-    (impossible-target 'impossible-target)
-    ((or bindable-symbol delayed-symbol)
-     'bindable-symbol)
-    (pathname 'pathname)
-    (module-spec 'module-spec)
-    (directory-ref 'directory-ref)
-    (pattern-ref 'pattern-ref)
-    (phony-target 'phony-target)
-    (oracle 'oracle)
-    ;; Bottom.
-    (otherwise nil)))
+(defmethod target= ((x delayed-symbol) y)
+  (target= (force-symbol x)
+           (force-symbol y)))
 
-(defmethod target= (x y)
-  "Are two targets the same?"
-  (etypecase-of target x
-    (root-target
-     (typep y 'root-target))
-    (trivial-target
-     (typep y 'trivial-target))
-    (impossible-target
-     (typep y 'impossible-target))
-    (phony-target
-     (and (typep y 'phony-target)
-          (eql (phony-target-name x)
-               (phony-target-name y))))
-    (bindable-symbol
-     (eql x y))
-    (delayed-symbol
-     (target= (force-symbol x)
-              (force-symbol y)))
-    (pathname
-     (and (pathnamep y)
-          (pathname-equal x y)))
-    (module-spec
-     (multiple-value-match (values x y)
-       (((module-spec lang1 path1)
-         (module-spec lang2 path2))
-        (and (eql lang1 lang2)
-             (pathname-equal path1 path2)))))
-    (directory-ref
-     (and (typep y 'directory-ref)
-          (compare #'pathname-equal #'directory-ref.path x y)))
-    (oracle
-     (oracle= x y))
-    (pattern-ref
-     (and (typep y 'pattern-ref)
-          (and (compare #'equal #'pattern-ref.input    x y)
-               (compare #'eql   #'pattern-ref.pattern  x y))))))
+(defmethod target= ((x cl:pathname) (y cl:pathname))
+  (pathname-equal x y))
 
-(deftype hash-friendly-target ()
-  '(or root-target
-    impossible-target
-    trivial-target
-    bindable-symbol
-    pathname))
+(defmethod target= ((x module-spec) (y module-spec))
+  (multiple-value-match (values x y)
+    (((module-spec lang1 path1)
+      (module-spec lang2 path2))
+     (and (eql lang1 lang2)
+          (pathname-equal path1 path2)))))
+
+(defmethod target= ((x directory-ref) (y directory-ref))
+  (pathname-equal (directory-ref.path x)
+                  (directory-ref.path y)))
+
+(defmethod target= ((x pattern-ref) (y pattern-ref))
+  (and (equal (pattern-ref.input x)
+              (pattern-ref.input y))
+       (eql (pattern-ref.pattern x)
+            (pattern-ref.pattern y))))
+
+(defgeneric hash-friendly? (target)
+  (:method ((x root-target)) t)
+  (:method ((x impossible-target)) t)
+  (:method ((x trivial-target)) t)
+  (:method ((x symbol)) t)
+  (:method ((x cl:pathname)) t)
+  (:method (x)
+    (declare (ignore x))
+    nil))
 
 (defstruct (target-table (:conc-name target-table.)
                          (:constructor %make-target-table))
@@ -823,32 +832,26 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun target-table-ref (table key)
   (with-target-table-locked (table)
-    (etypecase-of target key
-      (hash-friendly-target
-       (let ((hash (target-table.hash-table table)))
-         (gethash key hash)))
-      (target
-       (fset:lookup (target-table.map table) key)))))
+    (if (hash-friendly? key)
+        (let ((hash (target-table.hash-table table)))
+          (gethash key hash))
+        (fset:lookup (target-table.map table) key))))
 
 (defun (setf target-table-ref) (value table key)
   (prog1 value
     (with-target-table-locked (table)
-      (etypecase-of target key
-        (hash-friendly-target
-         (let ((hash (target-table.hash-table table)))
-           (setf (gethash key hash) value)))
-        (target
-         (callf #'fset:with (target-table.map table) key value))))))
+      (if (hash-friendly? key)
+          (let ((hash (target-table.hash-table table)))
+            (setf (gethash key hash) value))
+          (callf #'fset:with (target-table.map table) key value)))))
 
 (defun target-table-rem (table key)
   (prog1 nil
     (with-target-table-locked (table)
-      (etypecase-of target key
-        (hash-friendly-target
-         (let ((hash (target-table.hash-table table)))
-           (remhash key hash)))
-        (target
-         (callf #'fset:less (target-table.map table) key))))))
+      (if (hash-friendly? key)
+          (let ((hash (target-table.hash-table table)))
+            (remhash key hash))
+          (callf #'fset:less (target-table.map table) key)))))
 
 (defun target-table-member (table key)
   (nth-value 1
@@ -941,78 +944,87 @@ inherit a method on `make-load-form', and need only specialize
         (constantly nil)
         impossible-target))
 
-(defmethod target-build-script (target)
+(defmethod target-build-script :around ((target t))
   (check-not-frozen)
   (assure task
-    (etypecase-of target target
-      (pathname
-       (or (gethash target *tasks*)
-           (impossible-task target)))
-      (bindable-symbol
-       (or (gethash target *tasks*)
-           ;; If there is no real target by that name, look for a
-           ;; phony target.
-           (target-build-script
-            (phony-target target))))
-      (phony-target
-       (let* ((name (phony-target-name target))
-              (key `(phony ,name)))
-         (or (gethash key *tasks*)
-             (impossible-task target))))
-      (target (impossible-task target)))))
+    (call-next-method)))
 
-(defmethod target-default-build-script (target)
+(defmethod target-build-script ((target t))
+  (impossible-task target))
+
+(defmethod target-build-script ((target cl:pathname))
+  (or (gethash target *tasks*)
+      (impossible-task target)))
+
+(defmethod target-build-script ((target symbol))
+  (or (gethash target *tasks*)
+      ;; If there is no real target by that name, look for a
+      ;; phony target.
+      (target-build-script
+       (phony-target target))))
+
+(defmethod target-build-script ((target phony-target))
+  (let* ((name (phony-target-name target))
+         (key `(phony ,name)))
+    (or (gethash key *tasks*)
+        (impossible-task target))))
+
+(defmethod target-default-build-script :around ((target t))
   (check-not-frozen)
   (assure task
-    (etypecase-of target target
-      ((or pathname bindable-symbol delayed-symbol phony-target
-           impossible-target trivial-target oracle)
-       (trivial-task target))
-      (root-target
-       (task target
-             (lambda ()
-               ;; NB. Note that we do not get the prereqs of the root
-               ;; target from the database. We do not want them to be
-               ;; persistent; we only want to build the targets that
-               ;; have been defined in this image.
-               (let ((*building-root* t))
-                 (depends-on-all (list-top-level-targets))))
-             trivial-target))
-      (pattern-ref
-       (let* ((input (pattern-ref.input target))
-              (output (pattern-ref.output target))
-              (pattern (find-pattern (pattern-ref.pattern target))))
-         (task output
-               (lambda ()
-                 (let ((*input* input)
-                       (*output* output))
-                   (let ((*base* (pathname-directory-pathname input)))
-                     (depends-on input))
-                   (pattern-build pattern)))
-               (pattern.script pattern))))
-      (directory-ref
-       (let ((dir (directory-ref.path target)))
-         (task target
-               (lambda ()
-                 (let ((dir (resolve-target dir (base))))
-                   (ensure-directories-exist dir)))
-               trivial-target)))
-      (module-spec
-       (let ((cell (module-spec-cell target)))
-         (with-slots (lang source) cell
-           (task target
-                 (lambda ()
-                   (let ((*base* (pathname-directory-pathname source)))
-                     ;; Depend on the source file.
-                     (depends-on source)
-                     ;; Let the language tell you what to depend on.
-                     (lang-deps lang source))
+    (call-next-method)))
 
-                   (let ((*language* lang))
-                     (load-module-into-cell cell)))
-                 trivial-target)))))))
+(defmethod target-default-build-script ((target t))
+  (trivial-task target))
 
-(defmethod build-script-target (script)
+(defmethod target-default-build-script ((target root-target))
+  (task target
+        (lambda ()
+          ;; NB. Note that we do not get the prereqs of the root
+          ;; target from the database. We do not want them to be
+          ;; persistent; we only want to build the targets that
+          ;; have been defined in this image.
+          (let ((*building-root* t))
+            (depends-on-all (list-top-level-targets))))
+        trivial-target))
+
+(defmethod target-default-build-script ((target pattern-ref))
+  (let* ((input (pattern-ref.input target))
+         (output (pattern-ref.output target))
+         (pattern (find-pattern (pattern-ref.pattern target))))
+    (task output
+          (lambda ()
+            (let ((*input* input)
+                  (*output* output))
+              (let ((*base* (pathname-directory-pathname input)))
+                (depends-on input))
+              (pattern-build pattern)))
+          (pattern.script pattern))))
+
+(defmethod target-default-build-script ((target directory-ref))
+  (let ((dir (directory-ref.path target)))
+    (task target
+          (lambda ()
+            (let ((dir (resolve-target dir (base))))
+              (ensure-directories-exist dir)))
+          trivial-target)))
+
+(defmethod target-default-build-script ((target module-spec))
+  (let ((cell (module-spec-cell target)))
+    (with-slots (lang source) cell
+      (task target
+            (lambda ()
+              (let ((*base* (pathname-directory-pathname source)))
+                ;; Depend on the source file.
+                (depends-on source)
+                ;; Let the language tell you what to depend on.
+                (lang-deps lang source))
+
+              (let ((*language* lang))
+                (load-module-into-cell cell)))
+            trivial-target))))
+
+(defmethod build-script-target ((script task))
   (task-script script))
 
 (defmethod run-script (task &aux (parent (current-parent)))
@@ -1028,23 +1040,30 @@ inherit a method on `make-load-form', and need only specialize
   (save-task target thunk script)
   (depends-on target))
 
+(defgeneric save-task* (target thunk script)
+  (:method :before (target thunk script)
+    (declare (ignore target thunk script))
+    (check-not-frozen))
+  (:method (target thunk script)
+    (declare (ignore thunk script))
+    (error* "Task for ~a cannot be redefined." target))
+  (:method ((target symbol) thunk script)
+    (setf (gethash target *tasks*)
+          (task target thunk script)))
+  (:method ((target cl:pathname) thunk script)
+    (setf (gethash target *tasks*)
+          (task target thunk script)))
+  (:method ((target delayed-symbol) thunk script)
+    (save-task (force-symbol target) thunk script))
+  (:method ((target phony-target) thunk script)
+    (let* ((name (phony-target-name target))
+           (task (task target thunk script))
+           (key `(phony ,name)))
+      (setf (gethash key *tasks*) task))))
+
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
-  (etypecase-of target target
-    ((or root-target trivial-target impossible-target
-         module-spec
-         directory-ref pattern-ref
-         oracle)
-     (error* "Task for ~a cannot be redefined." target))
-    ((or bindable-symbol delayed-symbol pathname)
-     (let* ((target (force-symbol target))
-            (task (task target thunk script)))
-       (setf (gethash target *tasks*) task)))
-    (phony-target
-     (let* ((name (phony-target-name target))
-            (task (task target thunk script))
-            (key `(phony ,name)))
-       (setf (gethash key *tasks*) task)))))
+  (save-task* target thunk script))
 
 (defun task-values (task)
   (values (task-target task)
@@ -1065,34 +1084,47 @@ inherit a method on `make-load-form', and need only specialize
              spaces
              (target-being-built-string target))))
 
-(defun target-being-built-string (target)
+(defmethod target-being-built-string :around (target)
+  (declare (ignore target))
   (assure string
-    (etypecase-of target target
-      (pathname (native-namestring target))
-      (bindable-symbol (fmt "'~s" target))
-      (delayed-symbol
-       (target-being-built-string (force-symbol target)))
-      (root-target "everything")
-      ;; Shouldn't happen
-      (trivial-target "TRIVIAL TARGET")
-      (impossible-target "IMPOSSIBLE TARGET")
-      (module-spec
-       (let-match1 (module-spec lang path) target
-         (let ((path (native-namestring path)))
-           (fmt "~a (#lang ~a)"
-                path (string-downcase lang)))))
-      (directory-ref
-       (let ((name (directory-ref.path target)))
-         (fmt "directory ~a" name)))
-      (phony-target
-       (let ((name (phony-target-name target)))
-         (fmt "phony target ~a" name)))
-      (pattern-ref
-       (native-namestring
-        (pattern-ref.output target)))
-      (oracle
-       (let ((name (oracle-name target)))
-         (fmt "oracle for ~a" name))))))
+    (call-next-method)))
+
+(defmethod target-being-built-string ((target cl:pathname))
+  (native-namestring target))
+
+(defmethod target-being-built-string ((target symbol))
+  (fmt "'~s" target))
+
+(defmethod target-being-built-string ((target delayed-symbol))
+  () (target-being-built-string (force-symbol target)))
+
+(defmethod target-being-built-string ((target root-target))
+  "everything")
+;; Shouldn't happen
+
+(defmethod target-being-built-string ((target trivial-target))
+  "TRIVIAL TARGET")
+
+(defmethod target-being-built-string ((target impossible-target))
+  "IMPOSSIBLE TARGET")
+
+(defmethod target-being-built-string ((target module-spec))
+  (let-match1 (module-spec lang path) target
+    (let ((path (native-namestring path)))
+      (fmt "~a (#lang ~a)"
+           path (string-downcase lang)))))
+
+(defmethod target-being-built-string ((target directory-ref))
+  (let ((name (directory-ref.path target)))
+    (fmt "directory ~a" name)))
+
+(defmethod target-being-built-string ((target phony-target))
+  (let ((name (phony-target-name target)))
+    (fmt "phony target ~a" name)))
+
+(defmethod target-being-built-string ((target pattern-ref))
+  (native-namestring
+   (pattern-ref.output target)))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
@@ -1100,26 +1132,14 @@ inherit a method on `make-load-form', and need only specialize
     (file-meta size timestamp)))
 
 (defmethod target-stamp (target)
-  (assure stamp
-    (etypecase-of target target
-      ((or root-target
-           trivial-target
-           impossible-target
-           bindable-symbol
-           delayed-symbol
-           pattern-ref
-           ;; TODO?
-           directory-ref
-           module-spec
-           phony-target)
-       (target-timestamp target))
-      (oracle (oracle-timestamp target))
-      (pathname
-       (cond ((file-exists-p target)
-              (file-stamp target))
-             ((directory-pathname-p target)
-              (target-timestamp target))
-             (t deleted))))))
+  (target-timestamp target))
+
+(defmethod target-stamp ((target cl:pathname))
+  (cond ((file-exists-p target)
+         (file-stamp target))
+        ((directory-pathname-p target)
+         (target-timestamp target))
+        (t deleted)))
 
 (defun rebuild-symbol (symbol thunk)
   (lambda ()
@@ -1136,7 +1156,7 @@ inherit a method on `make-load-form', and need only specialize
       (assert (not (timestamp-newer? old (target-timestamp file)))))))
 
 (defun save-file-task (file thunk script)
-  (check-type file pathname)
+  (check-type file cl:pathname)
   (check-type thunk function)
   (save-task file
              (rebuild-file file thunk (base))
@@ -1688,7 +1708,7 @@ forever."))
   (cond ((packagep lang)
          `(module-cell ,(lang-name lang) ,path))
         ((or (quoted-symbol? lang) (keywordp lang))
-         (typecase-of (or string pathname) path
+         (typecase-of (or string cl:pathname) path
            (string `(module-cell ,lang ,(ensure-pathname path :want-pathname t)))
            (pathname
             (let ((path (resolve-target path (base)))) ;Resolve now, while `*base*' is bound.
@@ -1907,15 +1927,15 @@ interoperation with Emacs."
        (make-pathname :directory `(:relative ,lang-string))
        suffix))))
 
-(defun faslize (lang pathname)
+(defun faslize (lang cl:pathname)
   (etypecase-of lang lang
     (package
      (~> lang
          package-name-keyword
-         (faslize pathname)))
+         (faslize cl:pathname)))
     (lang-name
-     (path-join (lang-fasl-dir lang pathname)
-                (make-pathname :name (pathname-name pathname)
+     (path-join (lang-fasl-dir lang cl:pathname)
+                (make-pathname :name (pathname-name cl:pathname)
                                :type fasl-ext)))))
 
 (defun fasl? (pathname)
