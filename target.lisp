@@ -375,6 +375,41 @@ inherit a method on `make-load-form', and need only specialize
     (string (directory-ref (ensure-pathname name :want-pathname t)))
     (directory-pathname (make 'directory-ref :path name))))
 
+(defmethods directory-ref (target (path name))
+  (:method target-exists? (target)
+    (~> path
+        (resolve-target (base))
+        directory-exists-p))
+  (:method target-timestamp (target)
+    (let* ((dir path)
+           (dir (resolve-target dir (base))))
+      (if (directory-exists-p dir)
+          far-future
+          never)))
+  (:method (setf target-timestamp) (timestamp target)
+    (declare (ignore timestamp))
+    (if (directory-exists-p path)
+        ;; TODO Ditto.
+        (error* "Cannot set directory timestamps (yet).")
+        (ensure-directories-exist path)))
+  (:method resolve-target (target base)
+    (directory-ref
+     (assure tame-pathname
+       (~> target
+           path
+           (merge-pathnames* base)))))
+  (:method target= (target (y directory-ref))
+    (pathname-equal path (directory-ref.path y)))
+  (:method target-default-build-script (target)
+    (let ((dir path))
+      (task target
+            (lambda ()
+              (let ((dir (resolve-target dir (base))))
+                (ensure-directories-exist dir)))
+            trivial-target)))
+  (:method target-being-built-string (target)
+    (fmt "directory ~a" path)))
+
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
   ;; either a symbol or an instance of `pattern', which is not yet
@@ -589,12 +624,6 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod target-exists? ((target cl:pathname))
   (pathname-exists? target))
 
-(defmethod target-exists? ((target directory-ref))
-  (~> target
-      directory-ref.path
-      (resolve-target (base))
-      directory-exists-p))
-
 (defmethod target-exists? ((target pattern-ref))
   (~> target
       pattern-ref.output
@@ -631,13 +660,6 @@ inherit a method on `make-load-form', and need only specialize
   (if (pathname-exists? target)
       (file-mtime target)
       never))
-
-(defmethod target-timestamp ((target directory-ref))
-  (let* ((dir (directory-ref.path target))
-         (dir (resolve-target dir (base))))
-    (if (directory-exists-p dir)
-        far-future
-        never)))
 
 (defmethod target-timestamp ((target pattern-ref))
   (with-accessors ((output pattern-ref.output)) target
@@ -677,14 +699,6 @@ inherit a method on `make-load-form', and need only specialize
       (error* "Cannot set pathname timestamps (yet).")
       (open target :direction :probe :if-does-not-exist :create)))
 
-(defmethod (setf target-timestamp) (timestamp (target directory-ref))
-  (declare (ignore timestamp))
-  (let ((dir (directory-ref.path target)))
-    (if (directory-exists-p dir)
-        ;; TODO Ditto.
-        (error* "Cannot set directory timestamps (yet).")
-        (ensure-directories-exist dir))))
-
 (defmethod (setf target-timestamp) (timestamp (target module-spec))
   (let ((cell (module-spec-cell target)))
     (setf (module-cell.timestamp cell) timestamp)))
@@ -718,13 +732,6 @@ inherit a method on `make-load-form', and need only specialize
   (pattern-ref (pattern-ref.pattern target)
                (merge-pathnames* (pattern-ref.input target) base)))
 
-(defmethod resolve-target ((target directory-ref) base)
-  (directory-ref
-   (assure tame-pathname
-     (~> target
-         directory-ref.path
-         (merge-pathnames* base)))))
-
 (defmethod resolve-target ((target module-spec) base)
   (let-match1 (module-spec lang source) target
     (module-spec lang
@@ -751,10 +758,6 @@ inherit a method on `make-load-form', and need only specialize
       (module-spec lang2 path2))
      (and (eql lang1 lang2)
           (pathname-equal path1 path2)))))
-
-(defmethod target= ((x directory-ref) (y directory-ref))
-  (pathname-equal (directory-ref.path x)
-                  (directory-ref.path y)))
 
 (defmethod target= ((x pattern-ref) (y pattern-ref))
   (and (equal (pattern-ref.input x)
@@ -1001,14 +1004,6 @@ inherit a method on `make-load-form', and need only specialize
               (pattern-build pattern)))
           (pattern.script pattern))))
 
-(defmethod target-default-build-script ((target directory-ref))
-  (let ((dir (directory-ref.path target)))
-    (task target
-          (lambda ()
-            (let ((dir (resolve-target dir (base))))
-              (ensure-directories-exist dir)))
-          trivial-target)))
-
 (defmethod target-default-build-script ((target module-spec))
   (let ((cell (module-spec-cell target)))
     (with-slots (lang source) cell
@@ -1113,10 +1108,6 @@ inherit a method on `make-load-form', and need only specialize
     (let ((path (native-namestring path)))
       (fmt "~a (#lang ~a)"
            path (string-downcase lang)))))
-
-(defmethod target-being-built-string ((target directory-ref))
-  (let ((name (directory-ref.path target)))
-    (fmt "directory ~a" name)))
 
 (defmethod target-being-built-string ((target phony-target))
   (let ((name (phony-target-name target)))
