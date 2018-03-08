@@ -612,9 +612,6 @@ inherit a method on `make-load-form', and need only specialize
      (or (file-exists-p path)
          (directory-exists-p path)))))
 
-(defmethod target-exists? :around ((target t))
-  (true (call-next-method)))
-
 (defmethod target-exists? ((target root-target))
   t)
 
