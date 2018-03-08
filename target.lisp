@@ -531,26 +531,28 @@ inherit a method on `make-load-form', and need only specialize
 
 (fset:define-cross-type-compare-methods phony-target)
 
-;; (deftype target ()
-;;   ;; NB Not allowing lists of targets as targets is a conscious
-;;   ;; decision. It would make things much more complicated. In
-;;   ;; particular, there would no longer be a single timestamp for a
-;;   ;; target, because the proper timestamp to use for a list of targets
-;;   ;; would depend on whether it was being depended on (in which case
-;;   ;; we want the /newest/ timestamp) or doing the depending (in which
-;;   ;; case we want the /oldest/ timestamp).
-;;   '(or
-;;     root-target
-;;     impossible-target
-;;     trivial-target
-;;     phony-target
-;;     bindable-symbol
-;;     delayed-symbol
-;;     pathname
-;;     directory-ref
-;;     pattern-ref
-;;     module-spec
-;;     oracle))
+(deftype target ()
+  ;; NB Not allowing lists of targets as targets is a conscious
+  ;; decision. It would make things much more complicated. In
+  ;; particular, there would no longer be a single timestamp for a
+  ;; target, because the proper timestamp to use for a list of targets
+  ;; would depend on whether it was being depended on (in which case
+  ;; we want the /newest/ timestamp) or doing the depending (in which
+  ;; case we want the /oldest/ timestamp).
+  '(not list)
+  ;; '(or
+  ;;   root-target
+  ;;   impossible-target
+  ;;   trivial-target
+  ;;   phony-target
+  ;;   bindable-symbol
+  ;;   delayed-symbol
+  ;;   pathname
+  ;;   directory-ref
+  ;;   pattern-ref
+  ;;   module-spec
+  ;;   oracle)
+  )
 
 (defconstructor task
   "A task."
