@@ -5,6 +5,7 @@
    #:target-stamp
    #:target-exists?
    #:target=
+   #:hash-target
    #:target-build-script
    #:target-default-build-script
    #:build-script-target
@@ -29,6 +30,7 @@
 (defgeneric target-stamp (target))
 (defgeneric target-exists? (target))
 (defgeneric target= (target1 target2))
+(defgeneric hash-target (target))
 (defgeneric target-build-script (target))
 (defgeneric target-default-build-script (target))
 (defgeneric build-script-target (script))
