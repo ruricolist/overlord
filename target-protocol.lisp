@@ -1,8 +1,11 @@
 (defpackage :overlord/target-protocol
   (:use :cl :alexandria :serapeum)
   (:import-from :overlord/stamp :target-timestamp)
+  (:import-from :fset :compare :define-cross-type-compare-methods)
   (:export
    #:root-target
+   #:impossible-target
+   #:trivial-target
    #:target-stamp
    #:target-timestamp
    #:target-exists?
@@ -25,13 +28,26 @@
    #:clear-temp-prereqs
    #:save-temp-prereqsne
    #:clear-temp-prereqsne
-   #:generate-impossible-target
    #:call-with-target-locked
    #:target-being-built-string))
 (in-package :overlord/target-protocol)
 
-(defgeneric root-target ()
-  (:documentation "Return the root target."))
+(defunit root-target
+  "The root target.
+Building this builds all targets defined in this session \(not all targets in the database).")
+
+(defunit impossible-target
+  "The target that is always out of date.")
+
+(defunit trivial-target
+  "The target that is never out of date.")
+
+(defmethod compare ((x impossible-target) (y impossible-target)) :equal)
+(defmethod compare ((x trivial-target) (y trivial-target)) :equal)
+(defmethod compare ((x impossible-target) (y impossible-target)) :equal)
+(define-cross-type-compare-methods root-target)
+(define-cross-type-compare-methods impossible-target)
+(define-cross-type-compare-methods trivial-target)
 
 (defgeneric target-stamp (target)
   (:documentation "Return the stamp of TARGET.")
@@ -105,8 +121,6 @@ hash \(though the reverse is not necessarily true)."))
 (defgeneric clear-temp-prereqs (target))
 
 (defgeneric clear-temp-prereqsne (target))
-
-(defgeneric generate-impossible-target ())
 
 (defgeneric call-with-target-locked (target fn)
   (:documentation "Call FN holding the target-specific lock for TARGET."))

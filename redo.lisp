@@ -58,7 +58,7 @@
       (target-has-build-script? target)))
 
 (defun redo (&rest args)
-  (redo-all (or args (list (root-target)))))
+  (redo-all (or args (list root-target))))
 
 (defparameter *specials*
   '(*parents*
@@ -197,9 +197,9 @@
     (record-prereqne i)))
 
 (defun redo-always ()
-  (record-prereq (generate-impossible-target)))
+  (record-prereq impossible-target))
 
-(defun target-tree (&optional (target (root-target)))
+(defun target-tree (&optional (target root-target))
   "Return a list of (target . deps), where each dep is of the same
 type."
   (when (target? target)

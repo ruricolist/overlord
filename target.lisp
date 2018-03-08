@@ -228,6 +228,10 @@ Works for SBCL, at least."
 (defplace temp-prereqsne (target)
   (prop target prereqsne-temp (fset:empty-set)))
 
+(defun current-parent ()
+  (or (first *parents*)
+      root-target))
+
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
 
@@ -236,7 +240,7 @@ Works for SBCL, at least."
 
 (defun record-parent-prereq (parent target)
   (check-type target target)
-  (unless (root-target? parent)
+  (unless (eql parent root-target)
     (withf (temp-prereqs parent)
            target
            (target-stamp target))))
@@ -518,41 +522,6 @@ inherit a method on `make-load-form', and need only specialize
              (list2 (list lang2 path2)))
          (declare (dynamic-extent list1 list2))
          (fset:compare list1 list2)))))
-
-(defunit root-target)
-
-(defmethod root-target ()
-  root-target)
-
-(defun root-target? (x)
-  (eql x root-target))
-
-(defun current-parent ()
-  (or (first *parents*)
-      root-target))
-
-(defmethods root-target (self)
-  (:method fset:compare (self (obj t))
-    (if (eq self obj) :equal :unequal))
-  (:method fset:compare ((obj t) self)
-    (if (eq self obj) :equal :unequal)))
-
-(fset:define-cross-type-compare-methods root-target)
-
-(defunit impossible-target)
-(defunit trivial-target)
-
-(defmethod fset:compare ((x impossible-target) (y impossible-target))
-  :equal)
-
-(defmethod fset:compare ((x trivial-target) (y trivial-target))
-  :equal)
-
-(fset:define-cross-type-compare-methods impossible-target)
-(fset:define-cross-type-compare-methods trivial-target)
-
-(defmethod generate-impossible-target ()
-  impossible-target)
 
 (defconstructor phony-target
   (name symbol))
