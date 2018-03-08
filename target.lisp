@@ -419,7 +419,7 @@ inherit a method on `make-load-form', and need only specialize
     (if *print-escape*
         (format stream "~a~s"
                 (read-eval-prefix ref stream)
-                `(pattern-ref ,(safe-symbol pattern-name)
+                `(pattern-ref ,(maybe-delay-symbol pattern-name)
                               ,input))
         (print-unreadable-object (ref stream :type t)
           (format stream "~a (~a)"

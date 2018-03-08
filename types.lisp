@@ -164,7 +164,7 @@ If the value of `*default-pathname-defaults*' and a call to
 
 (defun delay-symbol (symbol)
   (assure delayed-symbol
-    (ematch symbol
+    (match symbol
       ((delayed-symbol) symbol)
       ((and _ (type symbol))
        (let ((package-name
@@ -172,7 +172,8 @@ If the value of `*default-pathname-defaults*' and a call to
                    symbol-package
                    package-name))
              (symbol-name (symbol-name symbol)))
-         (delayed-symbol package-name symbol-name))))))
+         (delayed-symbol package-name symbol-name)))
+      (otherwise symbol))))
 
 (defun force-symbol (delay)
   (match delay
