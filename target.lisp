@@ -925,10 +925,13 @@ inherit a method on `make-load-form', and need only specialize
 
 ;;; Building targets (scripts).
 
-(define-global-state *tasks* (dict))
+;;; NB `*tasks*' and `*top-level-targets* cannot be safely reset,
+;;; since they contain information that could only be obtained by
+;;; reloading all Lisp files.
+(defvar *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(define-global-state *top-level-targets* (make-target-table :synchronized t))
+(defvar *top-level-targets* (make-target-table :synchronized t))
 (declaim (type target-table *top-level-targets*))
 
 (defun ensure-target-recorded (target)
@@ -938,6 +941,10 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun list-top-level-targets ()
   (target-table-keys *top-level-targets*))
+
+(defmethod target-saved-prereqs ((rt root-target))
+  (mapcar (op (saved-prereq _1 (target-stamp _1)))
+          (list-top-level-targets)))
 
 (defun trivial-task (target)
   (task target
@@ -1213,7 +1220,7 @@ value and NEW do not match under TEST."
       (values target system-name package))))
 
 (defun build (&rest targets)
-  (redo-all targets))
+  (depends-on-all targets))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))
