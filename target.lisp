@@ -263,6 +263,9 @@ Works for SBCL, at least."
 
 (defmethod target-in-db? (target)
   (has-prop? target
+             ;; The uptodate key is sort of a fallback for a target
+             ;; that, for whatever reason, has no prerequisites. Such
+             ;; a target would be built once, and then never again.
              uptodate
              prereqs
              prereqs-temp
