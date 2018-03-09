@@ -968,6 +968,12 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod target-build-script ((target t))
   (impossible-task target))
 
+(defmethod target-build-script ((target trivial-target))
+  (trivial-task target))
+
+(defmethod target-build-script ((target impossible-target))
+  (trivial-task target))
+
 (defmethod target-build-script ((target cl:pathname))
   (or (gethash target *tasks*)
       (impossible-task target)))
@@ -986,7 +992,7 @@ inherit a method on `make-load-form', and need only specialize
         (impossible-task target))))
 
 (defmethod target-default-build-script ((target t))
-  (trivial-task target))
+  (impossible-task target))
 
 (defmethod target-default-build-script ((target root-target))
   (task target
@@ -1094,7 +1100,7 @@ inherit a method on `make-load-form', and need only specialize
   (fmt "'~s" target))
 
 (defmethod target-being-built-string ((target delayed-symbol))
-  () (target-being-built-string (force-symbol target)))
+  (target-being-built-string (force-symbol target)))
 
 (defmethod target-being-built-string ((target root-target))
   "everything")
