@@ -163,7 +163,9 @@
                    (outdated (filter #'changed? reqs)))
               (redo-all outdated)
               (notevery #'unchanged? prereqs)))
-           (not-in-db? (not (target-in-db? target))))
+           (not-in-db?
+            (and (target? target)
+                 (not (target-in-db? target)))))
     (or target-does-not-exist?
         non-existent-prereqs-exist?
         regular-prereqs-changed?
