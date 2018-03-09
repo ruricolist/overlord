@@ -197,7 +197,7 @@ If the value of `*default-pathname-defaults*' and a call to
           (equal s1 s2)))))
 
 (defmethod compare ((ds1 delayed-symbol) (ds2 delayed-symbol))
-  (fset:compare-slots ds1 ds1
+  (fset:compare-slots ds1 ds2
                       #'delayed-symbol-package-name
                       #'delayed-symbol-symbol-name))
 
