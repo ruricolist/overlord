@@ -134,7 +134,7 @@
 (test config/deps
   (nap 1)
   (local
-    (def original #.+literal-string+)
+    (def original +literal-string+)
     (touch +literal-string-file+)
     (overlord:build '+literal-string+)
     (is (not (eq original +literal-string+)))))
@@ -143,6 +143,8 @@
   (local
     (def string1 *literal-string*)
     (is (stringp string1))
+
+    (nap 1)
 
     (touch +literal-string-file+)
     (overlord:build '*literal-string*)
