@@ -235,6 +235,9 @@ Works for SBCL, at least."
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
 
+(defmethod record-prereq ((target trivial-target))
+  (declare (ignore target)))
+
 (defmethod record-prereq ((target symbol))
   (record-prereq (maybe-delay-symbol target)))
 
@@ -247,6 +250,9 @@ Works for SBCL, at least."
 
 (defmethod record-prereqne (target &aux (parent (current-parent)))
   (record-parent-prereqne parent target))
+
+(defmethod record-prereqne ((target impossible-target))
+  (declare (ignore target)))
 
 (defmethod record-prereqne ((target symbol))
   (record-prereqne (maybe-delay-symbol target)))
