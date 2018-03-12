@@ -1235,7 +1235,7 @@ value and NEW do not match under TEST."
       (values target system-name package))))
 
 (defun build (&rest targets)
-  (redo targets))
+  (redo-all targets))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))
