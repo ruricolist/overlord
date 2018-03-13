@@ -1097,7 +1097,12 @@ inherit a method on `make-load-form', and need only specialize
   (native-namestring target))
 
 (defmethod target-being-built-string ((target symbol))
-  (fmt "'~s" target))
+  (if (string$= '.do target)
+      (fmt "script for '~s"
+           (find-symbol
+            (slice (symbol-name target) 0 -3)
+            (symbol-package target)))
+      (fmt "'~s" target)))
 
 (defmethod target-being-built-string ((target delayed-symbol))
   (target-being-built-string (force-symbol target)))
