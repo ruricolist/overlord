@@ -17,6 +17,7 @@
   (:import-from #:lparallel #:pmap)
   (:nicknames :redo)
   (:export
+   #:building?
    #:redo
    #:redo-all
    #:redo/parallel
@@ -27,7 +28,8 @@
    #:redo-ifcreate-all
    #:redo-always
    #:*parents*
-   #:target-tree))
+   #:target-tree
+   #:building?))
 (in-package #:overlord/redo)
 
 ;;; NB This file is only concerned with the logic of the build system.
@@ -36,6 +38,9 @@
 
 (defvar *parents* '()
   "The chain of parents being built.")
+
+(defun building? ()
+  (true *parents*))
 
 (defmacro with-target-locked ((target) &body body)
   (with-thunk (body)
@@ -57,7 +62,7 @@
       ;; considered out of date if it has no presence in the DB.
       (target-has-build-script? target)))
 
-(defun redo (&rest args)
+(defun redo (&rest args &aux (*building* t))
   (redo-all (or args (list root-target))))
 
 (defparameter *specials*
@@ -75,7 +80,8 @@
     *load-truename*
     *cli*
     *building-root*
-    *save-pending*)
+    *save-pending*
+    *building*)
   "Special variables whose bindings, if any, should be propagated into
   subthreads.")
 
