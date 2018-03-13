@@ -9,7 +9,9 @@
     #:pmap)
   (:export
    #:with-our-kernel
-   #:end-our-kernel))
+   #:end-our-kernel
+   #:make-resource
+   #:with-resource-held))
 (in-package :overlord/parallel)
 
 (def nprocs
@@ -55,3 +57,45 @@
       (when-let (*kernel* (bound-value '*our-kernel*))
         (message "Terminating Overlord thread pool")
         (end-kernel :wait t)))))
+
+(defconstructor resource-token
+  (pool-name string)
+  (id (integer 0 *)))
+
+(defstruct-read-only (resource
+                      (:constructor %make-resource)
+                      (:conc-name resource.))
+  (name :type string)
+  (count :type (integer 1 *))
+  queue)
+
+(defmethod print-object ((self resource) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "~a (~a)"
+            (resource.name self)
+            (resource.count self))))
+
+(defun make-resource (&key (name "Anonymous resource")
+                           (count 1))
+  (check-type count (integer 1 *))
+  (check-type name string)
+  (%make-resource
+   :name name
+   :count count
+   :queue (lparallel.queue:make-queue
+           :fixed-capacity count
+           :initial-contents
+           (loop for i below count
+                 collect (resource-token name i)))))
+
+(defun call/resource-held (fn resource)
+  (if (not (use-threads-p)) (funcall fn)
+      (let* ((queue (resource.queue resource))
+             (token (lparallel.queue:pop-queue queue)))
+        (multiple-value-prog1
+            (funcall fn)
+          (lparallel.queue:push-queue token queue)))))
+
+(defmacro with-resource-held ((resource) &body body)
+  (with-thunk (body)
+    `(call/resource-held ,body ,resource)))

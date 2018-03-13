@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria #:serapeum #:overlord/specials)
   (:import-from #:overlord/types #:absolute-pathname)
   (:import-from #:overlord/file-package #:ensure-file-package)
+  (:import-from #:overlord/parallel #:make-resource #:with-resource-held)
   (:export #:compile-to-file #:load-as-module :fasl-ext :module))
 (in-package #:overlord/compile-to-file)
 
@@ -33,6 +34,10 @@
            ;; macroexpansion.
            (:use ,@use-list))))))
 
+(def compiler-resource
+  (make-resource :name "Lisp compiler")
+  "Resource to limit concurrent access to the Lisp compiler.")
+
 (defun compile-to-file (program output-file
                         &key top-level source
                         &aux (namestring (namestring source)))
@@ -48,22 +53,23 @@
         (*program*
           (if top-level program
               `(setq *module* ,program))))
-    ;; TODO The following is cribbed from the sources of Slime and Sly.
-    (with-compilation-unit (:allow-other-keys t
-                            ;; SBCL
-                            :source-namestring namestring)
-      (let ((*package* package)
-            (*readtable* (copy-readtable nil)))
-        (compile-file universal-file
-                      :allow-other-keys t
-                      :output-file output-file
-                      :external-format :utf-8
-                      ;; CCL.
-                      :compile-file-original-truename source
-                      ;; ECL.
-                      :source-truename source
-                      ;; Clasp.
-                      :source-debug-namestring namestring)))))
+    (with-resource-held (compiler-resource)
+      ;; TODO The following is cribbed from the sources of Slime and Sly.
+      (with-compilation-unit (:allow-other-keys t
+                              ;; SBCL
+                              :source-namestring namestring)
+        (let ((*package* package)
+              (*readtable* (copy-readtable nil)))
+          (compile-file universal-file
+                        :allow-other-keys t
+                        :output-file output-file
+                        :external-format :utf-8
+                        ;; CCL.
+                        :compile-file-original-truename source
+                        ;; ECL.
+                        :source-truename source
+                        ;; Clasp.
+                        :source-debug-namestring namestring))))))
 
 (defun load-as-module (file)
   "Load FILE and return whatever it assigns to `*module*'."
