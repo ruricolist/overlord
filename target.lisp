@@ -235,7 +235,7 @@ Works for SBCL, at least."
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
 
-(defmethod record-prereq ((target trivial-target))
+(defmethod record-prereq ((target trivial-prereq))
   (declare (ignore target)))
 
 (defmethod record-prereq ((target symbol))
@@ -274,7 +274,7 @@ Works for SBCL, at least."
 
 (defmethod target-in-db? ((target root-target)) t)
 (defmethod target-in-db? ((target impossible-prereq)) t)
-(defmethod target-in-db? ((target trivial-target)) t)
+(defmethod target-in-db? ((target trivial-prereq)) t)
 
 (defmethod clear-temp-prereqs (target)
   (delete-prop target prereqs-temp))
@@ -423,7 +423,7 @@ inherit a method on `make-load-form', and need only specialize
             (lambda ()
               (let ((dir (resolve-target dir (base))))
                 (ensure-directories-exist dir)))
-            trivial-target)))
+            trivial-prereq)))
   (:method target-being-built-string (target)
     (fmt "directory ~a" path))
   (:method hash-target (target)
@@ -556,7 +556,7 @@ inherit a method on `make-load-form', and need only specialize
   ;; '(or
   ;;   root-target
   ;;   impossible-prereq
-  ;;   trivial-target
+  ;;   trivial-prereq
   ;;   phony-target
   ;;   bindable-symbol
   ;;   delayed-symbol
@@ -599,7 +599,7 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod target-exists? ((target root-target))
   t)
 
-(defmethod target-exists? ((target trivial-target))
+(defmethod target-exists? ((target trivial-prereq))
   t)
 
 (defmethod target-exists? ((target impossible-prereq))
@@ -636,7 +636,7 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod target-timestamp ((target phony-target))
   never)
 
-(defmethod target-timestamp ((target trivial-target))
+(defmethod target-timestamp ((target trivial-prereq))
   far-future)
 
 (defmethod target-timestamp ((target symbol))
@@ -757,8 +757,8 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod hash-target ((target root-target))
   (load-time-value (sxhash root-target)))
 
-(defmethod hash-target ((target trivial-target))
-  (load-time-value (sxhash trivial-target)))
+(defmethod hash-target ((target trivial-prereq))
+  (load-time-value (sxhash trivial-prereq)))
 
 (defmethod hash-target ((target impossible-prereq))
   (load-time-value (sxhash impossible-prereq)))
@@ -779,7 +779,7 @@ inherit a method on `make-load-form', and need only specialize
 (defgeneric hash-friendly? (target)
   (:method ((x root-target)) t)
   (:method ((x impossible-prereq)) t)
-  (:method ((x trivial-target)) t)
+  (:method ((x trivial-prereq)) t)
   (:method ((x symbol)) t)
   (:method ((x cl:pathname)) t)
   (:method (x)
@@ -958,7 +958,7 @@ inherit a method on `make-load-form', and need only specialize
 (defun trivial-task (target)
   (task target
         (constantly nil)
-        trivial-target))
+        trivial-prereq))
 
 (defun impossible-task (target)
   (task target
@@ -968,7 +968,7 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod target-build-script ((target t))
   (impossible-task target))
 
-(defmethod target-build-script ((target trivial-target))
+(defmethod target-build-script ((target trivial-prereq))
   (trivial-task target))
 
 (defmethod target-build-script ((target impossible-prereq))
@@ -1003,7 +1003,7 @@ inherit a method on `make-load-form', and need only specialize
           ;; have been defined in this image.
           (let ((*building-root* t))
             (depends-on-all (list-top-level-targets))))
-        trivial-target))
+        trivial-prereq))
 
 (defmethod target-default-build-script ((target pattern-ref))
   (let* ((input (pattern-ref.input target))
@@ -1031,7 +1031,7 @@ inherit a method on `make-load-form', and need only specialize
 
               (let ((*language* lang))
                 (load-module-into-cell cell)))
-            trivial-target))))
+            trivial-prereq))))
 
 (defmethod build-script-target ((script task))
   (task-script script))
@@ -1040,7 +1040,7 @@ inherit a method on `make-load-form', and need only specialize
   (check-not-frozen)
   ;; XXX exhaustive?
   (unless (typep parent
-                 '(or impossible-prereq trivial-target))
+                 '(or impossible-prereq trivial-prereq))
     (print-target-being-built parent))
   (funcall (task-thunk task)))
 
@@ -1106,7 +1106,7 @@ inherit a method on `make-load-form', and need only specialize
   "everything")
 ;; Shouldn't happen
 
-(defmethod target-being-built-string ((target trivial-target))
+(defmethod target-being-built-string ((target trivial-prereq))
   "TRIVIAL TARGET")
 
 (defmethod target-being-built-string ((target impossible-prereq))
@@ -1359,7 +1359,7 @@ value and NEW do not match under TEST."
                                   (now))))
            ,@(unsplice documentation)))
        (eval-always
-         (save-task ',name (constantly ,init) trivial-target))
+         (save-task ',name (constantly ,init) trivial-prereq))
        (eval-always
          (update-config-if-changed ',name ,init ,test))
        ',name)))
@@ -1561,7 +1561,7 @@ specify the dependencies you want on build."
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
-   :script trivial-target)
+   :script trivial-prereq)
   (:documentation "A file-to-file build pattern."))
 
 (defmethod load-form-slot-names append ((self pattern))

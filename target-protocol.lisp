@@ -6,7 +6,7 @@
   (:export
    #:root-target
    #:impossible-prereq
-   #:trivial-target
+   #:trivial-prereq
    #:target-stamp
    #:target-timestamp
    #:target-exists?
@@ -40,15 +40,15 @@ Building this builds all targets defined in this session \(not all targets in th
 (defunit impossible-prereq
   "The target that is always out of date.")
 
-(defunit trivial-target
+(defunit trivial-prereq
   "The target that is never out of date.")
 
 (defmethod compare ((x root-target) (y root-target)) :equal)
-(defmethod compare ((x trivial-target) (y trivial-target)) :equal)
+(defmethod compare ((x trivial-prereq) (y trivial-prereq)) :equal)
 (defmethod compare ((x impossible-prereq) (y impossible-prereq)) :equal)
 (define-cross-type-compare-methods root-target)
 (define-cross-type-compare-methods impossible-prereq)
-(define-cross-type-compare-methods trivial-target)
+(define-cross-type-compare-methods trivial-prereq)
 
 (defgeneric target-stamp (target)
   (:documentation "Return the stamp of TARGET.")
