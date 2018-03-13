@@ -22,7 +22,9 @@
    :oracle
    :use-var
    :use-env
-   :oracle-name))
+   :oracle-name
+   :system-version-oracle
+   :dist-version-oracle))
 (in-package :overlord/oracle)
 
 ;;; Oracles. Oracles let you depend on the environment: either the
@@ -60,12 +62,15 @@
         :accessor oracle.key
         :reader oracle-name)))
 
-(defun depends-on-oracle (&rest oracles)
+(defun depends-on-oracles (oracles)
   (do-each (oracle (reshuffle oracles))
     (if (target-exists? oracle)
         (redo-ifchange oracle)
         (redo-ifcreate oracle)))
   (values))
+
+(defun depends-on-oracle (&rest oracles)
+  (depends-on-oracles oracles))
 
 (defmethods oracle (self key)
   (:method make-load-form (self &optional env)
@@ -202,4 +207,44 @@ A name is extracted using `named-readtable:readtable-name'."))
   (let ((oracles
           (mapcar (op (make 'env-oracle :name _))
                   names)))
-    (apply #'depends-on-oracle oracles)))
+    (depends-on-oracles oracles)))
+
+(defclass system-version-oracle (oracle)
+  ((key :initarg :name
+        :type string)))
+
+(defmethods system-version-oracle (self (name key))
+  (:method oracle-value (self)
+    (if-let (system (asdf:find-system name nil))
+      (asdf:component-version system)
+      nil)))
+
+(defun system-version-oracle (name)
+  (make 'system-version-oracle :name name))
+
+(defun use-versioned-system (&rest systems)
+  (let* ((names (mapcar #'string-downcase systems))
+         (oracles (mapcar (op (make 'system-version-oracle :name _))
+                          names)))
+    (depends-on-oracle oracles)))
+
+(defconst quicklisp "quicklisp")
+
+(defun ql-dist-version (&optional (dist-name quicklisp))
+  (when (find-package :ql)
+    (ignore-errors
+     (~>> dist-name
+          (uiop:symbol-call :ql-dist :find-dist)
+          (uiop:symbol-call :ql-dist :version)))))
+
+(defclass dist-version-oracle (oracle)
+  ((key :initarg :name
+        :type string)))
+
+(defmethods dist-version-oracle (self (name key))
+  (:method oracle-value (self)
+    (ql-dist-version name)))
+
+(defun dist-version-oracle (&optional (dist-name quicklisp))
+  (make 'dist-version-oracle
+        :name (assure string dist-name)))

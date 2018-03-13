@@ -1309,6 +1309,12 @@ value and NEW do not match under TEST."
               (:always (&optional (bool t))
                 `(and ,bool (redo-always)))
 
+              (:system-version (system-name)
+                `(system-version-oracle ,system-name))
+              (:dist-version (&optional (dist nil dist?))
+                (if dist?
+                    `(dist-version-oracle ,dist)
+                    `(dist-version-oracle)))
 
               ;; Utilities.
               (:extension (ext)
