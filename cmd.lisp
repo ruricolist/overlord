@@ -49,9 +49,10 @@ process to change its own working directory."
                 "-c"
                 ;; Use Bernstein chaining; change to the directory in
                 ;; $1, shift, and exec the rest of the argument array.
-                ;; (If only there were a standard tool to do this, along
-                ;; the lines of chroot or su, so we wouldn't have to
-                ;; spin up a shell.)
+                ;; (If only there were a standard tool to do this,
+                ;; along the lines of chroot or su, so we wouldn't
+                ;; have to spin up a shell. Hopefully your distro uses
+                ;; something lighter than bash for /bin/sh.)
                 "cd $1; shift; exec \"$@\""
                 ;; Terminate processing of shell options; everything
                 ;; after this is passed through.
@@ -72,8 +73,15 @@ process to change its own working directory."
 
 (defun cmd (&rest args)
   (multiple-value-bind (tokens plist) (parse-cmd-args args)
-    (multiple-value-call #'uiop:run-program
-      (wrap-with-current-dir tokens)
-      (values-list plist)
-      :output t
-      :error-output *message-stream*)))
+    (flet ((cmd ()
+             (multiple-value-call #'uiop:run-program
+               (wrap-with-current-dir tokens)
+               (values-list plist)
+               :output t
+               :error-output *message-stream*)))
+      (if (use-threads-p)
+          ;; If using threads, buffer stdout.
+          (write-string
+           (with-output-to-string (*standard-output*)
+             (cmd)))
+          (cmd)))))
