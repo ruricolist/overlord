@@ -199,7 +199,7 @@
     (record-prereqne i)))
 
 (defun redo-always ()
-  (record-prereq impossible-target))
+  (record-prereq impossible-prereq))
 
 (defun target-tree (&optional (target root-target))
   "Return a list of (target . deps), where each dep is of the same

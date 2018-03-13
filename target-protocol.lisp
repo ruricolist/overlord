@@ -5,7 +5,7 @@
   (:import-from :fset :compare :define-cross-type-compare-methods)
   (:export
    #:root-target
-   #:impossible-target
+   #:impossible-prereq
    #:trivial-target
    #:target-stamp
    #:target-timestamp
@@ -37,7 +37,7 @@
   "The root target.
 Building this builds all targets defined in this session \(not all targets in the database).")
 
-(defunit impossible-target
+(defunit impossible-prereq
   "The target that is always out of date.")
 
 (defunit trivial-target
@@ -45,9 +45,9 @@ Building this builds all targets defined in this session \(not all targets in th
 
 (defmethod compare ((x root-target) (y root-target)) :equal)
 (defmethod compare ((x trivial-target) (y trivial-target)) :equal)
-(defmethod compare ((x impossible-target) (y impossible-target)) :equal)
+(defmethod compare ((x impossible-prereq) (y impossible-prereq)) :equal)
 (define-cross-type-compare-methods root-target)
-(define-cross-type-compare-methods impossible-target)
+(define-cross-type-compare-methods impossible-prereq)
 (define-cross-type-compare-methods trivial-target)
 
 (defgeneric target-stamp (target)
