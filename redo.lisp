@@ -62,7 +62,7 @@
       ;; considered out of date if it has no presence in the DB.
       (target-has-build-script? target)))
 
-(defun redo (&rest args &aux (*building* t))
+(defun redo (&rest args)
   (redo-all (or args (list root-target))))
 
 (defparameter *specials*
