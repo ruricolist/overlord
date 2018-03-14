@@ -95,6 +95,7 @@
         (map nil fn seq))))
 
 (defun redo-target (target)
+  (setf target (resolve-target target))
   (with-target-locked (target)
     (when (member target *parents* :test #'target=)
       (error* "Recursive dependency: ~a depends on itself" target))
@@ -137,6 +138,7 @@
 
 (defun resolve-build-script (target)
   ;; TODO What directory should be current? Or should the script take care of that?
+  (setf target (resolve-target target))
   (let* ((script (target-build-script target))
          (script-target (build-script-target script)))
     (if (target-exists? script-target)
@@ -182,6 +184,7 @@
   (redo-ifchange-all args))
 
 (defun redo-ifchange-target (target)
+  (setf target (resolve-target target))
   (when (changed? target)
     (redo target))
   (record-prereq target))
@@ -200,6 +203,7 @@
   (redo-ifcreate-all targets))
 
 (defun redo-ifcreate-all (targets)
+  (setf targets (map 'vector #'resolve-target targets))
   (when-let (i (some #'target-exists? targets))
     (error* "Non-existent prerequisite ~a already exists" i))
   (do-each (i (reshuffle targets))
