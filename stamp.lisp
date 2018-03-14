@@ -19,7 +19,8 @@
    #:stamp
    #:timestamp-newer?
    #:target-timestamp=
-   #:stamp=))
+   #:stamp=
+   #:stamp-satisfies-p))
 (in-package :overlord/stamp)
 
 ;;; Timestamps can be exact timestamps (from local-time), universal
@@ -173,3 +174,11 @@ already negligible possibility of a collision."
     ((target-timestamp file-meta)
      (stamp= s1 (file-meta-timestamp s2)))
     ((file-meta stamp) nil)))
+
+(defun stamp-satisfies-p (new old)
+  "Is stamp NEW practically equivalent to (but not necessarily the
+same as) OLD?"
+  ;; Resist the temptation to compare timestamps chronologically here:
+  ;; that would plunge us back into the hell of time zones, clock
+  ;; skew, &c.
+  (stamp= old new))

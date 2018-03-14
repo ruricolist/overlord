@@ -13,7 +13,7 @@
   (:import-from #:overlord/parallel
     #:with-our-kernel)
   (:import-from #:overlord/stamp
-    #:stamp=)
+    #:stamp-satisfies-p)
   (:import-from #:lparallel #:pmap)
   (:nicknames :redo)
   (:export
@@ -153,9 +153,10 @@
               (error* "No script found for ~a" target))))))
 
 (defun unchanged? (saved-prereq)
-  (let ((req   (saved-prereq-target saved-prereq))
-        (stamp (saved-prereq-stamp  saved-prereq)))
-    (stamp= stamp (target-stamp req))))
+  (let* ((req (saved-prereq-target saved-prereq))
+         (old-stamp (saved-prereq-stamp  saved-prereq))
+         (new-stamp (target-stamp req)))
+    (stamp-satisfies-p new-stamp old-stamp)))
 
 ;;; Should be (target).
 (-> changed? (t) boolean)
