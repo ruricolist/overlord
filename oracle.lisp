@@ -18,6 +18,7 @@
     :overlord-error)
   (:import-from :overlord/digest
     :digest-string)
+  (:import-from :fset)
   (:export
    :oracle :oracle-name
    :var-oracle :use-var
@@ -80,6 +81,19 @@
     (format stream "~a~s"
             (read-eval-prefix self stream)
             `(make ',(class-name-of self) :key ,key)))
+
+  ;; Yes, these are circular; every subclass must define one or the
+  ;; other.
+  (:method fset:compare (self (other oracle))
+    (if (target= self other)
+        :equal
+        (fset:compare-slots self other
+                            #'class-name-of
+                            #'oracle.key)))
+  (:method target= (self (other oracle))
+    (eql :equal (fset:compare self other)))
+
+
   (:method hash-target (self)
     (sxhash (make-load-form self)))
   (:method oracle-value :around (self)
@@ -90,8 +104,6 @@
       (if (stringp value)
           (byte-array-to-hex-string (digest-string value))
           (prin1-to-string (oracle-value self)))))
-  (:method target= (self (other oracle))
-    nil)
   (:method target-being-built-string (self)
     (fmt "oracle for ~a" key)))
 
@@ -152,16 +164,19 @@
   (:method oracle-value (self)
     name)
   (:method target-exists? (self)
-    t)
-  (:method target= (self (other name-oracle))
-    (equal name (name-oracle.name other))))
+    t))
 
 (defclass package-oracle (name-oracle)
   ((key :type string
+        :reader package-oracle.name
         :initform (package-name *package*)))
   (:documentation "Oracle that wraps the current package."))
 
-(defclass readtable-oracle (oracle)
+(defmethods package-oracle (self (name key))
+  (:method target= (self (other package-oracle))
+    (string= name (package-oracle.name other))))
+
+(defclass readtable-oracle (name-oracle)
   ((key :type delayed-symbol
         :initform (delay-symbol (readtable-name *readtable*))))
   (:documentation "Oracle that wraps the current readtable.
@@ -218,22 +233,19 @@ A name is extracted using `named-readtable:readtable-name'."))
 
 (defclass system-version-oracle (oracle)
   ((key :initarg :name
+        :reader system-version-oracle.system-name
         :type string)))
 
 (defmethods system-version-oracle (self (name key))
   (:method oracle-value (self)
     (if-let (system (asdf:find-system name nil))
       (asdf:component-version system)
-      nil)))
+      nil))
+  (:method target= (self (other system-version-oracle))
+    (string-equal name (system-version-oracle.system-name other))))
 
 (defun system-version-oracle (name)
-  (make 'system-version-oracle :name name))
-
-(defun use-versioned-system (&rest systems)
-  (let* ((names (mapcar #'string-downcase systems))
-         (oracles (mapcar (op (make 'system-version-oracle :name _))
-                          names)))
-    (depends-on-oracle oracles)))
+  (make 'system-version-oracle :name (assure string name)))
 
 (defconst quicklisp "quicklisp")
 
@@ -246,11 +258,14 @@ A name is extracted using `named-readtable:readtable-name'."))
 
 (defclass dist-version-oracle (oracle)
   ((key :initarg :name
+        :reader dist-version-oracle.name
         :type string)))
 
 (defmethods dist-version-oracle (self (name key))
   (:method oracle-value (self)
-    (ql-dist-version name)))
+    (ql-dist-version name))
+  (:method target= (self (other dist-version-oracle))
+    (equal name (dist-version-oracle.name other))))
 
 (defun dist-version-oracle (&optional (dist-name quicklisp))
   (make 'dist-version-oracle
