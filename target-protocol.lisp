@@ -94,10 +94,9 @@ hash \(though the reverse is not necessarily true).")
   (:method (target)
     (sxhash target)))
 
-(defgeneric resolve-target (target base)
-  (:documentation "Resolve any relative pathnames in TARGET, using
-  BASE for defaults.")
-  (:method (target base)
+(defgeneric resolve-target (target &optional base)
+  (:documentation "Resolve any relative pathnames in TARGET.")
+  (:method (target &optional base)
     (declare (ignore base))
     target))
 

@@ -402,11 +402,11 @@ inherit a method on `make-load-form', and need only specialize
 (defmethods directory-ref (target (path name))
   (:method target-exists? (target)
     (~> path
-        (resolve-target (base))
+        (resolve-target)
         directory-exists-p))
   (:method target-timestamp (target)
     (let* ((dir path)
-           (dir (resolve-target dir (base))))
+           (dir (resolve-target dir)))
       (if (directory-exists-p dir)
           far-future
           never)))
@@ -416,19 +416,21 @@ inherit a method on `make-load-form', and need only specialize
         ;; TODO Ditto.
         (error* "Cannot set directory timestamps (yet).")
         (ensure-directories-exist path)))
-  (:method resolve-target (target base)
-    (directory-ref
-     (assure tame-pathname
-       (~> target
-           path
-           (merge-pathnames* base)))))
+  (:method resolve-target (target &optional base)
+    (if (absolute-pathname-p path)
+        target
+        (directory-ref
+         (assure tame-pathname
+           (~> target
+               path
+               (merge-pathnames* (or base (base))))))))
   (:method target= (target (y directory-ref))
     (pathname-equal path (directory-ref.path y)))
   (:method target-default-build-script (target)
     (let ((dir path))
       (task target
             (lambda ()
-              (let ((dir (resolve-target dir (base))))
+              (let ((dir (resolve-target dir)))
                 (ensure-directories-exist dir)))
             trivial-prereq)))
   (:method target-being-built-string (target)
@@ -454,9 +456,10 @@ inherit a method on `make-load-form', and need only specialize
     (pathname-equal file (file-digest-ref.file other)))
   (:method hash-target (target)
     (dx-sxhash (list 'file-digest-ref file)))
-  (:method resolve-target (target base)
-    (make 'file-digest-ref
-          :file (merge-pathnames* file base)))
+  (:method resolve-target (target &optional base)
+    (if (absolute-pathname-p file) target
+        (make 'file-digest-ref
+              :file (merge-pathnames* file (or base (base))))))
 
   (:method target-timestamp (target)
     (target-timestamp file))
@@ -655,7 +658,7 @@ inherit a method on `make-load-form', and need only specialize
   (target-exists? (force-symbol target)))
 
 (defmethod target-exists? ((target cl:pathname))
-  (pathname-exists? target))
+  (pathname-exists? (resolve-target target)))
 
 (defmethod target-exists? ((target pattern-ref))
   (~> target
@@ -744,28 +747,27 @@ inherit a method on `make-load-form', and need only specialize
       (delete-directory-tree p)
       (delete-file-if-exists p)))
 
-(defmethod resolve-target :around (target base)
-  (declare (ignore target))
-  (setf base (pathname-directory-pathname base))
-  (when (typep base 'temporary-file)
-    (simple-style-warning "Base looks like a temporary file: ~a" base))
-  (call-next-method))
+(defmethod resolve-target ((target cl:pathname) &optional base)
+  (if (absolute-pathname-p target) target
+      (let ((path (merge-pathnames* target (or base (base)))))
+        (if (wild-pathname-p path)
+            (directory* path)
+            path))))
 
-(defmethod resolve-target ((target cl:pathname) base)
-  (let ((path (merge-pathnames* target base)))
-    (if (wild-pathname-p path)
-        (directory* path)
-        path)))
+(defmethod resolve-target ((target pattern-ref) &optional base)
+  (let ((input (pattern-ref.input target)))
+    (if (absolute-pathname-p input) target
+        (pattern-ref (pattern-ref.pattern target)
+                     (merge-pathnames* input
+                                       (or base (base)))))))
 
-(defmethod resolve-target ((target pattern-ref) base)
-  (pattern-ref (pattern-ref.pattern target)
-               (merge-pathnames* (pattern-ref.input target) base)))
-
-(defmethod resolve-target ((target module-spec) base)
+(defmethod resolve-target ((target module-spec) &optional base)
   (let-match1 (module-spec lang source) target
-    (module-spec lang
-                 (assure tame-pathname
-                   (merge-pathnames* source base)))))
+    (if (absolute-pathname-p source) target
+        (module-spec lang
+                     (assure tame-pathname
+                       (merge-pathnames* source
+                                         (or base (base))))))))
 
 
 ;;; Target table abstract data type.
@@ -1015,8 +1017,9 @@ inherit a method on `make-load-form', and need only specialize
   (trivial-task target))
 
 (defmethod target-build-script ((target cl:pathname))
-  (or (gethash target *tasks*)
-      (impossible-task target)))
+  (let ((target (resolve-target target)))
+    (or (gethash target *tasks*)
+        (impossible-task target))))
 
 (defmethod target-build-script ((target symbol))
   (or (gethash target *tasks*)
