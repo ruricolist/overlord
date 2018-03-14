@@ -14,6 +14,8 @@
     :overlord/target-protocol
     ;; Timestamps.
     :overlord/stamp
+    ;; Digests.
+    :overlord/digest
     ;; Resettable global state.
     :overlord/global-state
     ;; Types common to the project.
@@ -1135,6 +1137,12 @@ inherit a method on `make-load-form', and need only specialize
   (let ((size (file-size-in-octets file))
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
+
+(defun file-stamp/hash (file)
+  (let* ((file (ensure-pathname file))
+         (size (file-size-in-octets file))
+         (hash (digest-file file)))
+    (file-hash size hash)))
 
 (defmethod target-stamp ((target cl:pathname))
   (cond ((file-exists-p target)
