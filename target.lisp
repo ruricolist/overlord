@@ -1350,10 +1350,15 @@ value and NEW do not match under TEST."
                                               ,(base))))
 
               ;; Depending on specific things.
-              (:use-env (name)
-                `(use-env ,name))
-              (:use-var (var)
-                `(use-var ,var))
+              (:env (name)
+                `(env-oracle ,name))
+              (:var (name)
+                `(var-oracle ,name))
+              (:feature (name)
+                `(feature-oracle ,name))
+              (:use (&rest targets)
+                `(use ,@targets))
+
               (:always (&optional (bool t))
                 `(and ,bool (redo-always)))
 

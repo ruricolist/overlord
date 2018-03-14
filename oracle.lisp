@@ -21,26 +21,20 @@
   (:import-from :fset)
   (:export
    :oracle :oracle-name
-   :var-oracle :use-var
-   :env-oracle :use-env
+   :use :use-all
+   :var-oracle
+   :env-oracle
    :system-version-oracle
    :dist-version-oracle))
 (in-package :overlord/oracle)
 
 ;;; Oracles. Oracles let you depend on the environment: either the
-;;; Lisp environment (bound variables) or the system environment
+;;; Lisp environment (bound variables, features) or the OS environment
 ;;; (environment variables). When you depend on an oracle, Overlord
 ;;; remembers the value of the oracle at the time of the dependency
 ;;; (or the lack of a value, if the oracle was unbound). If that value
 ;;; changes, then any targets that depend on the oracle are considered
 ;;; out of date.
-
-;;; At the moment, there are two kinds of oracles: oracles for Lisp
-;;; variables, and oracles for environment variables. Oracles for Lisp
-;;; variables are intended to allow a target to record the fact that
-;;; it depends on some aspect of the compile time or read time
-;;; environment (e.g. `*read-base*') and should be considered out of
-;;; date if that changes.
 
 ;;; Note that, because Overlord remembers the value of the oracle,
 ;;; that value should be small -- a flag, a symbol, a file name. Note
@@ -62,15 +56,14 @@
         :accessor oracle.key
         :reader oracle-name)))
 
-(defun depends-on-oracles (oracles)
-  (do-each (oracle (reshuffle oracles))
+(defun use-all (oracles)
+  (do-each (oracle (reshuffle oracles) oracles)
     (if (target-exists? oracle)
         (redo-ifchange oracle)
-        (redo-ifcreate oracle)))
-  (values))
+        (redo-ifcreate oracle))))
 
-(defun depends-on-oracle (&rest oracles)
-  (depends-on-oracles oracles))
+(defun use (&rest oracles)
+  (use-all oracles))
 
 (defmethods oracle (self key)
   (:method make-load-form (self &optional env)
@@ -106,6 +99,14 @@
           (prin1-to-string (oracle-value self)))))
   (:method target-being-built-string (self)
     (fmt "oracle for ~a" key)))
+
+
+;;; Var oracles.
+
+;;; Oracles for Lisp variables are intended to allow a target to
+;;; record the fact that it depends on some aspect of the compile time
+;;; or read time environment (e.g. `*read-base*') and should be
+;;; considered out of date if that changes.
 
 (defclass var-oracle (oracle)
   ((key :reader var-oracle.var
@@ -196,9 +197,8 @@ A name is extracted using `named-readtable:readtable-name'."))
          (make 'cl-var-oracle :var var))
         (t (make 'var-oracle :var var))))
 
-(defun use-var (var)
-  (depends-on-oracle
-   (var-oracle var)))
+
+;;; Environment oracles.
 
 (defclass env-oracle (oracle)
   ((key :initarg :name
@@ -225,11 +225,12 @@ A name is extracted using `named-readtable:readtable-name'."))
   (make 'env-oracle
         :name (assure string name)))
 
-(defun use-env (&rest names)
-  (let ((oracles
-          (mapcar (op (make 'env-oracle :name _))
-                  names)))
-    (depends-on-oracles oracles)))
+
+;;; System version oracles.
+
+;;; Using a system version oracle, you can depend on the version of an
+;;; ASDF system. Note that if the system is not known to ASDF, then
+;;; the version recorded is simply nil.
 
 (defclass system-version-oracle (oracle)
   ((key :initarg :name
@@ -237,6 +238,8 @@ A name is extracted using `named-readtable:readtable-name'."))
         :type string)))
 
 (defmethods system-version-oracle (self (name key))
+  (:method target-exists? (self)
+    t)
   (:method oracle-value (self)
     (if-let (system (asdf:find-system name nil))
       (asdf:component-version system)
@@ -247,14 +250,21 @@ A name is extracted using `named-readtable:readtable-name'."))
 (defun system-version-oracle (name)
   (make 'system-version-oracle :name (assure string name)))
 
+
+;;; Dist version oracles.
+
+;;; Depend on the current version of a Quicklisp dist.
+
 (defconst quicklisp "quicklisp")
 
+(defun dist-exists? (dist)
+  (and (find-package :ql-dist)
+       (uiop:symbol-call :ql-dist :find-dist
+                         (assure string dist))))
+
 (defun ql-dist-version (&optional (dist-name quicklisp))
-  (when (find-package :ql)
-    (ignore-errors
-     (~>> dist-name
-          (uiop:symbol-call :ql-dist :find-dist)
-          (uiop:symbol-call :ql-dist :version)))))
+  (when (dist-exists? dist-name)
+    (uiop:symbol-call :ql-dist :version dist-name)))
 
 (defclass dist-version-oracle (oracle)
   ((key :initarg :name
@@ -262,6 +272,8 @@ A name is extracted using `named-readtable:readtable-name'."))
         :type string)))
 
 (defmethods dist-version-oracle (self (name key))
+  (:method target-exists? (self)
+    (dist-exists? name))
   (:method oracle-value (self)
     (ql-dist-version name))
   (:method target= (self (other dist-version-oracle))
@@ -270,3 +282,27 @@ A name is extracted using `named-readtable:readtable-name'."))
 (defun dist-version-oracle (&optional (dist-name quicklisp))
   (make 'dist-version-oracle
         :name (assure string dist-name)))
+
+
+;;;; Feature oracles.
+
+;;; TODO We could do automatic translation (along the lines of
+;;; trivial-features) to ensure that feature dependencies are
+;;; portable?
+
+(defclass feature-oracle (oracle)
+  ((key :initarg :feature
+        :type keyword
+        :reader feature-oracle.feature)))
+
+(defun feature-oracle (feature)
+  (make 'feature-oracle
+        :feature (assure keyword feature)))
+
+(defmethods feature-oracle (self (feature key))
+  (:method target-exists? (self)
+    (featurep feature))
+  (:method oracle-value (self)
+    t)
+  (:method target= (self (other feature-oracle))
+    (eql feature (feature-oracle.feature other))))
