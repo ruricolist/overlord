@@ -54,13 +54,26 @@
 (defun file-meta= (x y)
   (and (typep x 'file-meta)
        (typep y 'file-meta)
-       (compare #'= #'file-meta-size x y)
-       (compare #'target-timestamp= #'file-meta-timestamp x y)))
+       (= (file-meta-size x)
+          (file-meta-size y))
+       (target-timestamp=
+        (file-meta-timestamp x)
+        (file-meta-timestamp y))))
 
 (defmethod fset:compare ((x file-meta) (y file-meta))
-  (if (file-meta= x y)
-      :equal
-      :unequal))
+  ;; NB Fset doesn't know how to compare target timestamps.
+  ;; (fset:compare-slots x y #'file-meta-size #'file-meta-timestamp)
+  ;; Sort first based on size, then on timestamp.
+  (let* ((size1 (file-meta-size x))
+         (size2 (file-meta-size y))
+         (size-order (fset:compare size1 size2)))
+    (if (not (eql size-order :equal))
+        size-order
+        (let ((ts1 (file-meta-timestamp x))
+              (ts2 (file-meta-timestamp y)))
+          (if (target-timestamp= ts1 ts2)
+              :equal
+              :unequal)))))
 
 (deftype stamp ()
   `(or target-timestamp
