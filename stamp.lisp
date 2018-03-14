@@ -14,9 +14,9 @@
    #:never
    #:far-future
    #:file-meta
+   #:file-hash
    #:target-timestamp
    #:stamp
-   #:deleted
    #:timestamp-newer?
    #:target-timestamp=
    #:stamp=))
