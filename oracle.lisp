@@ -19,10 +19,9 @@
   (:import-from :overlord/digest
     :digest-string)
   (:export
-   :oracle
-   :use-var
-   :use-env
-   :oracle-name
+   :oracle :oracle-name
+   :var-oracle :use-var
+   :env-oracle :use-env
    :system-version-oracle
    :dist-version-oracle))
 (in-package :overlord/oracle)
@@ -98,6 +97,7 @@
 
 (defclass var-oracle (oracle)
   ((key :reader var-oracle.var
+        :initarg :var
         :type delayed-symbol)
    (sym :type symbol))
   (:default-initargs
@@ -171,16 +171,19 @@ A name is extracted using `named-readtable:readtable-name'."))
   (:method target= (self (other readtable-oracle))
     (delayed-symbol= name (name-oracle.name other))))
 
-(defun use-var (var)
+(defun var-oracle (var)
   (check-type var symbol)
+  (cond ((eql var '*readtable*)
+         (make 'readtable-oracle))
+        ((eql var '*package*)
+         (make 'package-oracle))
+        ((cl-sym? var)
+         (make 'cl-var-oracle :var var))
+        (t (make 'var-oracle :var var))))
+
+(defun use-var (var)
   (depends-on-oracle
-   (cond ((eql var '*readtable*)
-          (make 'readtable-oracle))
-         ((eql var '*package*)
-          (make 'package-oracle))
-         ((cl-sym? var)
-          (make 'cl-var-oracle :var var))
-         (t (make 'var-oracle :var var)))))
+   (var-oracle var)))
 
 (defclass env-oracle (oracle)
   ((key :initarg :name
@@ -202,6 +205,10 @@ A name is extracted using `named-readtable:readtable-name'."))
     (uiop:getenvp name))
   (:method target= (self (other env-oracle))
     (equal name (env-oracle.name other))))
+
+(defun env-oracle (name)
+  (make 'env-oracle
+        :name (assure string name)))
 
 (defun use-env (&rest names)
   (let ((oracles
