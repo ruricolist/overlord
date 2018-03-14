@@ -377,7 +377,12 @@ inherit a method on `make-load-form', and need only specialize
     '(name))
 
   (:method fset:compare (self (other ref))
-    (fset:compare-slots self other #'class-name-of #'ref.name)))
+    (fset:compare-slots self other #'class-name-of #'ref.name))
+
+  (:method hash-target (self)
+    (dx-sxhash
+     (list (class-name-of self)
+           (ref.name self)))))
 
 (fset:define-cross-type-compare-methods ref)
 
@@ -430,6 +435,39 @@ inherit a method on `make-load-form', and need only specialize
     (fmt "directory ~a" path))
   (:method hash-target (target)
     (dx-sxhash (list 'directory-ref path))))
+
+(defclass file-digest-ref (ref)
+  ((name :type pathname
+         :initarg :file
+         :reader file-digest-ref.file)))
+
+(defun file-digest-ref (file)
+  (make 'file-digest-ref :file (ensure-pathname file)))
+
+(defmethods file-digest-ref (target (file name))
+  (:method target-stamp (target)
+    (file-stamp/hash file))
+
+  (:method target-exists? (target)
+    (file-exists-p file))
+  (:method target= (target (other file-digest-ref))
+    (pathname-equal file (file-digest-ref.file other)))
+  (:method hash-target (target)
+    (dx-sxhash (list 'file-digest-ref file)))
+  (:method resolve-target (target base)
+    (make 'file-digest-ref
+          :file (merge-pathnames* file base)))
+
+  (:method target-timestamp (target)
+    (target-timestamp file))
+  (:method (setf target-timestamp) (value target)
+    (setf (target-timestamp file) value))
+  (:method target-build-script (target)
+    (target-build-script file))
+  (:method target-default-build-script (target)
+    (target-default-build-script file))
+  (:method target-being-built-string (target)
+    (target-being-built-string file)))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -1141,7 +1179,7 @@ inherit a method on `make-load-form', and need only specialize
 (defun file-stamp/hash (file)
   (let* ((file (ensure-pathname file))
          (size (file-size-in-octets file))
-         (hash (digest-file file)))
+         (hash (byte-array-to-hex-string (digest-file file))))
     (file-hash size hash)))
 
 (defmethod target-stamp ((target cl:pathname))
@@ -1299,6 +1337,8 @@ value and NEW do not match under TEST."
                   (path path)))
               (:file (file)
                 `(:path ,file))
+              (:file-digest (file)
+                `(file-digest-ref (path ,file)))
               (:directory-exists (name)
                 `(directory-ref ,name))
               (:pattern (name input)
