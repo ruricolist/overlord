@@ -62,11 +62,9 @@
       :equal
       :unequal))
 
-(defconst deleted :deleted)
-
 (deftype stamp ()
   `(or target-timestamp
-       (eql ,deleted)
+       deleted
        string
        file-meta))
 
@@ -116,7 +114,8 @@
      (= ts1 (timestamp-to-universal ts2)))
 
     ;; This might seem weird, but it's necessary for impossible
-    ;; targets to always show up as changed.
+    ;; targets to always show up as changed, as well as for files that
+    ;; have been deleted.
     ((never never) nil)
     ((far-future far-future) t)
     ((target-timestamp target-timestamp) nil)))
@@ -138,6 +137,4 @@
      (stamp= (file-meta-timestamp s1) s2))
     ((target-timestamp file-meta)
      (stamp= s1 (file-meta-timestamp s2)))
-    ((file-meta stamp) nil)
-
-    (((eql #.deleted) stamp) nil)))
+    ((file-meta stamp) nil)))
