@@ -4,9 +4,11 @@
   (:import-from :overlord/types :hash-code)
   (:import-from :fset :compare :define-cross-type-compare-methods)
   (:export
+   ;; Unit types.
    #:root-target
    #:impossible-prereq
    #:trivial-prereq
+   ;; Methods that targets should implement.
    #:target-stamp
    #:target-timestamp
    #:target-exists?
@@ -15,6 +17,8 @@
    #:resolve-target
    #:target-build-script
    #:target-default-build-script
+   #:target-being-built-string
+   ;; Other methods.
    #:build-script-target
    #:run-script
    #:record-prereq
@@ -29,8 +33,7 @@
    #:clear-temp-prereqs
    #:save-temp-prereqsne
    #:clear-temp-prereqsne
-   #:call-with-target-locked
-   #:target-being-built-string))
+   #:call-with-target-locked))
 (in-package :overlord/target-protocol)
 
 (defunit root-target
