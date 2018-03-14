@@ -1141,7 +1141,7 @@ inherit a method on `make-load-form', and need only specialize
          (file-stamp target))
         ((directory-pathname-p target)
          (target-timestamp target))
-        (t deleted)))
+        (t never)))
 
 (defun rebuild-symbol (symbol thunk)
   (lambda ()
