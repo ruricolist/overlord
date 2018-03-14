@@ -75,11 +75,29 @@
               :equal
               :unequal)))))
 
+(defconstructor file-hash
+  "The hash of a file.
+We store both the size and the hash of the file to further reduce the
+already negligible possibility of a collision."
+  (size (integer 0 *))
+  (hash string))
+
+(defun file-hash= (x y)
+  (and (typep x 'file-hash)
+       (typep y 'file-hash)
+       (= (file-hash-size x)
+          (file-hash-size y))
+       (string= (file-hash-hash x)
+                (file-hash-hash y))))
+
+(Defmethod fset:compare ((x file-hash) (y file-hash))
+  (fset:compare-slots x y #'file-hash-size #'file-hash-hash))
+
 (deftype stamp ()
   `(or target-timestamp
-       deleted
        string
-       file-meta))
+       file-meta
+       file-hash))
 
 ;; NB Note that conversion from timestamp to universal rounds down
 ;; (loses nsecs), so when comparing one of each, whether you convert
@@ -143,6 +161,10 @@
     ((string string)
      (string= s1 s2))
     ((string stamp) nil)
+
+    ((file-hash file-hash)
+     (file-hash= s1 s2))
+    ((file-hash stamp) nil)
 
     ((file-meta file-meta)
      (file-meta= s1 s2))
