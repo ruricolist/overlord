@@ -283,7 +283,8 @@ the stack so the error itself can be printed."
                                  :direction :output
                                  :element-type 'character
                                  ;; Ensure the temp file is on the
-                                 ;; same file system as the log.
+                                 ;; same file system as the log so the
+                                 ;; rename is atomic.
                                  :directory (pathname-directory-pathname log))
         (setq temp p)
         (kv-write (make-log-record :data map) s))
@@ -305,7 +306,7 @@ the stack so the error itself can be printed."
     (path-join
      (db-version-dir)
      #p"log/"
-     #p"log")))
+     #p"log.sexp")))
 
 (defun reload-kv ()
   (message "Reloading database")
