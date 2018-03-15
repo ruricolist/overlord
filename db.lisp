@@ -87,6 +87,12 @@
       (fset:do-map (k v map)
         (collect (cons k v))))))
 
+(-> log-file-size (pathname) (integer 0 *))
+(defun log-file-size (log)
+  (if (file-exists-p log)
+      (file-size-in-octets log)
+      0))
+
 (defmethods kv (self version current-map last-saved-map log)
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
@@ -94,9 +100,7 @@
       (format stream "v.~a ~d record~:p, ~:d byte~:p~@[ (~a)~]"
               version
               (fset:size current-map)
-              (if (file-exists-p log)
-                  (file-size-in-octets log)
-                  0)
+              (log-file-size log)
               (and (not (eql current-map last-saved-map))
                    "unsaved"))))
 
@@ -296,14 +300,16 @@ the stack so the error itself can be printed."
      #p"log.sexp")))
 
 (defun reload-kv ()
-  (message "Reloading database")
-  (mvlet* ((log (log-file-path))
-           (map map-count (log.load log)))
-    (squash-data log map map-count)
-    (make 'kv
-          :current-map map
-          :last-saved-map map
-          :log log)))
+  (let ((log (log-file-path)))
+    (message "Reloading database (~:d byte~:p)"
+             (log-file-size log))
+    (receive (map map-count)
+        (log.load log)
+      (squash-data log map map-count)
+      (make 'kv
+            :current-map map
+            :last-saved-map map
+            :log log))))
 
 (define-global-state *kv* nil)
 
