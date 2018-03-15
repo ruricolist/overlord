@@ -19,7 +19,6 @@
   (:export
    :prop :has-prop? :delete-prop
    :save-database
-   :compact-database
    :saving-database
    :unload-db
    :deactivate-db
@@ -40,7 +39,6 @@
 (defgeneric (setf kv.ref) (value kv key))
 (defgeneric kv.del (kv key))
 (defgeneric kv.sync (kv))
-(defgeneric kv.squash (kv))
 
 (defunit tombstone)
 
@@ -131,12 +129,7 @@
   (:method kv.sync (self)
     (synchronized (self)
       (log.update log last-saved-map current-map)
-      (setf last-saved-map current-map)))
-
-  (:method kv.squash (self)
-    (synchronized (self)
-      (kv.sync self)
-      (log.squash log))))
+      (setf last-saved-map current-map))))
 
 (defclass dead-kv (kv)
   ())
@@ -152,8 +145,6 @@
     (declare (ignore key))
     (values))
   (:method kv.sync (self)
-    (values))
-  (:method kv.squash (self)
     (values)))
 
 ;;; TODO use a binary representation for the log.
@@ -272,9 +263,8 @@ the stack so the error itself can be printed."
              (return-from log.load
                (values (fset:empty-map) 0)))))))
 
-(defun log.squash (log)
-  (mvlet ((map map-count (log.load log))
-         temp)
+(defun squash-data (log map map-count)
+  (let (temp)
     (when (> map-count 1)
       (message "Compacting log")
       (uiop:with-temporary-file (:stream s
@@ -291,15 +281,12 @@ the stack so the error itself can be printed."
       (rename-file-overwriting-target temp log)))
   log)
 
+(defun log.squash (log)
+  (receive (map map-count) (log.load log)
+    (squash-data log map map-count)))
+
 (defun empty-kv ()
   (make 'kv))
-
-(defun load-kv (log)
-  (let ((map (log.load log)))
-    (make 'kv
-          :current-map map
-          :last-saved-map map
-          :log log)))
 
 (defun log-file-path ()
   (assure absolute-pathname
@@ -310,9 +297,13 @@ the stack so the error itself can be printed."
 
 (defun reload-kv ()
   (message "Reloading database")
-  (let ((path (log-file-path)))
-    (log.squash path)
-    (load-kv path)))
+  (mvlet* ((log (log-file-path))
+           (map map-count (log.load log)))
+    (squash-data log map map-count)
+    (make 'kv
+          :current-map map
+          :last-saved-map map
+          :log log)))
 
 (define-global-state *kv* nil)
 
@@ -395,9 +386,6 @@ reloaded on demand."
   (values))
 
 (uiop:register-image-dump-hook 'save-database)
-
-(defun compact-database ()
-  (kv.squash (kv)))
 
 (defun call/saving-database (thunk)
   (if *save-pending*
