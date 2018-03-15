@@ -59,26 +59,27 @@
                    (fmt "v~a" version)
                    :implementation)))
 
-(defclass kv ()
-  ((version
-    :initform (db-version)
-    :reader kv.version)
-   (current-map
-    :initarg :current-map
-    :type fset-map
-    :accessor kv.current-map)
-   (last-saved-map
-    :initarg :last-saved-map
-    :type fset-map
-    :accessor kv.last-saved-map)
-   (log
-    :initarg :log
-    :type :pathname
-    :reader kv.log))
-  (:default-initargs
-   :current-map (fset:empty-map)
-   :last-saved-map (fset:empty-map)
-   :log (log-file-path)))
+(locally (declare (optimize safety))
+  (defclass kv ()
+    ((version
+      :initform (db-version)
+      :reader kv.version)
+     (current-map
+      :initarg :current-map
+      :type fset:map
+      :accessor kv.current-map)
+     (last-saved-map
+      :initarg :last-saved-map
+      :type fset:map
+      :accessor kv.last-saved-map)
+     (log
+      :initarg :log
+      :type :pathname
+      :reader kv.log))
+    (:default-initargs
+     :current-map (fset:empty-map)
+     :last-saved-map (fset:empty-map)
+     :log (log-file-path))))
 
 (defun kv-alist (kv)
   "For debugging."
@@ -349,15 +350,15 @@ reloaded on demand."
 
 (defun unqualify-symbol (x)
   (eif (symbolp x)
-      (eif (keywordp x)
-          x
-          (eif (eql (symbol-package x)
-                    #.(find-package :cl))
-              x
-              (let* ((p (symbol-package x)))
-                (cons (and p (package-name p))
-                      (symbol-name x)))))
-      x))
+       (eif (keywordp x)
+            x
+            (eif (eql (symbol-package x)
+                      #.(find-package :cl))
+                 x
+                 (let* ((p (symbol-package x)))
+                   (cons (and p (package-name p))
+                         (symbol-name x)))))
+       x))
 
 (defun prop-key (obj prop)
   (cons (unqualify-symbol obj)
