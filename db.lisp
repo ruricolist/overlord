@@ -26,19 +26,19 @@
    :db-version-dir))
 (in-package :overlord/db)
 
-(deftype kv-key ()
+(deftype db-key ()
   '(not null))
 
-(deftype kv-value ()
+(deftype db-value ()
   't)
 
 (define-modify-macro withf (&rest item-or-tuple) fset:with)
 (define-modify-macro lessf (&rest item-or-tuple) fset:less)
 
-(defgeneric kv.ref (kv key))
-(defgeneric (setf kv.ref) (value kv key))
-(defgeneric kv.del (kv key))
-(defgeneric kv.sync (kv))
+(defgeneric db.ref (db key))
+(defgeneric (setf db.ref) (value db key))
+(defgeneric db.del (db key))
+(defgeneric db.sync (db))
 
 (defunit tombstone)
 
@@ -60,30 +60,30 @@
                    :implementation)))
 
 (locally (declare (optimize safety))
-  (defclass kv ()
+  (defclass db ()
     ((version
       :initform (db-version)
-      :reader kv.version)
+      :reader db.version)
      (current-map
       :initarg :current-map
       :type fset:map
-      :accessor kv.current-map)
+      :accessor db.current-map)
      (last-saved-map
       :initarg :last-saved-map
       :type fset:map
-      :accessor kv.last-saved-map)
+      :accessor db.last-saved-map)
      (log
       :initarg :log
       :type :pathname
-      :reader kv.log))
+      :reader db.log))
     (:default-initargs
      :current-map (fset:empty-map)
      :last-saved-map (fset:empty-map)
      :log (log-file-path))))
 
-(defun kv-alist (kv)
+(defun db-alist (db)
   "For debugging."
-  (let ((map (kv.current-map kv)))
+  (let ((map (db.current-map db)))
     (collecting
       (fset:do-map (k v map)
         (collect (cons k v))))))
@@ -94,7 +94,7 @@
       (file-size-in-octets log)
       0))
 
-(defmethods kv (self version current-map last-saved-map log)
+(defmethods db (self version current-map last-saved-map log)
   (:method print-object (self stream)
     (print-unreadable-object (self stream :type t)
       ;; version record-count byte-count saved or not?
@@ -105,18 +105,18 @@
               (and (not (eql current-map last-saved-map))
                    "unsaved"))))
 
-  (:method kv.ref (self key)
+  (:method db.ref (self key)
     (multiple-value-bind (value bool)
         (fset:lookup current-map
-                     (assure kv-key key))
+                     (assure db-key key))
       (if (eq value tombstone)
           (values nil nil)
-          (values (assure kv-value value)
+          (values (assure db-value value)
                   (assure boolean bool)))))
 
-  (:method (setf kv.ref) (value self key)
-    (check-type key kv-key)
-    (check-type value kv-value)
+  (:method (setf db.ref) (value self key)
+    (check-type key db-key)
+    (check-type value db-value)
     (prog1 value
       ;; TODO More CAS.
       #+sbcl
@@ -127,34 +127,34 @@
       (synchronized (self)
         (withf current-map key value))))
 
-  (:method kv.del (self key)
-    (setf (kv.ref self key) tombstone)
+  (:method db.del (self key)
+    (setf (db.ref self key) tombstone)
     (values))
 
-  (:method kv.sync (self)
+  (:method db.sync (self)
     (synchronized (self)
       (log.update log last-saved-map current-map)
       (setf last-saved-map current-map))))
 
-(defclass dead-kv (kv)
+(defclass dead-db (db)
   ())
 
-(defmethods dead-kv (self)
-  (:method kv.ref (self key)
+(defmethods dead-db (self)
+  (:method db.ref (self key)
     (declare (ignore key))
     (values nil nil))
-  (:method (setf kv.ref) (value self key)
+  (:method (setf db.ref) (value self key)
     (declare (ignore key))
     value)
-  (:method kv.del (self key)
+  (:method db.del (self key)
     (declare (ignore key))
     (values))
-  (:method kv.sync (self)
+  (:method db.sync (self)
     (values)))
 
 ;;; TODO use a binary representation for the log.
 
-(def kv-readtable
+(def db-readtable
   (lret ((*readtable*
           (copy-readtable fset::*fset-rereading-readtable*)))
     (local-time:enable-read-macros)))
@@ -208,10 +208,10 @@ the stack so the error itself can be printed."
   (with-thunk (body)
     `(call/standard-io-syntax ,body)))
 
-(defun kv-write (obj stream)
+(defun db-write (obj stream)
   (with-standard-io-syntax*
     ;; It's possible a writer may look at the current readtable.
-    (let ((*readtable* kv-readtable))
+    (let ((*readtable* db-readtable))
       (write obj :stream stream
                  :readably t
                  :pretty nil
@@ -226,7 +226,7 @@ the stack so the error itself can be printed."
                                     :element-type 'character
                                     :if-does-not-exist :create
                                     :if-exists :append)
-            (kv-write record out)
+            (db-write record out)
             (finish-output out)))))))
 
 (defun strip-tombstones (map)
@@ -245,7 +245,7 @@ the stack so the error itself can be printed."
          (restart-case
              (return-from log.load
                (with-standard-input-syntax
-                 (let* ((*readtable* kv-readtable)
+                 (let* ((*readtable* db-readtable)
                         (records
                           (with-input-from-file (in log :element-type 'character)
                             ;; TODO ignore errors?
@@ -282,7 +282,7 @@ the stack so the error itself can be printed."
                                  ;; rename is atomic.
                                  :directory (pathname-directory-pathname log))
         (setq temp p)
-        (kv-write (make-log-record :data map) s))
+        (db-write (make-log-record :data map) s))
       (rename-file-overwriting-target temp log)))
   log)
 
@@ -290,8 +290,8 @@ the stack so the error itself can be printed."
   (receive (map map-count) (log.load log)
     (squash-data log map map-count)))
 
-(defun empty-kv ()
-  (make 'kv))
+(defun empty-db ()
+  (make 'db))
 
 (defun log-file-path ()
   (assure absolute-pathname
@@ -300,51 +300,51 @@ the stack so the error itself can be printed."
      #p"log/"
      #p"log.sexp")))
 
-(defun reload-kv ()
+(defun reload-db ()
   (let ((log (log-file-path)))
     (message "Reloading database (~:d byte~:p)"
              (log-file-size log))
     (receive (map map-count)
         (log.load log)
       (squash-data log map map-count)
-      (make 'kv
+      (make 'db
             :current-map map
             :last-saved-map map
             :log log))))
 
-(define-global-state *kv* nil)
+(define-global-state *db* nil)
 
-(defun kv ()
-  (synchronized ('*kv)
-    (ensure-kv)
+(defun db ()
+  (synchronized ('*db)
+    (ensure-db)
     (check-version))
-  *kv*)
+  *db*)
 
-(defun ensure-kv ()
-  (ensure *kv*
-    (reload-kv)))
+(defun ensure-db ()
+  (ensure *db*
+    (reload-db)))
 
 (defun unload-db ()
   "Clear the DB out of memory in such a way that it can still be
 reloaded on demand."
   ;; TODO Force a full GC afterwards?
-  (synchronized ('*kv*)
-    (nix *kv*)))
+  (synchronized ('*db*)
+    (nix *db*)))
 
 (defun deactivate-db ()
   "Clear the DB out of memory in such a way that it will not be reloaded on demand."
-  (synchronized ('*kv*)
-    (setq *kv* (make 'dead-kv))))
+  (synchronized ('*db*)
+    (setq *db* (make 'dead-db))))
 
 (defun check-version ()
-  (unless (= (kv.version *kv*)
+  (unless (= (db.version *db*)
              (db-version))
     (cerror "Load the correct database"
             "Database version mismatch")
-    (setq *kv* (reload-kv))))
+    (setq *db* (reload-db))))
 
-(defplace kv-ref* (key)
-  (kv.ref (kv) key))
+(defplace db-ref* (key)
+  (db.ref (db) key))
 
 ;;; But should be manipulating stored plists instead?
 
@@ -365,7 +365,7 @@ reloaded on demand."
         (unqualify-symbol prop)))
 
 (defplace prop-1 (obj prop)
-  (kv.ref (kv) (prop-key obj prop)))
+  (db.ref (db) (prop-key obj prop)))
 
 (defun prop (obj prop &optional default)
   (multiple-value-bind (val val?) (prop-1 obj prop)
@@ -386,10 +386,10 @@ reloaded on demand."
          (cons prop props)))
 
 (defun delete-prop (obj prop)
-  (kv.del (kv) (prop-key obj prop)))
+  (db.del (db) (prop-key obj prop)))
 
 (defun save-database ()
-  (kv.sync (kv))
+  (db.sync (db))
   (values))
 
 (uiop:register-image-dump-hook 'save-database)

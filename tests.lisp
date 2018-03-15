@@ -44,7 +44,7 @@
          ;; everything is being compiled clean.
          (version (random most-positive-fixnum))
          (overlord/specials:*db-version* version)
-         (overlord/db::*kv* (overlord/db::reload-kv)))
+         (overlord/db::*db* (overlord/db::reload-db)))
     (unwind-protect
          (funcall fn)
       (when (equal (overlord/specials:db-version) version)
