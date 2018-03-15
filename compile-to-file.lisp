@@ -3,6 +3,7 @@
   (:import-from #:overlord/types #:absolute-pathname)
   (:import-from #:overlord/file-package #:ensure-file-package)
   (:import-from #:overlord/parallel #:make-resource #:with-resource-held)
+  (:import-from #:overlord/asdf #:asdf-system-relative-pathname)
   (:export #:compile-to-file #:load-as-module :fasl-ext :module))
 (in-package #:overlord/compile-to-file)
 
@@ -21,7 +22,8 @@
   "The extension of a fasl in this Lisp.")
 
 ;;; http://kpreid.livejournal.com/14713.html
-(def universal-file (asdf:system-relative-pathname :overlord "universal.lisp"))
+(def universal-file
+  (asdf-system-relative-pathname :overlord "universal.lisp"))
 
 (defmacro define-file-package (source lang)
   (let* ((package (ensure-file-package source :lang lang))

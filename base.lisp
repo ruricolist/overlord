@@ -3,7 +3,8 @@
 (defpackage :overlord/base
   (:use :cl :alexandria :serapeum
     :overlord/types
-    :overlord/global-state)
+    :overlord/global-state
+    :overlord/asdf)
   (:import-from :overlord/specials
     :*base* :*cli* :use-threads-p)
   (:import-from :named-readtables
@@ -92,11 +93,11 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
 
 (defun set-package-base* (base &optional (system nil system-supplied?))
   "Set the base for the current package.
-If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
+If SYSTEM is supplied, resolve BASE as a system-relative pathname."
   (setf (gethash *package* *package-bases*)
         (assure (and absolute-pathname directory-pathname)
           (if system-supplied?
-              (asdf:system-relative-pathname system base)
+              (asdf-system-relative-pathname system base)
               base))))
 
 (defmacro set-package-base (base &optional (system nil system-supplied?))
@@ -133,26 +134,26 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
   (let ((*readtable* (find-readtable :standard))
         (*read-base* 10)
         (*read-default-float-format* 'double-float))
-    (asdf:find-system system error-p)))
+    (find-asdf-system system :error error-p)))
 
 (defun system-base (system)
   (setf system (find-system system))
-  (let ((base (asdf:system-relative-pathname system "")))
+  (let ((base (asdf-system-relative-pathname system "")))
     (if (absolute-pathname-p base)
         base
-        (if (typep system 'asdf:package-inferred-system)
-            (let* ((system-name (asdf:primary-system-name system))
+        (if (package-inferred-asdf-system? system)
+            (let* ((system-name (primary-asdf-system-name system))
                    (base-system-name (take-while (op (not (eql _ #\/))) system-name))
                    (base-system (find-system base-system-name)))
               (system-base base-system))
             (error* "System ~a has no base." system)))))
 
 (defun infer-system (&key (errorp t))
-  (assure (or null asdf:system)
+  (assure (or null (satisfies asdf-system?))
     (or (infer-system-from-package)
         (look-for-asd)
         (and errorp
-             (assure asdf:system
+             (assure (satisfies asdf-system?)
                (ensure2 (gethash *package* *supplied-package-systems*)
                  (cerror* "Supply a system name"
                           "Cannot infer a system for ~a" *package*)
@@ -172,13 +173,9 @@ If SYSTEM is supplied, use it with `asdf:system-relative-pathname' on BASE."
 
 (defun infer-system-from-package ()
   (some (lambda (name)
-          (when-let (guess (package-name-system name))
+          (when-let (guess (package-name-asdf-system name))
             (find-system guess nil)))
         (package-names *package*)))
-
-;;; XXX
-(defun package-name-system (n)
-  (asdf/package-inferred-system::package-name-system n))
 
 (defun package-names (p)
   (cons (package-name p)

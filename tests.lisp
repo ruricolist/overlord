@@ -5,6 +5,8 @@
     :with-import-default :require-default)
   (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
+  (:import-from :overlord/asdf
+    :asdf-system-relative-pathname)
   (:import-from :local-time :now)
   (:import-from :uiop
     :native-namestring
@@ -20,7 +22,7 @@
   (:export :run))
 (in-package :overlord-tests)
 
-(overlord:set-package-base (asdf:system-relative-pathname :overlord ""))
+(overlord:set-package-base (asdf-system-relative-pathname :overlord ""))
 
 (defun nap (&optional (n 1))
   "Sleep until the universal time counter ticks over."
@@ -54,7 +56,7 @@
 
 ;;; Running tests.
 (defun run-overlord-tests ()
-  (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
+  (let ((overlord:*base* (asdf-system-relative-pathname :overlord ""))
         (fiveam:*on-error* :debug)))
   (format t "~&First run (1/2)~%")
   (with-temp-db ()
@@ -68,7 +70,7 @@
 
 ;;; Internal use.
 (defun debug-test (test)
-  (let ((overlord:*base* (asdf:system-relative-pathname :overlord ""))
+  (let ((overlord:*base* (asdf-system-relative-pathname :overlord ""))
         (fiveam:*on-error* :debug)
         (fiveam:*on-failure* :debug))
     (run! test)))
@@ -87,7 +89,7 @@
   (native-namestring
    (if (absolute-pathname-p file)
        file
-       (asdf:system-relative-pathname :overlord file))))
+       (asdf-system-relative-pathname :overlord file))))
 
 (defun touch-file (file)
   (lret ((file-string (resolve-file file)))

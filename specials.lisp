@@ -4,6 +4,8 @@
   (:use #:cl :overlord/types)
   (:import-from :serapeum :defvar-unbound :assure :~> :true)
   (:import-from :alexandria :read-file-into-string)
+  (:import-from :overlord/asdf
+    :asdf-system-version)
   (:export #:*base*
            #:*cli*
            #:*input*
@@ -47,8 +49,7 @@ has to see before the other forms.")
 
 (defparameter *db-version*
   (parse-integer
-   (asdf:component-version
-    (asdf:find-system :overlord)))
+   (asdf-system-version :overlord))
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type db-version *db-version*))

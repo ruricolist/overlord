@@ -26,6 +26,8 @@
     :overlord/module
     ;; Utilities.
     :overlord/util
+    ;; ASDF interface.
+    :overlord/asdf
     ;; How to infer the base for the current package.
     :overlord/base
     ;; The #lang syntax.
@@ -1125,12 +1127,6 @@ inherit a method on `make-load-form', and need only specialize
           (task-thunk task)
           (task-script task)))
 
-(defun system-loaded? (system)
-  (let ((system (asdf:find-system system nil)))
-    (and system
-         (asdf:component-loaded-p system)
-         system)))
-
 (defun print-target-being-built (target)
   "Print some information about the target being built."
   (let* ((depth (max 0 (1- (length *parents*))))
@@ -1276,9 +1272,9 @@ value and NEW do not match under TEST."
            (system-name
             (string-downcase            ;What ASDF wants.
              (or system-name package-name))))
-    (unless (system-loaded? system-name)
+    (unless (asdf-system-loaded? system-name)
       (restart-case
-          (asdf:load-system system-name)
+          (load-asdf-system system-name)
         (quickload ()
           :test (lambda () (find-package :ql))
           :report (lambda (s)
@@ -2386,13 +2382,13 @@ This should be a superset of the variables bound by CL during calls to
   (declare (ignore c))
   (invoke-restart 'load-same-name-system))
 
-(defgeneric find-asdf-system (lang)
+(defgeneric maybe-find-asdf-system (lang)
   (:method ((lang no-such-lang))
-    (find-asdf-system (no-such-lang.lang lang)))
+    (maybe-find-asdf-system (no-such-lang.lang lang)))
   (:method ((lang t))
     (and (not (frozen?))
          (let ((lang (string-downcase lang)))
-           (asdf:find-system lang nil)))))
+           (find-asdf-system lang)))))
 
 (defun ensure-lang-exists (lang &optional (cont #'ensure-lang-exists))
   (check-type lang package-designator)
@@ -2403,10 +2399,10 @@ This should be a superset of the variables bound by CL during calls to
             (restart-case
                 (error 'no-such-lang :lang lang)
               (load-same-name-system ()
-                :test find-asdf-system
+                :test maybe-find-asdf-system
                 :report (lambda (s)
                           (format s "Load the system named ~a and try again" lang))
-                (asdf:load-system lang)
+                (load-asdf-system lang)
                 (funcall cont lang)))))))
 
 (defun lookup-hash-lang (name)

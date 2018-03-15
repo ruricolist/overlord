@@ -18,6 +18,8 @@
     :overlord-error)
   (:import-from :overlord/digest
     :digest-string)
+  (:import-from :overlord/asdf
+    :asdf-system-version)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -231,9 +233,7 @@ A name is extracted using `named-readtable:readtable-name'."))
   (:method target-exists? (self)
     t)
   (:method oracle-value (self)
-    (if-let (system (asdf:find-system name nil))
-      (asdf:component-version system)
-      nil))
+    (asdf-system-version name))
   (:method target= (self (other system-version-oracle))
     (string-equal name (system-version-oracle.system-name other))))
 

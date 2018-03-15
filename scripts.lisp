@@ -5,6 +5,8 @@
     #:safer-read-from-string)
   (:import-from #:overlord/specials #:*cli*)
   (:import-from :alexandria :read-file-into-string)
+  (:import-from #:overlord/asdf
+    #:asdf-system-relative-pathname)
   (:import-from :uiop :quit)
   (:export #:main))
 (in-package #:overlord/scripts)
@@ -37,7 +39,7 @@
   (read-file-into-string (version-file)))
 
 (defun version-file ()
-  (asdf:system-relative-pathname :overlord "version.sexp"))
+  (asdf-system-relative-pathname :overlord "version.sexp"))
 
 (defun main (argv)
   (handler-case
