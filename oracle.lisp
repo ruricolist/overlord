@@ -37,7 +37,7 @@
 
 ;;; Note that, because Overlord remembers the value of the oracle,
 ;;; that value should be small -- a flag, a symbol, a file name. Note
-;;; also that the value per se is not remember, but a string
+;;; also that the value per se is not remembered, but a string
 ;;; representation with `princ', so the value should be one with a
 ;;; meaningful literal representation.
 
