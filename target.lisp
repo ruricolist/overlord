@@ -1643,8 +1643,11 @@ specify the dependencies you want on build."
          :reader pattern-name))
   (:documentation "Encapsulates a pattern that has not been loaded in this session."))
 
-(defmethod load-form-slot-names append ((self unloaded-pattern))
-  '(name))
+(defmethods unloaded-pattern (self name)
+  (:method load-form-slot-names append (self)
+    '(name))
+  (:method pattern-build (self)
+    (make (force-symbol name))))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
