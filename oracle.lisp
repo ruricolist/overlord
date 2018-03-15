@@ -21,7 +21,6 @@
   (:import-from :fset)
   (:export
    :oracle :oracle-name
-   :use :use-all
    :var-oracle
    :env-oracle
    :system-version-oracle
@@ -55,15 +54,6 @@
   ((key :initarg :key
         :accessor oracle.key
         :reader oracle-name)))
-
-(defun use-all (oracles)
-  (do-each (oracle (reshuffle oracles) oracles)
-    (if (target-exists? oracle)
-        (redo-ifchange oracle)
-        (redo-ifcreate oracle))))
-
-(defun use (&rest oracles)
-  (use-all oracles))
 
 (defmethods oracle (self key)
   (:method make-load-form (self &optional env)

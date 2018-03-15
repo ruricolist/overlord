@@ -123,6 +123,7 @@
    :find-pattern
    :build
    :run
+
    :depends-on
    :depends-on*
    :pdepends-on
@@ -131,6 +132,8 @@
    :pdepends-on-all
    :depends-not
    :depends-not-all
+   :use :use-all
+
    :with-script
 
    :module-dynamic-exports
@@ -1315,6 +1318,26 @@ value and NEW do not match under TEST."
 (defun depends-not (&rest targets)
   (depends-not-all targets))
 
+(defun use-all* (targets)
+  "Depend on each target in TARGET -- as a normal prereq if TARGET
+exists, and as a non-existent prereq if TARGET does not exist."
+  (do-each (target targets targets)
+    (if (target-exists? target)
+        (redo-ifchange target)
+        (redo-ifcreate target))))
+
+(defun use-all (targets)
+  "Like `use-all*', but targets are shuffled."
+  (use-all* (reshuffle targets)))
+
+(defun use (&rest targets)
+  "Like `use-all', but variadic."
+  (use-all targets))
+
+(defun use* (&rest targets)
+  "Like `use', but ordered."
+  (use-all* targets))
+
 (defmacro with-script ((&key) &body body)
   `(macrolet ( ;; Depending on things in general.
               (:depends-on (x &rest xs)
@@ -1361,6 +1384,12 @@ value and NEW do not match under TEST."
                 `(feature-oracle ,name))
               (:use (&rest targets)
                 `(use ,@targets))
+              (:use* (&rest targets)
+                `(use* ,@targets))
+              (:use-all (targets)
+                `(use-all ,targets))
+              (:use-all* (targets)
+                `(use-all* ,targets))
 
               (:always (&optional (bool t))
                 `(and ,bool (redo-always)))
