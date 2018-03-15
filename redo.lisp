@@ -50,17 +50,18 @@
 
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
-  (or (not (target-exists? target))
-      ;; (target-in-db? target)
+  (or
+   ;; (not (target-exists? target))
+   ;; (target-in-db? target)
 
-      ;; NB This is a deviation from the Redo model. We don't want to
-      ;; depend on the database to tell what is or is not a target,
-      ;; because the database is cleared every time Overlord, or the
-      ;; underlying Lisp, is upgraded. Instead, what makes something a
-      ;; target is that it has a build script. (This idea comes from
-      ;; Gup). However (see `changed?' below) a target is still
-      ;; considered out of date if it has no presence in the DB.
-      (target-has-build-script? target)))
+   ;; NB This is a deviation from the Redo model. We don't want to
+   ;; depend on the database to tell what is or is not a target,
+   ;; because the database is cleared every time Overlord, or the
+   ;; underlying Lisp, is upgraded. Instead, what makes something a
+   ;; target is that it has a build script. (This idea comes from
+   ;; Gup). However (see `changed?' below) a target is still
+   ;; considered out of date if it has no presence in the DB.
+   (target-has-build-script? target)))
 
 (defun redo (&rest args)
   (redo-all (or args (list root-target))))
