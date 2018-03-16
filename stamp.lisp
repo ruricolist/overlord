@@ -7,6 +7,8 @@
   (:import-from :overlord/types
     :universal-time)
   (:import-from :overlord/util :compare)
+  (:import-from :overlord/version
+    :version :version= :version-satisfies?)
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
     :file-size-in-octets)
@@ -98,7 +100,8 @@ already negligible possibility of a collision."
   `(or target-timestamp
        string
        file-meta
-       file-hash))
+       file-hash
+       version))
 
 ;; NB Note that conversion from timestamp to universal rounds down
 ;; (loses nsecs), so when comparing one of each, whether you convert
@@ -173,7 +176,11 @@ already negligible possibility of a collision."
      (stamp= (file-meta-timestamp s1) s2))
     ((target-timestamp file-meta)
      (stamp= s1 (file-meta-timestamp s2)))
-    ((file-meta stamp) nil)))
+    ((file-meta stamp) nil)
+
+    ((version version)
+     (version= s1 s2))
+    ((version stamp) nil)))
 
 (defun stamp-satisfies-p (new old)
   "Is stamp NEW practically equivalent to (but not necessarily the
@@ -181,4 +188,9 @@ same as) OLD?"
   ;; Resist the temptation to compare timestamps chronologically here:
   ;; that would plunge us back into the hell of time zones, clock
   ;; skew, &c.
-  (stamp= old new))
+  (dispatch-case ((new stamp)
+                  (old stamp))
+    ((version version)
+     (version-satisfies? new old))
+    ((stamp stamp)
+     (stamp= new old))))
