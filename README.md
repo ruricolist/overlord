@@ -28,15 +28,6 @@ API at this stage would be futile. Instead, this README discusses the
 concepts behind Overlord. If you’re looking for the current syntax,
 consult the [test suite](tests.lisp) and the [files it uses](tests/).
 
-(If you are interested in reading the code, here are the more
-interesting parts:
-
-- [redo.lisp](redo.lisp) has the logic of the build system.
-- [target.lisp](target.lisp) implements different kinds of targets.
-- [db.lisp](db.lisp) implements the database.
-
-The rest is support.)
-
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
@@ -61,8 +52,8 @@ When I say “experimental”, I mean it. Anything may change at any time.
 ### About Quicklisp
 
 Overlord is now in [Quicklisp][]. This does not mean Overlord is done:
-it remains pre-alpha. But it does mean that bleeding-edge development
-will now take place in a [separate `dev` branch][dev].
+it remains pre-alpha. But it does mean that development will now take
+place in a [separate `dev` branch][dev].
 
 ## Embedding languages
 
@@ -100,13 +91,17 @@ Here are some example language embeddings:
    and shows how (and why) to load the same file in different
    languages.
 
-4. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets.
-   Shows how to combine Overlord’s support for languages with direct
-   use of the build system.
-
 5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
    dialect [ISLISP][] (itself a conceptual subset of Common Lisp).
    Shows how to use Overlord to build “language towers.”
+
+## Build system examples
+
+Here are some examples of how to make direct use of the build system:
+
+1. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets,
+   automatically fetched from the HTTPS Everywhere repository and
+   compiled into Lisp code.
 
 ## Parallelism
 
@@ -132,7 +127,7 @@ even without parallelism, it tries to discourage reliance on side
 effects by, whenever possible, randomizing the order in which targets
 are built.
 
-# Overlord and Lisp images
+# Freezing the Lisp image
 
 During development, as targets are defined and re-defined, and rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
