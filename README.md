@@ -85,13 +85,6 @@ several important properties:
    different languages to share the same parser or for the same
    language to be written in more than one syntax.
 
-One goal of the language implementation is to provide a reasonable
-level of integration with Emacs. A prototype Emacs minor mode is
-included in <elisp/overlord.el>. Using `overlord-minor-mode` lets you
-recompile a module using `C-c C-k`, and lets you view the Lisp code
-that the file expands into using `C-c RET` – just like an ordinary
-macroexpansion.
-
 ## Language examples
 
 Here are some example language embeddings:
@@ -114,15 +107,6 @@ Here are some example language embeddings:
 5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
    dialect [ISLISP][] (itself a conceptual subset of Common Lisp).
    Shows how to use Overlord to build “language towers.”
-
-## CLI
-
-Overlord has basic integration with the command line.
-
-It is possible to run Overlord using either [cl-launch][]
-or [Roswell][]. The cl-launch script is in `cl-launch/overlord`. The
-Roswell script is in `roswell/overlord.ros`. They each use the same
-syntax.
 
 ## Parallelism
 
