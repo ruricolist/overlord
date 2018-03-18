@@ -127,7 +127,7 @@ even without parallelism, it tries to discourage reliance on side
 effects by, whenever possible, randomizing the order in which targets
 are built.
 
-# Overlord and Lisp images
+# Freezing the Lisp image
 
 During development, as targets are defined and re-defined, and rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
