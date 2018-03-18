@@ -52,8 +52,8 @@ When I say “experimental”, I mean it. Anything may change at any time.
 ### About Quicklisp
 
 Overlord is now in [Quicklisp][]. This does not mean Overlord is done:
-it remains pre-alpha. But it does mean that bleeding-edge development
-will now take place in a [separate `dev` branch][dev].
+it remains pre-alpha. But it does mean that development will now take
+place in a [separate `dev` branch][dev].
 
 ## Embedding languages
 
