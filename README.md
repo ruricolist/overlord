@@ -28,15 +28,6 @@ API at this stage would be futile. Instead, this README discusses the
 concepts behind Overlord. If you’re looking for the current syntax,
 consult the [test suite](tests.lisp) and the [files it uses](tests/).
 
-(If you are interested in reading the code, here are the more
-interesting parts:
-
-- [redo.lisp](redo.lisp) has the logic of the build system.
-- [target.lisp](target.lisp) implements different kinds of targets.
-- [db.lisp](db.lisp) implements the database.
-
-The rest is support.)
-
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
