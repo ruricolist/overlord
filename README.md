@@ -91,13 +91,17 @@ Here are some example language embeddings:
    and shows how (and why) to load the same file in different
    languages.
 
-4. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets.
-   Shows how to combine Overlord’s support for languages with direct
-   use of the build system.
-
 5. [Core Lisp][]. A hygiene-compatible implementation of the Lisp
    dialect [ISLISP][] (itself a conceptual subset of Common Lisp).
    Shows how to use Overlord to build “language towers.”
+
+## Build system examples
+
+Here are some examples of how to make direct use of the build system:
+
+1. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets,
+   automatically fetched from the HTTPS Everywhere repository and
+   compiled into Lisp code.
 
 ## Parallelism
 
