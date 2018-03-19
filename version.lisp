@@ -23,11 +23,14 @@
    (patch wholenum)))
 
 (defun parse-version (version)
-  (match version
-    ((and _ (type version))
-     version)
-    ((and _ (type (integer 0 *)))
-     (version version 0 0))
+  (typecase version
+    (version version)
+    ((integer 0 *) (version version 0 0))
+    (string (parse-version-string version))
+    (otherwise unversioned)))
+
+(defun parse-version-string (string)
+  (ematch string
     ;; Disregard leading v (for git tags) and trailing crap. I don't
     ;; think it's worth implementing semver's rules for comparing
     ;; prerelease versions.
@@ -35,8 +38,7 @@
      (version (parse-integer major)
               (if minor (parse-integer minor) 0)
               (if patch (parse-integer patch) 0)))
-    (otherwise
-     unversioned)))
+    (otherwise unversioned)))
 
 (defun version< (version1 version2)
   (let ((v1 (parse-version version1))
