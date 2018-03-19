@@ -24,6 +24,8 @@
   (match version
     ((and _ (type version))
      version)
+    ((and _ (type (integer 0 *)))
+     (version version 0 0))
     ;; Disregard leading v (for git tags) and trailing crap. I don't
     ;; think it's worth implementing semver's rules for comparing
     ;; prerelease versions.
