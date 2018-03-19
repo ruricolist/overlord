@@ -45,9 +45,9 @@
                (parse-version version2)))
     (or (< major1 major2)
         (and (= major1 major2)
-             (< minor1 minor2)
-             (and (= minor1 minor2)
-                  (< patch1 patch2))))))
+             (or (< minor1 minor2)
+                 (and (= minor1 minor2)
+                      (< patch1 patch2)))))))
 
 (defun version= (version1 version2)
   (let-match (((version major1 minor1 patch1)
