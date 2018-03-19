@@ -20,6 +20,8 @@
     :digest-string)
   (:import-from :overlord/asdf
     :asdf-system-version)
+  (:import-from :overlord/version
+    :parse-version)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -230,12 +232,19 @@ A name is extracted using `named-readtable:readtable-name'."))
         :type string)))
 
 (defmethods system-version-oracle (self (name key))
+  (:method target= (self (other system-version-oracle))
+    (string-equal name (system-version-oracle.system-name other)))
+
   (:method target-exists? (self)
     t)
   (:method oracle-value (self)
-    (asdf-system-version name))
-  (:method target= (self (other system-version-oracle))
-    (string-equal name (system-version-oracle.system-name other))))
+    (let ((version (asdf-system-version name)))
+      (parse-version (asdf-system-version name))))
+  (:method target-stamp (self)
+    (oracle-value self))
+
+  (:method target-being-built-string (self)
+    (fmt "versioned system ~a" name)))
 
 (defun system-version-oracle (name)
   (make 'system-version-oracle :name (assure string name)))
