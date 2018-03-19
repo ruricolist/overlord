@@ -15,10 +15,12 @@
   (:documentation "Mostly-trivial parsing and ordering of versions."))
 (in-package :overlord/version)
 
-(defconstructor version
-  (major wholenum)
-  (minor wholenum)
-  (patch wholenum))
+(defunion version-spec
+  unversioned
+  (version
+   (major wholenum)
+   (minor wholenum)
+   (patch wholenum)))
 
 (defun parse-version (version)
   (match version
@@ -34,7 +36,7 @@
               (if minor (parse-integer minor) 0)
               (if patch (parse-integer patch) 0)))
     (otherwise
-     (error "~a is not a valid version designator." version))))
+     unversioned)))
 
 (defun version< (version1 version2)
   (let-match (((version major1 minor1 patch1)
