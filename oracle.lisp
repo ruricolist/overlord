@@ -28,6 +28,7 @@
    :var-oracle
    :env-oracle
    :system-version-oracle
+   :feature-oracle
    :dist-version-oracle))
 (in-package :overlord/oracle)
 
