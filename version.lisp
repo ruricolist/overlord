@@ -45,8 +45,9 @@
         (v2 (parse-version version2)))
     (dispatch-case ((v1 version-spec)
                     (v2 version-spec))
-      ((unversioned version-spec) nil)
-      ((version-spec unversioned) nil)
+      ((unversioned unversioned) nil)
+      ((unversioned version) nil)
+      ((version unversioned) nil)
       ((version version)
        (let-match (((version major1 minor1 patch1) v1)
                    ((version major2 minor2 patch2) v2))
@@ -61,8 +62,9 @@
         (v2 (parse-version version2)))
     (dispatch-case ((v1 version-spec)
                     (v2 version-spec))
-      ((unversioned version-spec) nil)
-      ((version-spec unversioned) nil)
+      ((unversioned unversioned) t)
+      ((unversioned version) nil)
+      ((version unversioned) nil)
       ((version version)
        (let-match (((version major1 minor1 patch1) v1)
                    ((version major2 minor2 patch2) v2))
@@ -86,11 +88,12 @@
         (spec (parse-version spec)))
     (dispatch-case ((version version-spec)
                     (spec version-spec))
-      ;; The absence of a version does not satisfy a version.
+      ;; If a formerly versioned dependency is no longer versioned, it
+      ;; should be rebuilt.
       ((unversioned version) nil)
-      ;; The absence of a version is the absence of constraints;
-      ;; anything satisfies it.
-      ((version-spec unversioned) t)
+      ;; If a formerly unversioned dependency has acquired a version,
+      ;; it should be rebuilt.
+      ((version-spec unversioned) nil)
       ((version version)
        (and (= (version-major version)
                (version-major spec))
