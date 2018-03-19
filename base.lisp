@@ -134,7 +134,7 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
   (let ((*readtable* (find-readtable :standard))
         (*read-base* 10)
         (*read-default-float-format* 'double-float))
-    (find-asdf-system system :error error-p)))
+    (find-asdf-system system :error (not error-p))))
 
 (defun system-base (system)
   (setf system (find-system system))
@@ -171,11 +171,25 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
 (defun current-lisp-file ()
   (or *compile-file-truename* *load-truename*))
 
-(defun infer-system-from-package ()
-  (some (lambda (name)
-          (when-let (guess (package-name-asdf-system name))
-            (find-system guess nil)))
-        (package-names *package*)))
+(defun infer-system-from-package (&optional (package *package*))
+  (or (infer-system-from-package-names package)
+      (infer-system-from-package-prefix package)))
+
+(defun infer-system-from-package-names (package)
+  (some #'guess-system-from-package-name
+        (package-names package)))
+
+(defun infer-system-from-package-prefix (package)
+  (let ((name (package-name package)))
+    (and (find #\/ name)
+         (let ((prefix (first (split-sequence #\/ name :count 1))))
+           (and prefix
+                (guess-system-from-package-name
+                 (string-downcase prefix)))))))
+
+(defun guess-system-from-package-name (name)
+  (when-let (guess (package-name-asdf-system name))
+    (find-system guess nil)))
 
 (defun package-names (p)
   (cons (package-name p)
