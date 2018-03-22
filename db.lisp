@@ -3,7 +3,8 @@
     :overlord/specials
     :overlord/types
     :overlord/message
-    :overlord/global-state)
+    :overlord/global-state
+    :overlord/cache)
   (:import-from :uiop
     :with-temporary-file
     :rename-file-overwriting-target
@@ -22,8 +23,7 @@
    :saving-database
    :unload-db
    :deactivate-db
-   :delete-versioned-db
-   :db-version-dir))
+   :delete-versioned-db))
 (in-package :overlord/db)
 
 (deftype db-key ()
@@ -47,17 +47,11 @@
   (data :type fset:map))
 
 (defun delete-versioned-db (&optional (version (db-version)))
-  (let ((dir (db-version-dir version)))
+  (let ((dir (current-cache-dir version)))
     (when (uiop:directory-exists-p dir)
       (uiop:delete-directory-tree
        dir
        :validate (op (subpathp _ (xdg-cache-home)))))))
-
-(defun db-version-dir (&optional (version (db-version)))
-  (ensure-directory-pathname
-   (xdg-cache-home "overlord"
-                   (fmt "v~a" version)
-                   :implementation)))
 
 (locally (declare (optimize safety))
   (defclass db ()
@@ -296,7 +290,7 @@ the stack so the error itself can be printed."
 (defun log-file-path ()
   (assure absolute-pathname
     (path-join
-     (db-version-dir)
+     (current-cache-dir)
      #p"log/"
      #p"log.sexp")))
 
