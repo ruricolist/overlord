@@ -26,6 +26,8 @@
     :overlord/module
     ;; Utilities.
     :overlord/util
+    ;; The disk cache.
+    :overlord/cache
     ;; ASDF interface.
     :overlord/asdf
     ;; How to infer the base for the current package.
@@ -2005,19 +2007,10 @@ interoperation with Emacs."
   (url-encode (string lang-name) :encoding :utf-8))
 
 (defun lang-fasl-dir (lang current-dir)
-  (assure (and absolute-pathname directory-pathname)
-    (let ((lang-string (escape-lang-name lang))
-          (suffix
-            (~>> current-dir
-                 pathname-directory
-                 (drop-while #'keywordp)
-                 (cons :relative)
-                 (make-pathname :directory))))
-      (path-join
-       (db-version-dir)
-       #p"fasls/"
-       (make-pathname :directory `(:relative ,lang-string))
-       suffix))))
+  (let ((lang-string (escape-lang-name lang)))
+    (shadow-tree-translate
+     (make-shadow-tree :prefix (list "fasls" lang-string))
+     (pathname-directory-pathname current-dir))))
 
 (defun faslize (lang cl:pathname)
   (etypecase-of lang lang
