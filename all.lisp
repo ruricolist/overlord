@@ -36,7 +36,8 @@
    :overlord/importing
    :overlord/freeze
    :overlord/parsers
-   :overlord/message))
+   :overlord/message
+   :overlord/target-protocol))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord/target)
