@@ -21,7 +21,6 @@
    #:package-exports
    #:locate-dominating-file
    #:quoted-symbol?
-   #:class-name-of
    #:package-name-keyword
    #:find-external-symbol
    #:coerce-case
@@ -87,9 +86,6 @@
        (= (length x) 2)
        (eql (first x) 'quote)
        (symbolp (second x))))
-
-(defsubst class-name-of (x)
-  (class-name (class-of x)))
 
 (defun package-name-keyword (x)
   (assure keyword
