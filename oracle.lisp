@@ -240,7 +240,7 @@ A name is extracted using `named-readtable:readtable-name'."))
     t)
   (:method oracle-value (self)
     (let ((version (asdf-system-version name)))
-      (parse-version (asdf-system-version name))))
+      (parse-version version)))
   (:method target-stamp (self)
     (oracle-value self))
 
