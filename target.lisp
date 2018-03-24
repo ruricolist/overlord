@@ -327,7 +327,7 @@ Works for SBCL, at least."
 
 (defmethod target-saved-prereqsne (target)
   (let ((set (prop target prereqsne)))
-    (and (typep set 'fset:map)
+    (and (typep set 'fset:set)
          (fset:convert 'list set))))
 
 (defun (setf target-saved-prereqsne) (value target)
