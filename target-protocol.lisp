@@ -16,7 +16,6 @@
    #:hash-target
    #:resolve-target
    #:target-build-script
-   #:target-default-build-script
    #:target-being-built-string
    ;; Other methods.
    #:build-script-target
@@ -110,8 +109,6 @@ hash \(though the reverse is not necessarily true).")
     target))
 
 (defgeneric target-build-script (target))
-
-(defgeneric target-default-build-script (target))
 
 (defgeneric target-being-built-string (target)
   (:documentation "Return a string suitable for logging \(for humans) what target is being built.")

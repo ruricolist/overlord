@@ -433,7 +433,7 @@ inherit a method on `make-load-form', and need only specialize
                (merge-pathnames* (or base (base))))))))
   (:method target= (target (y directory-ref))
     (pathname-equal path (directory-ref.path y)))
-  (:method target-default-build-script (target)
+  (:method target-build-script (target)
     (let ((dir path))
       (task target
             (lambda ()
@@ -474,8 +474,6 @@ inherit a method on `make-load-form', and need only specialize
     (setf (target-timestamp file) value))
   (:method target-build-script (target)
     (target-build-script file))
-  (:method target-default-build-script (target)
-    (target-default-build-script file))
   (:method target-being-built-string (target)
     (target-being-built-string file)))
 
@@ -624,11 +622,6 @@ inherit a method on `make-load-form', and need only specialize
   (script target))
 
 (defmethod target-build-script :around ((target t))
-  (check-not-frozen)
-  (assure task
-    (call-next-method)))
-
-(defmethod target-default-build-script :around ((target t))
   (check-not-frozen)
   (assure task
     (call-next-method)))
@@ -1041,10 +1034,7 @@ inherit a method on `make-load-form', and need only specialize
     (or (gethash key *tasks*)
         (impossible-task target))))
 
-(defmethod target-default-build-script ((target t))
-  (impossible-task target))
-
-(defmethod target-default-build-script ((target root-target))
+(defmethod target-build-script ((target root-target))
   (task target
         (lambda ()
           ;; NB. Note that we do not get the prereqs of the root
@@ -1055,7 +1045,7 @@ inherit a method on `make-load-form', and need only specialize
             (depends-on-all (list-top-level-targets))))
         trivial-prereq))
 
-(defmethod target-default-build-script ((target pattern-ref))
+(defmethod target-build-script ((target pattern-ref))
   (let* ((input (pattern-ref.input target))
          (output (pattern-ref.output target))
          (pattern (find-pattern (pattern-ref.pattern target))))
@@ -1068,7 +1058,7 @@ inherit a method on `make-load-form', and need only specialize
               (pattern-build pattern)))
           (pattern.script pattern))))
 
-(defmethod target-default-build-script ((target module-spec))
+(defmethod target-build-script ((target module-spec))
   (let ((cell (module-spec-cell target)))
     (with-slots (lang source) cell
       (task target

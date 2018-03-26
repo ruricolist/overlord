@@ -127,15 +127,8 @@
   (build-script-target
    (target-build-script target)))
 
-(defun target-default-build-script-target (target)
-  (build-script-target
-   (target-default-build-script target)))
-
 (defun target-has-build-script? (target)
-  (let ((script-target (target-build-script-target target)))
-    (or (target-exists? script-target)
-        (let ((default (target-default-build-script-target target)))
-          (target-exists? default)))))
+  (target-exists? (target-build-script-target target)))
 
 (defun resolve-build-script (target)
   ;; TODO What directory should be current? Or should the script take care of that?
@@ -146,14 +139,7 @@
         (let ((*parents* (cons target *parents*)))
           (redo-ifchange script-target)
           script)
-        (let* ((default (target-default-build-script target))
-               (default-target (build-script-target default)))
-          (if (target-exists? default-target)
-              (let ((*parents* (cons target *parents*)))
-                (redo-ifchange default-target)
-                (redo-ifcreate script-target)
-                default)
-              (error* "No script found for ~a" target))))))
+        (error* "No script found for ~a" target))))
 
 (defun unchanged? (saved-prereq)
   (let* ((req (saved-prereq-target saved-prereq))
