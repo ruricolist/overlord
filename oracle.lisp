@@ -21,7 +21,7 @@
   (:import-from :overlord/asdf
     :asdf-system-version)
   (:import-from :overlord/version
-    :parse-version)
+    :version)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -236,8 +236,7 @@ recorded is simply nil."))
   (:method target-exists? (self)
     t)
   (:method oracle-value (self)
-    (let ((version (asdf-system-version name)))
-      (parse-version version)))
+    (version (asdf-system-version name)))
   (:method target-stamp (self)
     (oracle-value self))
 

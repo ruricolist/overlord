@@ -5,6 +5,8 @@
   (:import-from :trivia.ppcre :ppcre)
   (:export
    :version
+   :versionp
+   :make-version
    :version=
    :version-satisfies?
    :version>
@@ -15,77 +17,85 @@
   (:documentation "Mostly-trivial parsing and ordering of versions."))
 (in-package :overlord/version)
 
-(defunion version-spec
-  unversioned
-  (version
-   (major wholenum)
-   (minor wholenum)
-   (patch wholenum)))
+(defunit unversioned)
 
-(defun parse-version (version)
+(defstruct-read-only (version
+                      (:predicate versionp))
+  (major :type wholenum)
+  (minor 0 :type wholenum)
+  (patch 0 :type wholenum))
+
+(deftype version-spec ()
+  '(or unversioned version))
+
+(defun version (version)
   (typecase version
     (version version)
-    ((integer 0 *) (version version 0 0))
-    (string (parse-version-string version))
+    ((integer 0 *) (make-version :major version))
+    (string (string->version version))
     (otherwise unversioned)))
 
-(defun parse-version-string (string)
+(defun string->version (string)
   (ematch string
     ;; Disregard leading v (for git tags) and trailing crap. I don't
     ;; think it's worth implementing semver's rules for comparing
     ;; prerelease versions.
     ((ppcre "^v?(\\d+)(?:\\.(\\d+))(?:\\.(\\d+))" major minor patch)
-     (version (parse-integer major)
-              (if minor (parse-integer minor) 0)
-              (if patch (parse-integer patch) 0)))
+     (make-version :major (parse-integer major)
+                   :minor (if minor (parse-integer minor) 0)
+                   :patch (if patch (parse-integer patch) 0)))
     (otherwise unversioned)))
 
-(defun version< (version1 version2)
-  (let ((v1 (parse-version version1))
-        (v2 (parse-version version2)))
-    (dispatch-case ((v1 version-spec)
-                    (v2 version-spec))
-      ((unversioned unversioned) nil)
-      ((unversioned version) nil)
-      ((version unversioned) nil)
-      ((version version)
-       (let-match (((version major1 minor1 patch1) v1)
-                   ((version major2 minor2 patch2) v2))
-         (or (< major1 major2)
-             (and (= major1 major2)
-                  (or (< minor1 minor2)
-                      (and (= minor1 minor2)
-                           (< patch1 patch2))))))))))
+(defun compare-versions (version1 version2)
+  (nest
+   (let ((v1 (version version1))
+         (v2 (version version2))))
+   (with-accessors ((major1 version-major)
+                    (minor1 version-minor)
+                    (patch1 version-patch))
+       v1)
+   (with-accessors ((major2 version-major)
+                    (minor2 version-minor)
+                    (patch2 version-patch))
+       v2)
+   (dispatch-case ((v1 version-spec)
+                   (v2 version-spec))
+     ((unversioned unversioned) '=)
+     ((unversioned version) '/=)
+     ((version unversioned) '/=)
+     ((version version)
+      (cond ((and (= major1 major2)
+                  (= minor1 minor2)
+                  (= patch1 patch2))
+             '=)
+            ((or (< major1 major2)
+                 (and (= major1 major2)
+                      (or (< minor1 minor2)
+                          (and (= minor1 minor2)
+                               (< patch1 patch2)))))
+             '<)
+            (t '>))))))
 
-(defun version= (version1 version2)
-  (let ((v1 (parse-version version1))
-        (v2 (parse-version version2)))
-    (dispatch-case ((v1 version-spec)
-                    (v2 version-spec))
-      ((unversioned unversioned) t)
-      ((unversioned version) nil)
-      ((version unversioned) nil)
-      ((version version)
-       (let-match (((version major1 minor1 patch1) v1)
-                   ((version major2 minor2 patch2) v2))
-         (and (= major1 major2)
-              (= minor1 minor2)
-              (= patch1 patch2)))))))
+(defsubst version< (v1 v2)
+  (eql '< (compare-versions v1 v2)))
 
-(defsubst version> (version1 version2)
-  (version< version2 version1))
+(defsubst version> (v1 v2)
+  (eql '> (compare-versions v1 v2)))
 
-(defsubst version<= (version1 version2)
-  (or (version< version1 version2)
-      (version= version1 version2)))
+(defsubst version= (v1 v2)
+  (eql '= (compare-versions v1 v2)))
 
-(defsubst version>= (version1 version2)
-  (or (version< version2 version1)
-      (version= version1 version2)))
+(defsubst version<= (v1 v2)
+  (case (compare-versions v1 v2)
+    ((< =) t)))
+
+(defsubst version>= (v1 v2)
+  (case (compare-versions v1 v2)
+    ((> =) t)))
 
 (defun version-satisfies? (version spec)
-  (let ((version (parse-version version))
-        (spec (parse-version spec)))
+  (let ((version (version version))
+        (spec (version spec)))
     (dispatch-case ((version version-spec)
                     (spec version-spec))
       ;; If a formerly versioned dependency is no longer versioned, it
