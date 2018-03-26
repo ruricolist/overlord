@@ -8,7 +8,7 @@
     :universal-time)
   (:import-from :overlord/util :compare)
   (:import-from :overlord/version
-    :version :version= :version-satisfies?)
+    :version :version= :version-compatible?)
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
     :file-size-in-octets)
@@ -191,6 +191,6 @@ same as) OLD?"
   (dispatch-case ((new stamp)
                   (old stamp))
     ((version version)
-     (version-satisfies? new old))
+     (version-compatible? new old))
     ((stamp stamp)
      (stamp= new old))))

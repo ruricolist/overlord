@@ -8,7 +8,7 @@
    :versionp
    :make-version
    :version=
-   :version-satisfies?
+   :version-compatible?
    :version>
    :version<
    :version=
@@ -101,7 +101,7 @@
   (case (compare-versions v1 v2)
     ((> =) t)))
 
-(defun version-satisfies? (version spec)
+(defun version-compatible? (version spec)
   (let ((version (version version))
         (spec (version spec)))
     (dispatch-case ((version version-spec)
