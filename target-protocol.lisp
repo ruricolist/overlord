@@ -1,7 +1,7 @@
 (defpackage :overlord/target-protocol
   (:use :cl :alexandria :serapeum)
-  (:import-from :overlord/stamp :target-timestamp)
-  (:import-from :overlord/types :hash-code)
+  (:import-from :overlord/stamp :target-timestamp :never)
+  (:import-from :overlord/types :hash-code :error*)
   (:import-from :fset :compare :define-cross-type-compare-methods)
   (:export
    ;; Unit types.
@@ -59,7 +59,14 @@ Building this builds all targets defined in this session \(not all targets in th
     (target-timestamp target)))
 
 (defgeneric target-timestamp (target)
-  (:documentation "Return the timestamp of TARGET."))
+  (:documentation "Return the timestamp of TARGET.")
+  (:method (target)
+    (error* "No timestamp method for target ~a.
+
+Need to specialize one of ~s or ~s for class ~s."
+            'target-timestamp
+            'target-stamp
+            (class-name-of target))))
 
 (defgeneric (setf target-timestamp) (timestamp target)
   (:documentation "Set the timestamp of TARGET.
@@ -70,7 +77,9 @@ Not every target type supports this."))
   (:documentation "Does TARGET exists?")
   (:method :around (target)
     (declare (ignore target))
-    (true (call-next-method))))
+    (true (call-next-method)))
+  (:method (target)
+    (not (eql never (target-timestamp target)))))
 
 (-> target= (t t) boolean)
 (defgeneric target= (target1 target2)
@@ -104,6 +113,17 @@ hash \(though the reverse is not necessarily true).")
 
 (defgeneric target-default-build-script (target))
 
+(defgeneric target-being-built-string (target)
+  (:documentation "Return a string suitable for logging \(for humans) what target is being built.")
+  (:method :around (target)
+    (declare (ignore target))
+    (assure string
+      (call-next-method)))
+  (:method (target)
+    (princ-to-string target)))
+
+
+
 (defgeneric build-script-target (script))
 
 (defgeneric run-script (task))
@@ -136,12 +156,3 @@ hash \(though the reverse is not necessarily true).")
 
 (defgeneric call-with-target-locked (target fn)
   (:documentation "Call FN holding the target-specific lock for TARGET."))
-
-(defgeneric target-being-built-string (target)
-  (:documentation "Return a string suitable for logging \(for humans) what target is being built.")
-  (:method :around (target)
-    (declare (ignore target))
-    (assure string
-      (call-next-method)))
-  (:method (target)
-    (princ-to-string target)))
