@@ -214,11 +214,15 @@
   (record-prereq impossible-prereq))
 
 (defun target-tree (&optional (target root-target))
-  "Return a list of (target . deps), where each dep is of the same
-type."
-  (when (target? target)
-    (let* ((saved-prereqs (target-saved-prereqs target))
-           (targets (mapcar #'saved-prereq-target saved-prereqs)))
-      (cons
-       target
-       (mapcar #'target-tree targets)))))
+  "Return a list of (target . deps), where each dep is also a target
+tree.
+
+As a second value, return the non-existent prereqs."
+  (if (not (target? target))
+      (values nil nil)
+      (let* ((saved-prereqs (target-saved-prereqs target))
+             (targets (mapcar #'saved-prereq-target saved-prereqs))
+             (deps (mapcar #'target-tree targets))
+             (tree (cons target deps)))
+        (values tree
+                (target-saved-prereqsne target)))))
