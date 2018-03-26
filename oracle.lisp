@@ -29,7 +29,8 @@
    :env-oracle
    :system-version-oracle
    :feature-oracle
-   :dist-version-oracle))
+   :dist-version-oracle
+   :function-oracle))
 (in-package :overlord/oracle)
 
 ;;; Oracles. Oracles let you depend on the environment: either the
@@ -306,3 +307,26 @@ A name is extracted using `named-readtable:readtable-name'."))
     t)
   (:method target= (self (other feature-oracle))
     (eql feature (feature-oracle.feature other))))
+
+
+;;; Function oracles.
+
+;;; For easy extension.
+(defclass function-oracle (oracle)
+  ((key :initarg :function
+        :type delayed-symbol
+        :reader function-oracle.delayed-symbol))
+  (:documentation "An oracle for a user-supplied function.
+
+The function must be supplied by name."))
+
+(defmethods function-oracle (self key fn)
+  (:method target-exists? (self)
+    (ignore-errors
+     (fboundp (force-symbol key))))
+  (:method oracle-value (self)
+    (funcall fn)))
+
+(defun function-oracle (function-name)
+  (check-type function-name symbol)
+  (make 'function-oracle :function (delay-symbol function-name)))
