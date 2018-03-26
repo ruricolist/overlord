@@ -33,20 +33,6 @@
    :function-oracle))
 (in-package :overlord/oracle)
 
-;;; Oracles. Oracles let you depend on the environment: either the
-;;; Lisp environment (bound variables, features) or the OS environment
-;;; (environment variables). When you depend on an oracle, Overlord
-;;; remembers the value of the oracle at the time of the dependency
-;;; (or the lack of a value, if the oracle was unbound). If that value
-;;; changes, then any targets that depend on the oracle are considered
-;;; out of date.
-
-;;; Note that, because Overlord remembers the value of the oracle,
-;;; that value should be small -- a flag, a symbol, a file name. Note
-;;; also that the value per se is not remembered, but a string
-;;; representation with `princ', so the value should be one with a
-;;; meaningful literal representation.
-
 (deftype oracle-value ()
   '(or
     number
@@ -59,7 +45,14 @@
 (defclass oracle ()
   ((key :initarg :key
         :accessor oracle.key
-        :reader oracle-name)))
+        :reader oracle-name))
+  (:documentation "Oracles let you depend on aspects of the Lisp or OS
+environment.
+
+When you depend on an oracle, Overlord remembers the value of the
+oracle at the time of the dependency \(or the lack of a value, if the
+oracle was unbound). If that value changes, then any targets that
+depend on the oracle are considered out of date."))
 
 (defmethods oracle (self key)
   (:method make-load-form (self &optional env)
@@ -99,11 +92,6 @@
 
 ;;; Var oracles.
 
-;;; Oracles for Lisp variables are intended to allow a target to
-;;; record the fact that it depends on some aspect of the compile time
-;;; or read time environment (e.g. `*read-base*') and should be
-;;; considered out of date if that changes.
-
 (defclass var-oracle (oracle)
   ((key :reader var-oracle.var
         :initarg :var
@@ -111,7 +99,12 @@
    (sym :type symbol))
   (:default-initargs
    :var (required-argument :var))
-  (:documentation "Oracle that wraps a special variable."))
+  (:documentation "Oracle that wraps a special variable.
+
+Oracles for Lisp variables are intended to allow a target to
+record the fact that it depends on some aspect of the compile time
+or read time environment (e.g. `*read-base*') and should be
+considered out of date if that changes."))
 
 (defmethods var-oracle (self (var key) sym)
   (:method initialize-instance :after (self &key var)
@@ -155,7 +148,8 @@
 (defclass name-oracle (oracle)
   ((key :reader name-oracle.name))
   (:documentation
-   "Oracle that extracts a name from a value instead of recording the value directly."))
+   "Oracle that extracts a name from a value instead of recording the
+   value directly."))
 
 (defmethods name-oracle (self (name key))
   (:method oracle-value (self)
@@ -177,6 +171,7 @@
   ((key :type delayed-symbol
         :initform (delay-symbol (readtable-name *readtable*))))
   (:documentation "Oracle that wraps the current readtable.
+
 A name is extracted using `named-readtable:readtable-name'."))
 
 (defmethods readtable-oracle (self (name key))
@@ -224,14 +219,15 @@ A name is extracted using `named-readtable:readtable-name'."))
 
 ;;; System version oracles.
 
-;;; Using a system version oracle, you can depend on the version of an
-;;; ASDF system. Note that if the system is not known to ASDF, then
-;;; the version recorded is simply nil.
-
 (defclass system-version-oracle (oracle)
   ((key :initarg :name
         :reader system-version-oracle.system-name
-        :type string)))
+        :type string))
+  (:documentation "Using a system version oracle, you can depend on
+the version of an ASDF system.
+
+Note that if the system is not known to ASDF, then the version
+recorded is simply nil."))
 
 (defmethods system-version-oracle (self (name key))
   (:method target= (self (other system-version-oracle))
@@ -249,7 +245,7 @@ A name is extracted using `named-readtable:readtable-name'."))
     (fmt "versioned system ~a" name)))
 
 (defun system-version-oracle (name)
-  (make 'system-version-oracle :name (assure string name)))
+  (make 'system-version-oracle :name (string-downcase name)))
 
 
 ;;; Dist version oracles.
@@ -270,7 +266,11 @@ A name is extracted using `named-readtable:readtable-name'."))
 (defclass dist-version-oracle (oracle)
   ((key :initarg :name
         :reader dist-version-oracle.name
-        :type string)))
+        :type string))
+  (:documentation "An oracle that reports the current version of a
+  Quicklisp dist.
+
+By default this is the Quicklisp dist itself."))
 
 (defmethods dist-version-oracle (self (name key))
   (:method target-exists? (self)
@@ -294,7 +294,9 @@ A name is extracted using `named-readtable:readtable-name'."))
 (defclass feature-oracle (oracle)
   ((key :initarg :feature
         :type keyword
-        :reader feature-oracle.feature)))
+        :reader feature-oracle.feature))
+  (:documentation "An oracle that wraps whether a particular keyword
+  is present in `*features*'."))
 
 (defun feature-oracle (feature)
   (make 'feature-oracle
