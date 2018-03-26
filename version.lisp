@@ -25,6 +25,14 @@
   (minor 0 :type wholenum)
   (patch 0 :type wholenum))
 
+(defmethod print-object ((self version) stream)
+  (if (not *print-escape*)
+      (format stream "~a.~a.~a"
+              (version-major self)
+              (version-minor self)
+              (version-patch self))
+      (call-next-method)))
+
 (deftype version-spec ()
   '(or unversioned version))
 
