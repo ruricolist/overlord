@@ -592,6 +592,69 @@ inherit a method on `make-load-form', and need only specialize
 
 (fset:define-cross-type-compare-methods phony-target)
 
+;;; NB Figure out whether this actually replaces all possible uses of
+;;; ifcreate. (It replaces the original use case, resolving files, but
+;;; not all possible use cases.)
+
+(defgeneric relative-file-truename (target))
+
+(defclass relative-file-target (externalizable)
+  ((path
+    :type relative-pathname
+    :initarg :path)))
+
+(defmethods relative-file-target (self path)
+  (:method load-form-slot-names append (self)
+    '(path))
+  (:method target-stamp (self)
+    (let ((truename (relative-file-truename self)))
+      (if (not (file-exists-p truename))
+          never
+          (resolved-file truename
+                         (target-timestamp truename)))))
+  (:method target-exists? (self)
+    (file-exists-p (relative-file-truename self)))
+  (:method target= (self (other relative-file-target))
+    (equal (relative-file-truename self)
+           (relative-file-truename other)))
+  (:method target-build-script (self)
+    (target-build-script (relative-file-truename self))))
+
+(defclass system-resource (relative-file-target)
+  ((system
+    :type string
+    :initarg :system
+    :reader system-resource.system))
+  (:documentation "Depend on a system-relative resource.
+
+The natural (Redo-ish) thing to do here would be to depend directly on
+the resolved file, but also add non-existent prerequisites for any
+possible path to $system.asd that might, in the future, supersede its
+current location.
+
+However, the rules ASDF uses to resolve system locations (see §8.1 in
+the ASDF manual) are far too flexible for the enumeration of possible
+locations to be practical.
+
+Since exhaustive enumeration is out, we use a different approach. We
+use a special kind of stamp that stores the resolved pathname. If the
+newly resolved pathname agrees with the stored one, then the metadata
+from that file is used. But if they disagree, then the dependency is
+treated as out-of-date, regardless of file metadata."))
+
+(defmethods system-resource (self system path)
+  (:method relative-file-truename (self)
+    (asdf:system-relative-pathname self path))
+  (:method hash-target (self)
+    (dx-sxhash (list 'system-resource system path)))
+  (:method target-being-built-string (self)
+    (fmt "resource ~a in system ~a" path system)))
+
+(defun system-resource (system path)
+  (make 'system-resource
+        :system system
+        :path path))
+
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
   ;; decision. It would make things much more complicated. In
@@ -1362,6 +1425,8 @@ exists, and as a non-existent prereq if TARGET does not exist."
                 `(module-spec ',lang
                               (resolve-target (ensure-pathname ,source)
                                               ,(base))))
+              (:system-resource (system path)
+                `(system-resource ,system ,path))
 
               ;; Depending on specific things.
               (:env (name)

@@ -5,7 +5,8 @@
   (:use :cl :alexandria :serapeum
     :local-time)
   (:import-from :overlord/types
-    :universal-time)
+    :universal-time
+    :file-pathname)
   (:import-from :overlord/util :compare)
   (:import-from :overlord/version
     :version :version= :version-compatible?)
@@ -17,6 +18,7 @@
    #:far-future
    #:file-meta
    #:file-hash
+   #:resolved-file
    #:target-timestamp
    #:stamp
    #:timestamp-newer?
@@ -55,13 +57,7 @@
   (timestamp target-timestamp))
 
 (defun file-meta= (x y)
-  (and (typep x 'file-meta)
-       (typep y 'file-meta)
-       (= (file-meta-size x)
-          (file-meta-size y))
-       (target-timestamp=
-        (file-meta-timestamp x)
-        (file-meta-timestamp y))))
+  (fset:equal? x y))
 
 (defmethod fset:compare ((x file-meta) (y file-meta))
   ;; NB Fset doesn't know how to compare target timestamps.
@@ -86,22 +82,40 @@ already negligible possibility of a collision."
   (hash string))
 
 (defun file-hash= (x y)
-  (and (typep x 'file-hash)
-       (typep y 'file-hash)
-       (= (file-hash-size x)
-          (file-hash-size y))
-       (string= (file-hash-hash x)
-                (file-hash-hash y))))
+  (fset:equal? x y))
 
-(Defmethod fset:compare ((x file-hash) (y file-hash))
-  (fset:compare-slots x y #'file-hash-size #'file-hash-hash))
+(defmethod fset:compare ((x file-hash) (y file-hash))
+  (fset:compare-slots x y
+                      #'file-hash-size
+                      #'file-hash-hash))
+
+(defconstructor resolved-file
+  "A resolved file.
+
+This enables a relative file as a target to register as changed if the
+file it resolves to changes.
+
+This is intended for cases (like the `system-resource' target class)
+where `redo-ifcreate' isn't enough to detect when a resource has been
+shadowed."
+  (path file-pathname)
+  (meta (or file-meta file-hash)))
+
+(defun resolved-file= (x y)
+  (fset:equal? x y))
+
+(defmethod fset:compare ((x resolved-file) (y resolved-file))
+  (fset:compare-slots x y
+                      #'resolved-file-path
+                      #'resolved-file-meta))
 
 (deftype stamp ()
   `(or target-timestamp
        string
        file-meta
        file-hash
-       version))
+       version
+       resolved-file))
 
 ;; NB Note that conversion from timestamp to universal rounds down
 ;; (loses nsecs), so when comparing one of each, whether you convert
@@ -180,7 +194,11 @@ already negligible possibility of a collision."
 
     ((version version)
      (version= s1 s2))
-    ((version stamp) nil)))
+    ((version stamp) nil)
+
+    ((resolved-file resolved-file)
+     (resolved-file= s1 s2))
+    ((resolved-file stamp) nil)))
 
 (defun stamp-satisfies-p (new old)
   "Is stamp NEW practically equivalent to (but not necessarily the
