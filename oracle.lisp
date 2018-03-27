@@ -86,7 +86,7 @@ depend on the oracle are considered out of date."))
       (if (stringp value)
           (byte-array-to-hex-string (digest-string value))
           (prin1-to-string (oracle-value self)))))
-  (:method target-being-built-string (self)
+  (:method target-node-label (self)
     (fmt "oracle for ~a" key)))
 
 
@@ -240,7 +240,7 @@ recorded is simply nil."))
   (:method target-stamp (self)
     (oracle-value self))
 
-  (:method target-being-built-string (self)
+  (:method target-node-label (self)
     (fmt "versioned system ~a" name)))
 
 (defun system-version-oracle (name)

@@ -16,7 +16,7 @@
    #:hash-target
    #:resolve-target
    #:target-build-script
-   #:target-being-built-string
+   #:target-node-label
    ;; Other methods.
    #:build-script-target
    #:run-script
@@ -110,7 +110,7 @@ hash \(though the reverse is not necessarily true).")
 
 (defgeneric target-build-script (target))
 
-(defgeneric target-being-built-string (target)
+(defgeneric target-node-label (target)
   (:documentation "Return a string suitable for logging \(for humans) what target is being built.")
   (:method :around (target)
     (declare (ignore target))

@@ -440,7 +440,7 @@ inherit a method on `make-load-form', and need only specialize
               (let ((dir (resolve-target dir)))
                 (ensure-directories-exist dir)))
             trivial-prereq)))
-  (:method target-being-built-string (target)
+  (:method target-node-label (target)
     (fmt "directory ~a" path))
   (:method hash-target (target)
     (dx-sxhash (list 'directory-ref path))))
@@ -474,8 +474,8 @@ inherit a method on `make-load-form', and need only specialize
     (setf (target-timestamp file) value))
   (:method target-build-script (target)
     (target-build-script file))
-  (:method target-being-built-string (target)
-    (target-being-built-string file)))
+  (:method target-node-label (target)
+    (target-node-label file)))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -647,7 +647,7 @@ treated as out-of-date, regardless of file metadata."))
     (asdf:system-relative-pathname self path))
   (:method hash-target (self)
     (dx-sxhash (list 'system-resource system path)))
-  (:method target-being-built-string (self)
+  (:method target-node-label (self)
     (fmt "resource ~a in system ~a" path system)))
 
 (defun system-resource (system path)
@@ -1188,12 +1188,12 @@ treated as out-of-date, regardless of file metadata."))
          (spaces (make-string depth :initial-element #\Space)))
     (message "~aBuilding ~a"
              spaces
-             (target-being-built-string target))))
+             (target-node-label target))))
 
-(defmethod target-being-built-string ((target cl:pathname))
+(defmethod target-node-label ((target cl:pathname))
   (native-namestring target))
 
-(defmethod target-being-built-string ((target symbol))
+(defmethod target-node-label ((target symbol))
   (if (string$= '.do target)
       (fmt "script for '~s"
            (find-symbol
@@ -1201,30 +1201,30 @@ treated as out-of-date, regardless of file metadata."))
             (symbol-package target)))
       (fmt "'~s" target)))
 
-(defmethod target-being-built-string ((target delayed-symbol))
-  (target-being-built-string (force-symbol target)))
+(defmethod target-node-label ((target delayed-symbol))
+  (target-node-label (force-symbol target)))
 
-(defmethod target-being-built-string ((target root-target))
+(defmethod target-node-label ((target root-target))
   "everything")
 ;; Shouldn't happen
 
-(defmethod target-being-built-string ((target trivial-prereq))
+(defmethod target-node-label ((target trivial-prereq))
   "TRIVIAL TARGET")
 
-(defmethod target-being-built-string ((target impossible-prereq))
+(defmethod target-node-label ((target impossible-prereq))
   "IMPOSSIBLE TARGET")
 
-(defmethod target-being-built-string ((target module-spec))
+(defmethod target-node-label ((target module-spec))
   (let-match1 (module-spec lang path) target
     (let ((path (native-namestring path)))
       (fmt "~a (#lang ~a)"
            path (string-downcase lang)))))
 
-(defmethod target-being-built-string ((target phony-target))
+(defmethod target-node-label ((target phony-target))
   (let ((name (phony-target-name target)))
     (fmt "phony target ~a" name)))
 
-(defmethod target-being-built-string ((target pattern-ref))
+(defmethod target-node-label ((target pattern-ref))
   (native-namestring
    (pattern-ref.output target)))
 
