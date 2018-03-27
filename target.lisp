@@ -2067,15 +2067,15 @@ interoperation with Emacs."
      (make-shadow-tree :prefix (list "fasls" lang-string))
      (pathname-directory-pathname current-dir))))
 
-(defun faslize (lang cl:pathname)
+(defun faslize (lang pathname)
   (etypecase-of lang lang
     (package
      (~> lang
          package-name-keyword
-         (faslize cl:pathname)))
+         (faslize pathname)))
     (lang-name
-     (path-join (lang-fasl-dir lang cl:pathname)
-                (make-pathname :name (pathname-name cl:pathname)
+     (path-join (lang-fasl-dir lang pathname)
+                (make-pathname :name (pathname-name pathname)
                                :type fasl-ext)))))
 
 (defun fasl? (pathname)
