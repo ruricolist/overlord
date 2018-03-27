@@ -1,5 +1,4 @@
 (defpackage :overlord/cache
-  (:documentation )
   (:use :cl :alexandria :serapeum
     :overlord/types)
   (:import-from :overlord/specials :db-version)
