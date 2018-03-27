@@ -1,4 +1,4 @@
-(uiop/package:define-package :overlord-tests
+(uiop/package:define-package :overlord/tests
     (:use :fiveam :overlord/import-set)
   (:mix :overlord/shadows :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as
@@ -20,7 +20,7 @@
   (:import-from :overlord/lang/s-exp)
   (:import-from :core-lisp)
   (:export :run))
-(in-package :overlord-tests)
+(in-package :overlord/tests)
 
 (overlord:set-package-base (asdf-system-relative-pathname :overlord ""))
 
