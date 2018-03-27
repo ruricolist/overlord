@@ -68,7 +68,7 @@
       :accessor db.last-saved-map)
      (log
       :initarg :log
-      :type :pathname
+      :type pathname
       :reader db.log))
     (:default-initargs
      :current-map (fset:empty-map)
