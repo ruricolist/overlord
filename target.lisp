@@ -1704,9 +1704,9 @@ specify the dependencies you want on build."
     :type pathname
     :reader pattern.output-defaults)
    (script
-    :initarg :script
-    :type target
-    :reader pattern.script))
+     :initarg :script
+     :type target
+     :reader pattern.script))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
