@@ -63,18 +63,18 @@ directory components are the same as the directory components of
 PATH.
 
 On Windows the suffix includes the device as a directory component."
-  (~>> path
-       (assure absolute-pathname)
-       pathname-directory
-       (drop-while #'keywordp)
-       (append (list :relative)
-               (if-let (device
-                        (and (os-windows-p)
-                             (pathname-device path)))
-                 (ensure-list device)
-                 nil))
-       (make-pathname
-        :defaults path
-        :device :unspecific
-        :directory)
-       (assure relative-pathname)))
+  (check-type path absolute-pathname)
+  (assure relative-pathname
+    (~>> path
+         pathname-directory
+         (drop-while #'keywordp)
+         (append (list :relative)
+                 (if-let (device
+                          (and (os-windows-p)
+                               (pathname-device path)))
+                   (ensure-list device)
+                   nil))
+         (make-pathname
+          :defaults path
+          :device :unspecific
+          :directory))))
