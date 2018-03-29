@@ -93,12 +93,15 @@
 
 (defun touch-file (file)
   (lret ((file-string (resolve-file file)))
-    (assert (file-exists-p file-string))
-    (if (os-windows-p)
-        (run-program
-         (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
-              (native-namestring file-string)))
-        (run-program `("touch" ,file-string)))))
+    (if (file-exists-p file-string)
+        (if (os-windows-p)
+            (run-program
+             (fmt "powershell (ls \"~a\").LastWriteTime = Get-Date"
+                  (native-namestring file-string)))
+            (run-program `("touch" ,file-string)))
+        (prog1 (open file-string :direction :probe
+                                 :if-does-not-exist :create)
+          (assert (file-exists-p file-string))))))
 
 (defun touch (&rest targets)
   (flet ((touch (target)
@@ -109,7 +112,21 @@
 
 ;;; Does the utility work?
 (test touch-test
-  (let ((file (resolve-file "tests/touch-test")))
+  ;; This is more complicated than you might expect, since I want it
+  ;; to be possible to run the test suite simultaneously in more than
+  ;; one Lisp instance.
+  (let ((file
+          (ensure-directories-exist
+           (resolve-file
+            (make-pathname
+             :name "touch-test"
+             :directory `(:relative
+                          "tests"
+                          "tmp"
+                          ,(uiop/os:implementation-identifier)))))))
+    (unless (file-exists-p file)
+      (touch file)
+      (nap 1))
     (is (< (file-write-date file)
            (progn
              (touch file)
