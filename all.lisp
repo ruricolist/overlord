@@ -22,14 +22,16 @@
   (:import-from :overlord/specials
     :use-threads-p)
   (:import-from :overlord/redo
-    :building?)
+    :building?
+    :redo-always)
   (:export
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
    :ensure-file-package :reset-file-package
    :message :*message-handler*
    :write-file-if-changed :copy-file-if-changed
-   :use-threads-p :building?)
+   :use-threads-p
+   :building? :redo-always)
   (:use-reexport
    :overlord/base
    :overlord/target
