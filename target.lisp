@@ -611,7 +611,7 @@ inherit a method on `make-load-form', and need only specialize
       (if (not (file-exists-p truename))
           never
           (resolved-file truename
-                         (target-timestamp truename)))))
+                         (target-stamp truename)))))
   (:method target-exists? (self)
     (file-exists-p (relative-file-truename self)))
   (:method target= (self (other relative-file-target))
@@ -643,8 +643,18 @@ from that file is used. But if they disagree, then the dependency is
 treated as out-of-date, regardless of file metadata."))
 
 (defmethods system-resource (self system path)
+  (:method print-object (self stream)
+    (if (not *print-escape*)
+        (print-unreadable-object (self stream :type t)
+          (format t "~a ~a" system path))
+        (progn
+          (write-string (read-eval-prefix self stream) stream)
+          (format stream "~s"
+                  `(system-resource ,system ,path)))))
   (:method relative-file-truename (self)
-    (asdf:system-relative-pathname self path))
+    (asdf:system-relative-pathname
+     (system-resource.system self)
+     path))
   (:method hash-target (self)
     (dx-sxhash (list 'system-resource system path)))
   (:method target-node-label (self)
@@ -652,8 +662,9 @@ treated as out-of-date, regardless of file metadata."))
 
 (defun system-resource (system path)
   (make 'system-resource
-        :system system
-        :path path))
+        :system (string-downcase system)
+        :path (assure relative-pathname
+                (ensure-pathname path :want-pathname t))))
 
 (deftype target ()
   ;; NB Not allowing lists of targets as targets is a conscious
