@@ -9,7 +9,7 @@
     :file-pathname)
   (:import-from :overlord/util :compare)
   (:import-from :overlord/version
-    :version :version= :version-compatible?)
+    :version :version-spec :version= :version-compatible?)
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
     :file-size-in-octets)
@@ -114,7 +114,7 @@ shadowed."
        string
        file-meta
        file-hash
-       version
+       version-spec
        resolved-file))
 
 ;; NB Note that conversion from timestamp to universal rounds down
@@ -192,9 +192,9 @@ shadowed."
      (stamp= s1 (file-meta-timestamp s2)))
     ((file-meta stamp) nil)
 
-    ((version version)
+    ((version-spec version-spec)
      (version= s1 s2))
-    ((version stamp) nil)
+    ((version-spec stamp) nil)
 
     ((resolved-file resolved-file)
      (resolved-file= s1 s2))

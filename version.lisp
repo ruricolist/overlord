@@ -5,6 +5,7 @@
   (:import-from :trivia.ppcre :ppcre)
   (:export
    :version
+   :version-spec
    :versionp
    :make-version
    :version=

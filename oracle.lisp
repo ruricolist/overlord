@@ -21,7 +21,8 @@
   (:import-from :overlord/asdf
     :asdf-system-version)
   (:import-from :overlord/version
-    :version)
+    :version
+    :version-spec)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -38,7 +39,8 @@
     number
     ;; NB boolean is a subtype of symbol.
     symbol
-    string))
+    string
+    version-spec))
 
 (defgeneric oracle-value (oracle))
 
