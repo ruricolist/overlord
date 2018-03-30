@@ -58,20 +58,29 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
             (setf *default-pathname-defaults*
                   (absolute-directory-pathname dpd))))
       (lret ((dpd *default-pathname-defaults*)
-             (cwd (getcwd)))
+             (cwd (getcwd-safe)))
         (unless (pathname-equal cwd dpd)
           (setf *default-pathname-defaults* cwd)))))
+
+(defun getcwd-safe ()
+  "Like `getcwd', but default to your home directory if the directory
+  has been deleted."
+  (handler-case
+      (getcwd)
+    (serious-condition ()
+      (user-homedir-pathname))))
 
 (defun (setf current-dir!) (dir)
   (lret ((dir (absolute-directory-pathname dir)))
     (ensure-directories-exist dir)
     (unless (use-threads-p)
-      (unless (pathname-equal dir (getcwd))
+      (unless (pathname-equal dir (getcwd-safe))
         (chdir dir)))
     (unless (pathname-equal dir *default-pathname-defaults*)
       (setf *default-pathname-defaults* dir))))
 
 (defun call/current-dir (thunk dir)
+  (ensure-directories-exist dir)
   (let ((*default-pathname-defaults* *nil-pathname*))
     (setf (current-dir!) dir)
     (funcall thunk)))
