@@ -13,7 +13,8 @@
     :subpathp
     :ensure-directory-pathname
     :merge-pathnames*
-    :pathname-directory-pathname)
+    :pathname-directory-pathname
+    :delete-file-if-exists)
   (:import-from :trivial-file-size :file-size-in-octets)
   (:import-from :fset)
   (:import-from :local-time)
@@ -259,6 +260,7 @@ the stack so the error itself can be printed."
              (go :retry))
            (truncate-db ()
              :report "Treat the database as corrupt and discard it."
+             (delete-file-if-exists log)
              (return-from log.load
                (values (fset:empty-map) 0)))))))
 
