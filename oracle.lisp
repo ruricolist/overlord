@@ -66,14 +66,10 @@ depend on the oracle are considered out of date."))
             (read-eval-prefix self stream)
             `(make ',(class-name-of self) :key ,key)))
 
-  ;; Yes, these are circular; every subclass must define one or the
-  ;; other.
   (:method fset:compare (self (other oracle))
-    (if (target= self other)
-        :equal
-        (fset:compare-slots self other
-                            #'class-name-of
-                            #'oracle.key)))
+    (fset:compare-slots self other
+                        #'class-name-of
+                        #'oracle.key))
   (:method target= (self (other oracle))
     (eql :equal (fset:compare self other)))
 
@@ -261,8 +257,8 @@ recorded is simply nil."))
                          (assure string dist))))
 
 (defun ql-dist-version (&optional (dist-name quicklisp))
-  (when (dist-exists? dist-name)
-    (uiop:symbol-call :ql-dist :version dist-name)))
+  (when-let (dist (dist-exists? dist-name))
+    (uiop:symbol-call :ql-dist :version dist)))
 
 (defclass dist-version-oracle (oracle)
   ((key :initarg :name
