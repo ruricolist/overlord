@@ -125,7 +125,8 @@
                                   ((:binding bindings))
                                   ((:lazy lazy?) t)
                                   prefix
-                                  function-wrapper)
+                                  function-wrapper
+                                  export-bindings-p)
                   &environment env)
   "Syntax for importing from modules.
 
@@ -153,8 +154,8 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
        ;; that we can just go ahead and redefine a global lexical as a
        ;; symbol macro.
        (import-module/lazy ,module :as ,lang :from ,source)
-       #+ () (,(if lazy? 'import-module/lazy 'import-module)
-              ,module :as ,lang :from ,(merge-pathnames* source (base)))
+       #+(or) (,(if lazy? 'import-module/lazy 'import-module)
+               ,module :as ,lang :from ,(merge-pathnames* source (base)))
        ;; We push the check down into a separate macro so we can
        ;; inspect overall macroexpansion without side effects.
        (check-static-bindings-now ,lang ,source ,bindings)
@@ -164,6 +165,10 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                          'fn)))
          (import-bindings ,module ,@bindings))
        (import-task ,module :as ,lang :from ,source :lazy ,lazy?)
+       ;; Fetch the symbols from function bindings and export them.
+       ,@(when export-bindings-p
+           (let ((symbols (mapcar (compose #'second #'second) bindings)))
+             `((export ',symbols))))
        ;; Strictly for debuggability.
        (values ',module ',bindings))))
 
@@ -270,10 +275,10 @@ actually exported by the module specified by LANG and SOURCE."
        (progn
          (require-as ',as ,from)
          ;; Put this back if we ever allow non-lazy loaded modules again.
-         #+ () ,(let ((req-form `(require-as ',as ,from)))
-                  (if lazy
-                      req-form
-                      `(setf ,module ,req-form)))))))
+         #+(or) ,(let ((req-form `(require-as ',as ,from)))
+                   (if lazy
+                       req-form
+                       `(setf ,module ,req-form)))))))
 
 (defmacro import-bindings (module &body bindings &environment env)
   `(progn

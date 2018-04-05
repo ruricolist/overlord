@@ -797,9 +797,9 @@ treated as out-of-date, regardless of file metadata."))
 
 (defmethod (setf target-timestamp) (timestamp (target symbol))
   ;; Configurations need to set the timestamp while unbound
-  #+ () (unless (boundp target)
-          (error* "Trying to set timestamp for unbound symbol ~s"
-                  target))
+  #+(or) (unless (boundp target)
+           (error* "Trying to set timestamp for unbound symbol ~s"
+                   target))
   (setf (gethash target *symbol-timestamps*) timestamp))
 
 (defmethod (setf target-timestamp) (timestamp (target cl:pathname))
@@ -2522,4 +2522,3 @@ the #lang declaration ends."
          (forms (funcall fn path stream)))
     `(module-progn-in ,(package-name-keyword package)
        ,@forms)))
-
