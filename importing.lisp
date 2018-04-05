@@ -126,7 +126,7 @@
                                   ((:lazy lazy?) t)
                                   prefix
                                   function-wrapper
-                                  export-bindings-p)
+                                  export-bindings)
                   &environment env)
   "Syntax for importing from modules.
 
@@ -165,8 +165,8 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                          'fn)))
          (import-bindings ,module ,@bindings))
        (import-task ,module :as ,lang :from ,source :lazy ,lazy?)
-       ;; Fetch the symbols from function bindings and export them.
-       ,@(when export-bindings-p
+       ;; Fetch the symbols from bindings and export them.
+       ,@(when export-bindings
            (let ((symbols (mapcar (compose #'second #'second) bindings)))
              `((export ',symbols))))
        ;; Strictly for debuggability.
