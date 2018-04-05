@@ -8,7 +8,7 @@
 ;;; Adapted from LoL.
 
 (defparameter *safer-read-from-string-blacklist*
-  '(#\# #+ () #\: #\|))
+  '(#\# #+(or) #\: #\|))
 
 (let ((rt (copy-readtable nil)))
   (defun safer-reader-error (stream closech)

@@ -120,8 +120,8 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
   (merge-pathnames pathname (base)))
 
 (defun base ()
-  #+ () (or *compile-file-truename*
-            *load-truename*)
+  #+(or) (or *compile-file-truename*
+             *load-truename*)
   (absolute-directory-pathname
    (if (boundp '*base*) *base*
        (infer-base-from-package))))

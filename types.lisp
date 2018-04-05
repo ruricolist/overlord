@@ -279,7 +279,7 @@ If the value of `*default-pathname-defaults*' and a call to
   `(and symbol
         (not keyword)
         ;; XXX Too slow.
-        #+ () (not (satisfies constantp))
+        #+(or) (not (satisfies constantp))
         (not (member ,@cl-constants))
         ;; This would just be confusing.
         (not (member quote function))))
