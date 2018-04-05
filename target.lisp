@@ -1501,13 +1501,19 @@ exists, and as a non-existent prereq if TARGET does not exist."
 ;;; anyway, and that is probably something it is better to be explicit
 ;;; about.
 
-(defmacro defconfig (name init &key (test '#'equal)
-                                    documentation)
+(defmacro defconfig (name init &body body)
+  "BODY can be either a string (a docstring) or keywords."
   (check-type name symbol)
-  (let ((init
-          (save-base
-           `(with-script ()
-              ,init))))
+  (mvlet* ((test documentation
+             (ematch body
+               ((list (and docstring (type string)))
+                (values '#'equal docstring))
+               ((trivia:lambda-list &key (test '#'equal) documentation)
+                (values test documentation))))
+           (init
+            (save-base
+             `(with-script ()
+                ,init))))
     `(progn
        (eval-always
          (define-global-var ,name
