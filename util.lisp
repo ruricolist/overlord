@@ -203,7 +203,7 @@ safely, overwrite DEST with the contents of the temporary file."
   "Write DATA into FILE only if FILE would change.
 DATA may be a string or a byte vector.
 
-Cf. Shake."
+Return T if the file was written to, NIL otherwise."
   (check-type file pathname)
   (etypecase (assure vector data)
     (string
@@ -212,14 +212,17 @@ Cf. Shake."
       file))
     ((and vector (not octet-vector))
      (write-file-if-changed
-      (coerce data 'octet-vector) file))
+      (coerce data 'octet-vector)
+      file))
     (octet-vector
      (cond ((not (file-exists-p file))
-            (replace-file-atomically data file))
+            (replace-file-atomically data file)
+            t)
            ((existing-file-unchanged? data file :buffer-size buffer-size)
-            (values))
+            nil)
            (t
-            (replace-file-atomically data file))))))
+            (replace-file-atomically data file)
+            t)))))
 
 (defun copy-file-if-changed (from to)
   (if (not (file-exists-p to))
