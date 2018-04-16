@@ -1280,14 +1280,18 @@ treated as out-of-date, regardless of file metadata."))
   (target-node-label (force-symbol target)))
 
 (defmethod target-node-label ((target root-target))
-  "everything")
+  (progn "everything"))
+
+(defmethod target-node-label ((target package))
+  (fmt "package ~a" target))
+
 ;; Shouldn't happen
-
 (defmethod target-node-label ((target trivial-prereq))
-  "TRIVIAL TARGET")
+  (progn "TRIVIAL TARGET"))
 
+;;; Shouldn't happen either.
 (defmethod target-node-label ((target impossible-prereq))
-  "IMPOSSIBLE TARGET")
+  (progn "IMPOSSIBLE TARGET"))
 
 (defmethod target-node-label ((target module-spec))
   (let-match1 (module-spec lang path) target
