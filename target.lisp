@@ -267,7 +267,6 @@ Works for SBCL, at least."
   (record-prereqne (maybe-delay-symbol target)))
 
 (defun record-parent-prereqne (parent target)
-  (check-type target target)
   (withf (temp-prereqsne parent) target))
 
 (defmethod target-in-db? (target)
