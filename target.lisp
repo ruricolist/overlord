@@ -126,6 +126,7 @@
 
    :find-pattern
    :build
+   :build-package
    :run
 
    :depends-on
@@ -239,7 +240,7 @@ Works for SBCL, at least."
 
 (defun current-parent ()
   (or (first *parents*)
-      root-target))
+      *package*))
 
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
@@ -250,9 +251,12 @@ Works for SBCL, at least."
 (defmethod record-prereq ((target symbol))
   (record-prereq (maybe-delay-symbol target)))
 
-(defun record-parent-prereq (parent target)
-  (check-type target target)
-  (unless (eql parent root-target)
+(defgeneric record-parent-prereq (parent target)
+  (:method ((parent root-target) target)
+    (declare (ignore target)))
+  (:method ((parent package) target)
+    (declare (ignore target)))
+  (:method (parent target)
     (withf (temp-prereqs parent)
            target
            (target-stamp target))))
@@ -281,6 +285,7 @@ Works for SBCL, at least."
              prereqsne-temp))
 
 (defmethod target-in-db? ((target root-target)) t)
+(defmethod target-in-db? ((target package)) t)
 (defmethod target-in-db? ((target impossible-prereq)) t)
 (defmethod target-in-db? ((target trivial-prereq)) t)
 
@@ -702,6 +707,9 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-exists? ((target root-target))
   t)
 
+(defmethod target-exists? ((target package))
+  t)
+
 (defmethod target-exists? ((target trivial-prereq))
   t)
 
@@ -731,6 +739,9 @@ treated as out-of-date, regardless of file metadata."))
       module-cell.module))
 
 (defmethod target-timestamp ((target root-target))
+  never)
+
+(defmethod target-timestamp ((target package))
   never)
 
 (defmethod target-timestamp ((target impossible-prereq))
@@ -880,6 +891,7 @@ treated as out-of-date, regardless of file metadata."))
 
 (defgeneric hash-friendly? (target)
   (:method ((x root-target)) t)
+  (:method ((x package)) t)
   (:method ((x impossible-prereq)) t)
   (:method ((x trivial-prereq)) t)
   (:method ((x symbol)) t)
@@ -1042,20 +1054,63 @@ treated as out-of-date, regardless of file metadata."))
 (defvar *tasks* (dict))
 (declaim (type hash-table *tasks*))
 
-(defvar *top-level-targets* (make-target-table :synchronized t))
+(def top-level-target-lock
+  (bt:make-recursive-lock))
+
+;;; Which targets belong to which packages. This is bidirectional: a
+;;; target can only belong to one package at a time.
+
+(defvar *top-level-targets* (make-target-table))
 (declaim (type target-table *top-level-targets*))
+
+(defvar *prereq-packages* (make-target-table))
+(declaim (type target-table *prereq-packages*))
+
+(defun package-prereqs-table (package)
+  (let ((package (find-package package))
+        (table *top-level-targets*))
+    (synchronized (top-level-target-lock)
+      (ensure2 (target-table-ref table package)
+        (make-target-table)))))
+
+(defun target-package (target)
+  (let ((table *prereq-packages*))
+    (assure package
+      (synchronized (top-level-target-lock)
+        (target-table-ref table target)))))
+
+(defun (setf target-package) (package target)
+  (let ((table *prereq-packages*)
+        (new (find-package package)))
+    (synchronized (top-level-target-lock)
+      (let ((old (shiftf (target-table-ref table target)
+                         new)))
+        (when (packagep old)
+          (let ((old-table (package-prereqs-table old)))
+            (nix (target-table-member old-table target))))
+        (let ((new-table (package-prereqs-table new)))
+          (setf (target-table-member new-table target) t))))))
+
+(defun list-package-prereqs (package)
+  (~> package
+      package-prereqs-table
+      target-table-keys))
+
+(defun record-package-prereq (package target)
+  (setf (target-package target) package))
 
 (defun ensure-target-recorded (target)
   (if *parents*
       (record-prereq target)
-      (setf (target-table-member *top-level-targets* target) t)))
-
-(defun list-top-level-targets ()
-  (target-table-keys *top-level-targets*))
+      (record-package-prereq *package* target)))
 
 (defmethod target-saved-prereqs ((rt root-target))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
           (list-top-level-targets)))
+
+(defmethod target-saved-prereqs ((pkg package))
+  (mapcar (op (saved-prereq _1 (target-stamp _1)))
+          (list-package-prereqs pkg)))
 
 (defun trivial-task (target)
   (task target
@@ -1101,8 +1156,19 @@ treated as out-of-date, regardless of file metadata."))
           ;; target from the database. We do not want them to be
           ;; persistent; we only want to build the targets that
           ;; have been defined in this image.
-          (let ((*building-root* t))
-            (depends-on-all (list-top-level-targets))))
+          (let ((*suppress-phonies* t))
+            (depends-on-all (list-all-packages))))
+        trivial-prereq))
+
+(defmethod target-build-script ((target package))
+  (task target
+        (lambda ()
+          ;; NB. Note that we do not get the prereqs of the root
+          ;; target from the database. We do not want them to be
+          ;; persistent; we only want to build the targets that
+          ;; have been defined in this image.
+          (let ((*suppress-phonies* t))
+            (depends-on-all (list-package-prereqs target))))
         trivial-prereq))
 
 (defmethod target-build-script ((target pattern-ref))
@@ -1341,6 +1407,9 @@ value and NEW do not match under TEST."
 
 (defun build (&rest targets)
   (redo-all targets))
+
+(defun build-package (package)
+  (build (find-package package)))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))
@@ -1646,7 +1715,7 @@ specify the dependencies you want on build."
                 (lambda ()
                   (redo-always)
                   ;; Phony targets don't *need* to be built.
-                  (unless *building-root*
+                  (unless *suppress-phonies*
                     (funcall (script-thunk ,@script))))
                 (script-for ',name))
      ',name))

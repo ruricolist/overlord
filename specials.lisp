@@ -18,7 +18,7 @@
            #:*source*
            #:*db-version*
            #:db-version
-           #:*building-root*
+           #:*suppress-phonies*
            #:*save-pending*
            #:use-threads-p))
 (in-package #:overlord/specials)
@@ -67,7 +67,7 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defun (setf use-threads-p) (value)
   (setf *use-threads* (true value)))
 
-(defvar *building-root* nil)
-(declaim (type boolean *building-root*))
+(defvar *suppress-phonies* nil)
+(declaim (type boolean *suppress-phonies*))
 
 (defvar *save-pending* nil)

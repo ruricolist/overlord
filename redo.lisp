@@ -80,7 +80,7 @@
     *compile-file-truename*
     *load-truename*
     *cli*
-    *building-root*
+    *suppress-phonies*
     *save-pending*
     *building*)
   "Special variables whose bindings, if any, should be propagated into
