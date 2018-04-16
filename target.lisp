@@ -920,6 +920,9 @@ treated as out-of-date, regardless of file metadata."))
           `(alist-to-target-table
             '(,@(target-table-to-alist self)))))
 
+(-> make-target-table
+    (&key (:size (integer 0 *)) (:synchronized t))
+    target-table)
 (defun make-target-table (&key (size 1024) synchronized)
   (%make-target-table
    :hash-table (make-hash-table :test 'equal
@@ -940,6 +943,7 @@ treated as out-of-date, regardless of file metadata."))
              (funcall ,body))
            (funcall ,body)))))
 
+(-> target-table-len (target-table) array-length)
 (defun target-table-len (table)
   (with-target-table-locked (table)
     (let ((hash-table (target-table.hash-table table))
@@ -958,6 +962,7 @@ treated as out-of-date, regardless of file metadata."))
       (fset:do-map (k v map)
         (collect (cons k v))))))
 
+(-> target-table-ref (target-table t) (values t boolean))
 (defun target-table-ref (table key)
   (with-target-table-locked (table)
     (if (hash-friendly? key)
@@ -965,6 +970,7 @@ treated as out-of-date, regardless of file metadata."))
           (gethash key hash))
         (fset:lookup (target-table.map table) key))))
 
+(-> (setf target-table-ref) (t target-table t) t)
 (defun (setf target-table-ref) (value table key)
   (prog1 value
     (with-target-table-locked (table)
@@ -973,6 +979,7 @@ treated as out-of-date, regardless of file metadata."))
             (setf (gethash key hash) value))
           (callf #'fset:with (target-table.map table) key value)))))
 
+(-> target-table-rem (target-table t) null)
 (defun target-table-rem (table key)
   (prog1 nil
     (with-target-table-locked (table)
@@ -981,18 +988,21 @@ treated as out-of-date, regardless of file metadata."))
             (remhash key hash))
           (callf #'fset:less (target-table.map table) key)))))
 
+(-> target-table-member (target-table t) boolean)
 (defun target-table-member (table key)
   (nth-value 1
     (target-table-ref table key)))
 
+(-> (setf target-table-member) (t target-table t) boolean)
 (defun (setf target-table-member) (value table key)
-  (prog1 value
+  (prog1 (true value)
     (if value
         (with-target-table-locked (table)
           (unless (target-table-member table key)
             (setf (target-table-ref table key) t)))
         (target-table-rem table key))))
 
+(-> target-table-keys (target-table) list)
 (defun target-table-keys (table)
   (with-target-table-locked (table)
     (collecting
@@ -1005,11 +1015,13 @@ treated as out-of-date, regardless of file metadata."))
         (declare (ignore v))
         (collect k)))))
 
+(-> clear-target-table (target-table) (values))
 (defun clear-target-table (table)
   (with-target-table-locked (table)
     (clrhash (target-table.hash-table table))
     (setf (target-table.map table)
-          (fset:empty-map))))
+          (fset:empty-map)))
+  (values))
 
 (defun deduplicate-targets (targets &key (key #'identity))
   ;; (test-chamber:with-experiment
