@@ -673,20 +673,7 @@ treated as out-of-date, regardless of file metadata."))
   ;; would depend on whether it was being depended on (in which case
   ;; we want the /newest/ timestamp) or doing the depending (in which
   ;; case we want the /oldest/ timestamp).
-  '(not list)
-  ;; '(or
-  ;;   root-target
-  ;;   impossible-prereq
-  ;;   trivial-prereq
-  ;;   phony-target
-  ;;   bindable-symbol
-  ;;   delayed-symbol
-  ;;   pathname
-  ;;   directory-ref
-  ;;   pattern-ref
-  ;;   module-spec
-  ;;   oracle)
-  )
+  '(not list))
 
 (defconstructor task
   "A task."
