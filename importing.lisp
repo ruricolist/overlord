@@ -123,7 +123,6 @@
                                   ((:as lang))
                                   ((:from source))
                                   ((:binding bindings))
-                                  ((:lazy lazy?) t)
                                   prefix
                                   function-wrapper
                                   export-bindings)
@@ -143,28 +142,18 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
     ;; and source.
     (claim-module-name module lang source)
     `(progn
-       ;; Importing modules non-lazily has a speed advantage when
-       ;; there are no bindings, but it also makes maintenance more
-       ;; complex to have two import forms. For now, just use lazy
-       ;; imports; maybe re-enable eager loading later.
-
-       ;; Also: while it happens to be the case that Serapeum's `def'
-       ;; expands into a symbol macro definition, so switching between
-       ;; lazy and eager imports works, it is *conceptually* weird
-       ;; that we can just go ahead and redefine a global lexical as a
-       ;; symbol macro.
-       (import-module/lazy ,module :as ,lang :from ,source)
-       #+(or) (,(if lazy? 'import-module/lazy 'import-module)
-               ,module :as ,lang :from ,(merge-pathnames* source (base)))
+       (import-module ,module
+                      :as ,lang
+                      :from ,(merge-pathnames* source (base)))
        ;; We push the check down into a separate macro so we can
-       ;; inspect overall macroexpansion without side effects.
+       ;; inspect the overall macroexpansion without side effects.
        (check-static-bindings-now ,lang ,source ,bindings)
        (macrolet ((function-wrapper (fn)
                     ,(if function-wrapper
                          `(list ',function-wrapper fn)
                          'fn)))
          (import-bindings ,module ,@bindings))
-       (import-task ,module :as ,lang :from ,source :lazy ,lazy?)
+       (import-task ,module :as ,lang :from ,source)
        ;; Fetch the symbols from bindings and export them.
        ,@(when export-bindings
            (let ((symbols (mapcar (compose #'second #'second) bindings)))
@@ -241,19 +230,16 @@ actually exported by the module specified by LANG and SOURCE."
      (ensure-target-recorded
       (module-spec ,as ,from))))
 
-(defmacro import-module (module &key as from)
+(defmacro import-module (module &key as from once)
+  "When ONCE is non-nil, the module will only be rebuilt if it has not
+yet been loaded."
   (check-type module var-alias)
-  (let ((req-form `(require-as ',as ,from)))
+  (let ((req-form
+          (if once
+              `(require-once ',as ,from)
+              `(require-as ',as ,from))))
     `(progn
        (overlord/shadows:def ,module ,req-form)
-       (declaim-module ,as ,from)
-       ',module)))
-
-(defmacro import-module/lazy (module &key as from)
-  (check-type module var-alias)
-  (let ((lazy-load `(load-module/lazy ',as ,from)))
-    `(progn
-       (overlord/shadows:define-symbol-macro ,module ,lazy-load)
        (declaim-module ,as ,from)
        ',module)))
 
@@ -264,21 +250,14 @@ actually exported by the module specified by LANG and SOURCE."
        :from ,from
        :binding ((:default :as ,var)))))
 
-(defmacro import-task (module &key as from lazy)
-  (declare (ignorable lazy))
+(defmacro import-task (module &key as from)
   (let ((task-name
           (etypecase-of import-alias module
             (var-alias module)
             ((or function-alias macro-alias)
              (second module)))))
     `(deftask ,task-name
-       (progn
-         (require-as ',as ,from)
-         ;; Put this back if we ever allow non-lazy loaded modules again.
-         #+(or) ,(let ((req-form `(require-as ',as ,from)))
-                   (if lazy
-                       req-form
-                       `(setf ,module ,req-form)))))))
+       (setf ,module (require-as ',as ,from)))))
 
 (defmacro import-bindings (module &body bindings &environment env)
   `(progn
@@ -385,7 +364,7 @@ actually exported by the module specified by LANG and SOURCE."
     ;; give the module a local binding and not have to look it up
     ;; every time.
     `(progn
-       (import-module/lazy ,mod :as ,lang :from ,source)
+       (import-module ,mod :as ,lang :from ,source :once t)
        (check-static-bindings-now ,lang ,source ,bindings)
        (import-bindings ,mod ,@bindings))))
 

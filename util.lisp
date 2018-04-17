@@ -257,14 +257,16 @@ not run time).
 
 Note that BODY should be idempotent, as it may be evaluated more than
 once."
-  ;; Evaluate it right now, unless we're at the top level.
+  ;; Evaluate it right now, unless we're at the top level (to avoid
+  ;; warnings about repeated definitions).
   (unless (null env)
     (eval `(progn ,@body)))
   `(progn
-     ;; Ensure the effect happens both at compile time, and at load
-     ;; time, when not at the top level.
+     ;; Ensure the effect happens both at the top level.
      (eval-when (:compile-toplevel :load-toplevel)
        ,@body)
+     ;; Ensure the effect happens at load time when not at the top
+     ;; level.
      (eval-when (:execute)
        (load-time-value
         (progn ,@body t)))

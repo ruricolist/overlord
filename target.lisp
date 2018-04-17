@@ -111,7 +111,7 @@
    :*language* :*source*
    :read-lang-name
    :require-as :require-default
-   :dynamic-require-as :dynamic-require-default
+   :dynamic-require-as :dynamic-require-default :require-once
 
    ;; Module protocol.
    :module-meta
@@ -148,8 +148,7 @@
    :guess-lang+pos
    :resolve-lang
    :module-spec
-   :ensure-target-recorded
-   :load-module/lazy))
+   :ensure-target-recorded))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -2060,26 +2059,6 @@ if it does not exist."
   `(module-cell.module (module-cell ,lang ,source)))
 
 
-;;; Lazy-loading modules.
-
-(defun load-module/lazy (lang source)
-  (load-module-into-cell/lazy
-   (module-cell lang source)))
-
-(define-compiler-macro load-module/lazy (lang path)
-  `(load-module-into-cell/lazy (module-cell ,lang ,path)))
-
-(defun load-module-into-cell/lazy (cell)
-  (with-slots (module lang source) cell
-    ;; "Double-checked locking."
-    (or module
-        (synchronized (cell)
-          (or module
-              (progn
-                (build (module-cell-spec cell))
-                module))))))
-
-
 ;;; Languages
 
 ;;; Note that support for languages follows support for file patterns.
@@ -2098,17 +2077,28 @@ if it does not exist."
   (let ((module (dynamic-require-as lang source :force force)))
     (module-ref module :default)))
 
-(defun dynamic-require-as (lang source &key force)
+(defun lang+source (lang source)
   (check-type source (and absolute-pathname file-pathname))
-  (ensure lang (guess-lang+pos source))
-  (setf lang (lang-name lang))
-  (when force
-    (dynamic-unrequire-as lang source))
-  (assure (not module-cell)
+  (let* ((lang (or lang (guess-lang+pos source)))
+         (lang (lang-name lang)))
+    (values lang source)))
+
+(defun dynamic-require-as (lang source &key force)
+  (receive (lang source) (lang+source lang source)
+    (when force
+      (dynamic-unrequire-as lang source))
+    (assure (not module-cell)
+      (let ((spec (module-spec lang source)))
+        (depends-on spec)
+        (module-cell.module
+         (module-spec-cell spec))))))
+
+(defun require-once (lang source)
+  (receive (lang source) (lang+source lang source)
     (let ((spec (module-spec lang source)))
-      (depends-on spec)
-      (module-cell.module
-       (module-spec-cell spec)))))
+      (or (module-cell.module
+           (module-spec-cell spec))
+          (dynamic-require-as lang source)))))
 
 (defun %unrequire-as (lang source *base*)
   (dynamic-unrequire-as lang
