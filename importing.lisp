@@ -143,8 +143,8 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
     (claim-module-name module lang source)
     `(progn
        (import-module ,module
-                      :as ,lang
-                      :from ,(merge-pathnames* source (base)))
+         :as ,lang
+         :from ,(merge-pathnames* source (base)))
        ;; We push the check down into a separate macro so we can
        ;; inspect the overall macroexpansion without side effects.
        (check-static-bindings-now ,lang ,source ,bindings)
@@ -152,8 +152,11 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                     ,(if function-wrapper
                          `(list ',function-wrapper fn)
                          'fn)))
-         (import-bindings ,module ,@bindings))
-       (import-task ,module :as ,lang :from ,source)
+         (import-values ,module
+           ,@bindings))
+       (import-task ,module
+         :as ,lang :from ,source
+         :values ,bindings)
        ;; Fetch the symbols from bindings and export them.
        ,@(when export-bindings
            (let ((symbols (mapcar (compose #'second #'second) bindings)))
@@ -250,14 +253,29 @@ yet been loaded."
        :from ,from
        :binding ((:default :as ,var)))))
 
-(defmacro import-task (module &key as from)
+(defmacro import-task (module &body (&key as from values))
   (let ((task-name
           (etypecase-of import-alias module
             (var-alias module)
             ((or function-alias macro-alias)
              (second module)))))
     `(deftask ,task-name
-       (setf ,module (require-as ',as ,from)))))
+       (setf ,module (require-as ',as ,from))
+       (update-value-bindings ,module ,@values))))
+
+(defmacro update-value-bindings (module &body values)
+  `(progn
+     ,@(collecting
+         (dolist (clause values)
+           (receive (import alias ref) (import+alias+ref clause module)
+             (declare (ignore import))
+             (collect
+                 (etypecase-of import-alias alias
+                   (var-alias `(setf ,alias ,ref))
+                   (function-alias
+                    `(setf (symbol-function ',(second alias)) ,ref))
+                   ;; Do nothing. Macros cannot be imported as values.
+                   (macro-alias nil))))))))
 
 (defmacro import-bindings (module &body bindings &environment env)
   `(progn
