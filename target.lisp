@@ -1200,6 +1200,9 @@ treated as out-of-date, regardless of file metadata."))
     (with-slots (lang source) cell
       (task target
             (lambda ()
+              ;; Prevent the old module object from persisting if
+              ;; there is a problem building the new one.
+              (unload-module-cell cell)
               (let ((*base* (pathname-directory-pathname source)))
                 ;; Depend on the source file.
                 (depends-on source)
