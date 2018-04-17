@@ -25,7 +25,8 @@
    :base-relative-pathname
    :infer-system
    :ensure-absolute
-   :with-current-dir))
+   :with-current-dir
+   :package-base))
 
 (in-package :overlord/base)
 
@@ -124,19 +125,17 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
              *load-truename*)
   (absolute-directory-pathname
    (if (boundp '*base*) *base*
-       (infer-base-from-package))))
+       (package-base *package*))))
 
-(defun infer-base-1 (&key (errorp t))
-  (or (gethash *package* *package-bases*)
-      (system-base (infer-system :errorp errorp))))
-
-(defun infer-base-from-package (&key (errorp t))
-  (let ((base (infer-base-1 :errorp errorp)))
-    (if (absolute-pathname-p base)
-        base
+(defun package-base (package &key (errorp t))
+  (let ((base
+          (or (gethash package *package-bases*)
+              (system-base
+               (infer-system package :errorp errorp)))))
+    (if (absolute-pathname-p base) base
         (and errorp
              (error* "Cannot infer base.~%Package: ~a~%File: "
-                     *package*
+                     package
                      (current-lisp-file))))))
 
 (defun find-system (system &optional error-p)
@@ -157,13 +156,13 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
               (system-base base-system))
             (error* "System ~a has no base." system)))))
 
-(defun infer-system (&key (errorp t))
+(defun infer-system (package &key (errorp t))
   (assure (or null (satisfies asdf-system?))
-    (or (infer-system-from-package)
+    (or (infer-system-from-package package)
         (look-for-asd)
         (and errorp
              (assure (satisfies asdf-system?)
-               (ensure2 (gethash *package* *supplied-package-systems*)
+               (ensure2 (gethash package *supplied-package-systems*)
                  (cerror* "Supply a system name"
                           "Cannot infer a system for ~a" *package*)
                  (read-system-by-name)))))))

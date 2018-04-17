@@ -2469,7 +2469,20 @@ This should be a superset of the variables bound by CL during calls to
 `cl:load'.")
 
 (defun expand-module (package source
+                      &key ((:in base))
                       &aux (file-locals *file-local-variables*))
+  ;; Specifying the base (for interactive use).
+  (when base
+    (nlet lp (base)
+      (etypecase-of (or directory-pathname string-designator package)
+          base
+        (directory-pathname
+         (setf source (merge-pathnames* source base)))
+        (string-designator
+         (lp (find-package base)))
+        (package
+         (lp (package-base base))))))
+
   (let* ((package (resolve-package package))
          (*language* (lang-name package))
          (source (ensure-pathname source :want-pathname t))
