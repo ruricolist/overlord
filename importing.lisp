@@ -334,7 +334,8 @@ yet been loaded."
          `(overlord/shadows:defalias ,alias
             (assure function (function-wrapper ,ref)))))
       (macro-alias
-       (error 'macro-as-value :name (second alias))))))
+       ;; Macros cannot be imported as values.
+       (import-binding clause module)))))
 
 (defun import+alias+ref (clause module)
   (destructuring-bind (import alias) (canonicalize-binding clause)
