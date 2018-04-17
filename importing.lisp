@@ -264,6 +264,10 @@ yet been loaded."
      ,@(mapcar (op (import-binding _ module env))
                bindings)))
 
+(defmacro import-values (module &body values)
+  `(progn
+     ,@(mapcar (op (import-value _ module)) values)))
+
 (defun canonicalize-binding (clause)
   (assure canonical-binding
     (if (typep clause 'canonical-binding)
@@ -367,7 +371,7 @@ yet been loaded."
     `(progn
        (import-module ,mod :as ,lang :from ,source :once ,once)
        (check-static-bindings-now ,lang ,source ,bindings)
-       (import-bindings ,mod ,@bindings))))
+       (import-values ,mod ,@bindings))))
 
 (defmacro with-imports ((mod &key from as binding prefix (once t)) &body body)
   "A version of `import' with local scope."
