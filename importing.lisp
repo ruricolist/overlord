@@ -230,7 +230,7 @@ actually exported by the module specified by LANG and SOURCE."
      (ensure-target-recorded
       (module-spec ,as ,from))))
 
-(defmacro import-module (module &key as from once)
+(defmacro import-module (module &body (&key as from once))
   "When ONCE is non-nil, the module will only be rebuilt if it has not
 yet been loaded."
   (check-type module var-alias)
@@ -351,7 +351,7 @@ yet been loaded."
       (make-keyword import)
       (make-keyword (second import))))
 
-(defmacro import/local (mod &body (&key from as binding prefix)
+(defmacro import/local (mod &body (&key from as binding prefix (once t))
                         &environment env)
   (receive (lang source bindings)
       (resolve-import-spec :lang as
@@ -364,25 +364,27 @@ yet been loaded."
     ;; give the module a local binding and not have to look it up
     ;; every time.
     `(progn
-       (import-module ,mod :as ,lang :from ,source :once t)
+       (import-module ,mod :as ,lang :from ,source :once ,once)
        (check-static-bindings-now ,lang ,source ,bindings)
        (import-bindings ,mod ,@bindings))))
 
-(defmacro with-imports ((mod &key from as binding prefix) &body body)
+(defmacro with-imports ((mod &key from as binding prefix (once t)) &body body)
   "A version of `import' with local scope."
   `(local*
      (import/local ,mod
        :from ,from
        :as ,as
        :binding ,binding
-       :prefix ,prefix)
+       :prefix ,prefix
+       :once ,once)
      (progn ,@body)))
 
-(defmacro with-import-default ((bind &key from as) &body body)
+(defmacro with-import-default ((bind &key from as (once t)) &body body)
   (with-unique-names (mod)
     `(with-imports (,mod
                     :from ,from
                     :as ,as
+                    :once ,once
                     :binding ((:default :as ,bind)))
        ,@body)))
 

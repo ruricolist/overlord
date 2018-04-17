@@ -79,11 +79,9 @@
 ;;; Utilities.
 
 ;;; Force reload whenever run.
-(defmacro with-imports* ((mod &rest args &key from as &allow-other-keys) &body body)
-  `(progn
-     (require-as ,as ,from)
-     (with-imports (,mod ,@args)
-       ,@body)))
+(defmacro with-imports* ((mod &rest args &key &allow-other-keys) &body body)
+  `(with-imports (,mod ,@args :once nil)
+     ,@body))
 
 (defun resolve-file (file)
   (native-namestring
@@ -194,7 +192,7 @@
 
 (test s-exp
   (is (= 42
-         (with-import-default (answer :from "tests/s-exp-test.sexp")
+         (with-import-default (answer :from "tests/s-exp-test.sexp" :once nil)
            answer))))
 
 (test sweet-exp
@@ -205,7 +203,7 @@
 
 (test import-default-as-function
   (is (= 2432902008176640000
-         (with-import-default (#'fact :from "tests/import-as-function.lsp")
+         (with-import-default (#'fact :from "tests/import-as-function.lsp" :once nil)
            (fact 20)))))
 
 
