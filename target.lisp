@@ -2300,7 +2300,8 @@ instances of this pattern must be parameterized with a language."))
            (*language* lang)
            ;; Must be bound here for macros that intern
            ;; symbols.
-           (*package* (user-package (resolve-package lang))))
+           (*package* (user-package (resolve-package lang)))
+           (*base* (pathname-directory-pathname *source*)))
       (depends-on *source*)
       (compile-to-file
        (wrap-current-module
