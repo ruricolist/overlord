@@ -45,7 +45,7 @@
   (unless (boundp '*our-kernel*)
     (synchronized ('*our-kernel*)
       (unless (boundp '*our-kernel*)
-        (message "Initializing Overlord thread pool")
+        (message "Initializing thread pool")
         (setf *our-kernel*
               (make-kernel (* nprocs 2)
                            :name "Overlord worker"))))))
