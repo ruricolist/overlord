@@ -1120,7 +1120,7 @@ treated as out-of-date, regardless of file metadata."))
 
 (defmethod target-saved-prereqs ((rt root-target))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
-          (list-top-level-targets)))
+          (list-all-packages)))
 
 (defmethod target-saved-prereqs ((pkg package))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
@@ -1427,7 +1427,9 @@ value and NEW do not match under TEST."
       (values target system-name package))))
 
 (defun build (&rest targets)
-  (redo-all targets))
+  (if (null targets)
+      (redo root-target)
+      (redo-all targets)))
 
 (defun build-package (package)
   (build (find-package package)))
