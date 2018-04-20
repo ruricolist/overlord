@@ -247,6 +247,9 @@ Works for SBCL, at least."
 (defmethod record-prereq ((target trivial-prereq))
   (declare (ignore target)))
 
+(defmethod record-prereq ((target null))
+  (error* "Not a target: ~a" target))
+
 (defmethod record-prereq ((target symbol))
   (record-prereq (maybe-delay-symbol target)))
 
