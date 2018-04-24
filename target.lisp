@@ -1170,8 +1170,7 @@ treated as out-of-date, regardless of file metadata."))
           ;; target from the database. We do not want them to be
           ;; persistent; we only want to build the targets that
           ;; have been defined in this image.
-          (let ((*suppress-phonies* t))
-            (depends-on-all (list-all-packages))))
+          (depends-on-all (list-all-packages)))
         trivial-prereq))
 
 (defmethod target-build-script ((target package))
