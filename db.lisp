@@ -76,7 +76,7 @@
      :last-saved-map (fset:empty-map)
      :log (log-file-path))))
 
-(defun db-alist (db)
+(defun db-alist (&optional (db (db)))
   "For debugging."
   (let ((map (db.current-map db)))
     (collecting
