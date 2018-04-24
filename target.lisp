@@ -1166,20 +1166,16 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-build-script ((target root-target))
   (task target
         (lambda ()
-          ;; NB. Note that we do not get the prereqs of the root
-          ;; target from the database. We do not want them to be
-          ;; persistent; we only want to build the targets that
-          ;; have been defined in this image.
           (depends-on-all (list-all-packages)))
         trivial-prereq))
 
 (defmethod target-build-script ((target package))
   (task target
         (lambda ()
-          ;; NB. Note that we do not get the prereqs of the root
+          ;; NB. Note that we do not get the prereqs of the package
           ;; target from the database. We do not want them to be
-          ;; persistent; we only want to build the targets that
-          ;; have been defined in this image.
+          ;; persistent; we only want to build the targets that have
+          ;; been defined in this image.
           (let ((*suppress-phonies* t))
             (depends-on-all (list-package-prereqs target))))
         trivial-prereq))
