@@ -1288,7 +1288,7 @@ treated as out-of-date, regardless of file metadata."))
   (progn "everything"))
 
 (defmethod target-node-label ((target package))
-  (fmt "package ~a" target))
+  (fmt "package ~a" (package-name target)))
 
 ;; Shouldn't happen
 (defmethod target-node-label ((target trivial-prereq))
