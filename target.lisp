@@ -1260,7 +1260,9 @@ treated as out-of-date, regardless of file metadata."))
 (defun print-target-being-built (target)
   "Print some information about the target being built."
   (let* ((depth (max 0 (1- (length *parents*))))
-         (spaces (make-string depth :initial-element #\Space)))
+         (spaces (make-string depth :initial-element #\Space))
+         ;; In case we are saving the database.
+         (*print-readably*))
     (message "~aBuilding ~a"
              spaces
              (target-node-label target))))
