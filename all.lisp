@@ -14,7 +14,6 @@
     :reset-file-package)
   (:import-from :overlord/message
     :message
-    :*message-handler*
     :*message-stream*)
   (:import-from :overlord/util
     :write-file-if-changed
@@ -28,7 +27,7 @@
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
    :ensure-file-package :reset-file-package
-   :message :*message-handler*
+   :message :*message-stream*
    :write-file-if-changed :copy-file-if-changed
    :use-threads-p
    :building? :redo-always)
