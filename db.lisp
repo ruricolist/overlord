@@ -344,21 +344,23 @@ reloaded on demand."
 
 ;;; But should be manipulating stored plists instead?
 
-(defun unqualify-symbol (x)
-  (eif (symbolp x)
-       (eif (keywordp x)
-            x
-            (eif (eql (symbol-package x)
-                      #.(find-package :cl))
-                 x
-                 (let* ((p (symbol-package x)))
-                   (cons (and p (package-name p))
-                         (symbol-name x)))))
-       x))
+(defun db-protect (x)
+  (typecase x
+    (keyword x)
+    (symbol
+     (eif (eql (symbol-package x)
+               #.(find-package :cl))
+          x
+          (let* ((p (symbol-package x)))
+            (cons (and p (package-name p))
+                  (symbol-name x)))))
+    (package
+     (cons :package (package-name x)))
+    (otherwise t)))
 
 (defun prop-key (obj prop)
-  (cons (unqualify-symbol obj)
-        (unqualify-symbol prop)))
+  (cons (db-protect obj)
+        (db-protect prop)))
 
 (defplace prop-1 (obj prop)
   (db.ref (db) (prop-key obj prop)))
