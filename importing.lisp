@@ -152,7 +152,7 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                     ,(if function-wrapper
                          `(list ',function-wrapper fn)
                          'fn)))
-         (import-values ,module
+         (import-bindings ,module
            ,@bindings))
        (import-task ,module
          :as ,lang :from ,source
@@ -277,9 +277,9 @@ yet been loaded."
                    ;; Do nothing. Macros cannot be imported as values.
                    (macro-alias nil))))))))
 
-(defmacro import-values (module &body values)
+(defmacro import-bindings (module &body values)
   `(progn
-     ,@(mapcar (op (import-value _ module)) values)))
+     ,@(mapcar (op (import-binding _ module)) values)))
 
 (defun canonicalize-binding (clause)
   (assure canonical-binding
@@ -309,7 +309,7 @@ yet been loaded."
                               (function-alias `(function ,(prefix (second alias))))
                               (macro-alias `(macro-function ,(prefix (second alias))))))))))
 
-(defun import-value (clause module)
+(defun import-binding (clause module)
   (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of import-alias alias
@@ -357,7 +357,7 @@ yet been loaded."
     `(progn
        (import-module ,mod :as ,lang :from ,source :once ,once)
        (check-static-bindings-now ,lang ,source ,bindings)
-       (import-values ,mod ,@bindings))))
+       (import-bindings ,mod ,@bindings))))
 
 (defmacro with-imports ((mod &key from as binding prefix (once t)) &body body)
   "A version of `import' with local scope."
