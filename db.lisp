@@ -356,7 +356,7 @@ reloaded on demand."
                   (symbol-name x)))))
     (package
      (cons :package (package-name x)))
-    (otherwise t)))
+    (otherwise x)))
 
 (defun prop-key (obj prop)
   (cons (db-protect obj)
