@@ -2025,7 +2025,7 @@ resolved at load time."
 
 (defun unload-module-cell (cell)
   (with-slots (timestamp module) cell
-    (reset-inline-caches (nix module))
+    (clear-inline-caches (nix module))
     (setf timestamp never)))
 
 (defun unload-module (lang source)

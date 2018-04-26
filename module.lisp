@@ -13,7 +13,7 @@
    #:module-ref/inline-cache
    #:module-fn-ref
    #:module-fn-ref/inline-cache
-   #:reset-inline-caches
+   #:clear-inline-caches
    #:module-exports #:module-exports*
    #:module-static-exports
    #:current-module
@@ -188,7 +188,7 @@ reloaded."
                   :test #'eq
                   :key #'tg:weak-pointer-value))))
 
-(defun reset-inline-caches (module)
+(defun clear-inline-caches (module)
   "Look up the inline caches pointing into MODULE and make them all
 unbound again.
 
