@@ -259,7 +259,7 @@ yet been loaded."
             (var-alias module)
             ((or function-alias macro-alias)
              (second module)))))
-    `(deftask ,task-name
+    `(define-target-task ,task-name
        (setf ,module (require-as ',as ,from))
        (update-value-bindings ,module ,@values))))
 

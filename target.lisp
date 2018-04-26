@@ -88,6 +88,7 @@
   (:export
    ;; Defining and building targets.
    :deftask
+   :define-target-task
    :defconfig
    :define-target-config
    :var-target
@@ -1113,6 +1114,9 @@ treated as out-of-date, regardless of file metadata."))
 (defun record-package-prereq (package target)
   (setf (target-package target) package))
 
+(defun record-package-prereq* (target)
+  (record-package-prereq *package* target))
+
 (defun ensure-target-recorded (target)
   (if *parents*
       (record-prereq target)
@@ -1722,23 +1726,30 @@ rebuilt."
 
 ;;;; Phony targets.
 
-(defmacro deftask (name &body script)
+(defmacro deftask (name &body body)
   "Define a task -- a target that only has dependencies.
 This is essentially a convenience to let you use keyword macros to
 specify the dependencies you want on build."
-  `(progn
-     (eval-always
-       (assert (not (boundp ',name))))
-     (define-script-for ,name
-       ,@script)
-     (save-task (phony-target ',name)
-                (lambda ()
-                  (redo-always)
-                  ;; Phony targets don't *need* to be built.
-                  (unless *suppress-phonies*
-                    (funcall (script-thunk ,@script))))
-                (script-for ',name))
-     ',name))
+  `(define-target-task ,name
+     ;; Phony targets don't *need* to be built.
+     (unless *suppress-phonies*
+       ,@body)))
+
+(defmacro define-target-task (name &body script)
+  "Lower-level version of `deftask'."
+  (let ((target `(phony-target ',name)))
+    `(progn
+       (eval-always
+         (assert (not (boundp ',name))))
+       (define-script-for ,name
+         ,@script)
+       (save-task ,target
+                  (lambda ()
+                    (redo-always)
+                    (funcall (script-thunk ,@script)))
+                  (script-for ',name))
+       (record-package-prereq* ,target)
+       ',name)))
 
 
 ;;; File targets.
