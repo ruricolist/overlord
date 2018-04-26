@@ -143,11 +143,10 @@
 
 (defun unchanged? (saved-prereq)
   (let* ((req (saved-prereq-target saved-prereq))
-         (old-stamp (saved-prereq-stamp  saved-prereq))
+         (old-stamp (saved-prereq-stamp saved-prereq))
          (new-stamp (target-stamp req)))
     (stamp-satisfies-p new-stamp old-stamp)))
 
-;;; Should be (target).
 (-> changed? (t) boolean)
 (defun changed? (target)
   (mvlet* ((prereqsne (target-saved-prereqsne target))
