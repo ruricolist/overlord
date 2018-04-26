@@ -921,23 +921,6 @@ treated as out-of-date, regardless of file metadata."))
               (collect target))))))))
 
 
-
-;;; This is bad; how many locks can a program have? There could be
-;;; millions of targets.
-(defvar *target-locks-table*
-  (make-target-table :size 1024))
-
-(defmethod call-with-target-locked ((target t) (fn function))
-  (let ((lock
-          (let ((table *target-locks-table*))
-            (or (target-table-ref table target)
-                (synchronized (table)
-                  (ensure (target-table-ref table target)
-                    (bt:make-lock)))))))
-    (synchronized (lock)
-      (funcall fn))))
-
-
 ;;; Building targets (scripts).
 
 ;;; NB `*tasks*' and `*top-level-targets* cannot be safely reset,
@@ -953,10 +936,8 @@ treated as out-of-date, regardless of file metadata."))
 ;;; target can only belong to one package at a time.
 
 (defvar *top-level-targets* (make-target-table))
-(declaim (type target-table *top-level-targets*))
 
 (defvar *prereq-packages* (make-target-table))
-(declaim (type target-table *prereq-packages*))
 
 (defun package-prereqs-table (package)
   (let ((package (find-package package))

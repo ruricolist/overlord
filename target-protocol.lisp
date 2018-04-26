@@ -31,8 +31,7 @@
    #:save-temp-prereqs
    #:clear-temp-prereqs
    #:save-temp-prereqsne
-   #:clear-temp-prereqsne
-   #:call-with-target-locked))
+   #:clear-temp-prereqsne))
 (in-package :overlord/target-protocol)
 
 (defunit root-target
@@ -158,6 +157,3 @@ should be copied.")
 (defgeneric clear-temp-prereqs (target))
 
 (defgeneric clear-temp-prereqsne (target))
-
-(defgeneric call-with-target-locked (target fn)
-  (:documentation "Call FN holding the target-specific lock for TARGET."))

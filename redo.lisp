@@ -7,7 +7,8 @@
 (defpackage :overlord/redo
   (:use #:cl #:alexandria #:serapeum
     #:overlord/specials
-    #:overlord/target-protocol)
+    #:overlord/target-protocol
+    #:overlord/target-table)
   (:import-from #:overlord/types #:error*)
   (:import-from #:overlord/db #:saving-database)
   (:import-from #:overlord/parallel
@@ -41,6 +42,21 @@
 
 (defun building? ()
   (true *parents*))
+
+;;; This is bad; how many locks can a program have? There could be
+;;; millions of targets.
+(defvar *target-locks-table*
+  (make-target-table :size 1024))
+
+(defun call-with-target-locked (target fn)
+  (let ((lock
+          (let ((table *target-locks-table*))
+            (or (target-table-ref table target)
+                (synchronized (table)
+                  (ensure (target-table-ref table target)
+                    (bt:make-lock)))))))
+    (synchronized (lock)
+      (funcall fn))))
 
 (defmacro with-target-locked ((target) &body body)
   (with-thunk (body)
