@@ -152,7 +152,7 @@ Note you can do (import #'foo ...), and the module will be bound as a function."
                     ,(if function-wrapper
                          `(list ',function-wrapper fn)
                          'fn)))
-         (import-values ,module
+         (import-bindings ,module
            ,@bindings))
        (import-task ,module
          :as ,lang :from ,source
@@ -259,7 +259,7 @@ yet been loaded."
             (var-alias module)
             ((or function-alias macro-alias)
              (second module)))))
-    `(deftask ,task-name
+    `(define-target-task ,task-name
        (setf ,module (require-as ',as ,from))
        (update-value-bindings ,module ,@values))))
 
@@ -277,14 +277,9 @@ yet been loaded."
                    ;; Do nothing. Macros cannot be imported as values.
                    (macro-alias nil))))))))
 
-(defmacro import-bindings (module &body bindings &environment env)
+(defmacro import-bindings (module &body values)
   `(progn
-     ,@(mapcar (op (import-binding _ module env))
-               bindings)))
-
-(defmacro import-values (module &body values)
-  `(progn
-     ,@(mapcar (op (import-value _ module)) values)))
+     ,@(mapcar (op (import-binding _ module)) values)))
 
 (defun canonicalize-binding (clause)
   (assure canonical-binding
@@ -314,38 +309,7 @@ yet been loaded."
                               (function-alias `(function ,(prefix (second alias))))
                               (macro-alias `(macro-function ,(prefix (second alias))))))))))
 
-(defun import-binding (clause module &optional env)
-  (receive (import alias ref) (import+alias+ref clause module)
-    (declare (ignore import))
-    (etypecase-of import-alias alias
-      (var-alias
-       `(overlord/shadows:define-symbol-macro ,alias ,ref))
-      (function-alias
-       (let ((alias (second alias))
-             (exp (macroexpand-1 `(function-wrapper ,ref) env)))
-         ;; NB Core Lisp binds `args' as a symbol macro, and SBCL,
-         ;; stickler that it is, objects to dynamic-extent
-         ;; declarations for symbol macros.
-         (if (equal exp ref)
-             `(progn
-                (declaim (notinline ,alias))
-                (overlord/shadows:defun ,alias (&rest args)
-                  #-sbcl (declare (dynamic-extent args))
-                  (apply ,ref args)))
-             `(progn
-                (overlord/shadows:defalias ,alias
-                  (function-wrapper
-                   (lambda (&rest args)
-                    #-sbcl (declare (dynamic-extent args))
-                    (apply ,ref args))))))))
-      (macro-alias
-       (let ((alias (second alias)))
-         (with-gensyms (whole body env)
-           `(overlord/shadows:defmacro ,alias (&whole ,whole &body ,body &environment ,env)
-              (declare (ignore ,body))
-              (funcall ,ref ,whole ,env))))))))
-
-(defun import-value (clause module)
+(defun import-binding (clause module)
   (receive (import alias ref) (import+alias+ref clause module)
     (declare (ignore import))
     (etypecase-of import-alias alias
@@ -357,7 +321,11 @@ yet been loaded."
             (assure function (function-wrapper ,ref)))))
       (macro-alias
        ;; Macros cannot be imported as values.
-       (import-binding clause module)))))
+       (let ((alias (second alias)))
+         (with-gensyms (whole body env)
+           `(overlord/shadows:defmacro ,alias (&whole ,whole &body ,body &environment ,env)
+              (declare (ignore ,body))
+              (funcall ,ref ,whole ,env))))))))
 
 (defun import+alias+ref (clause module)
   (destructuring-bind (import alias) (canonicalize-binding clause)
@@ -389,7 +357,7 @@ yet been loaded."
     `(progn
        (import-module ,mod :as ,lang :from ,source :once ,once)
        (check-static-bindings-now ,lang ,source ,bindings)
-       (import-values ,mod ,@bindings))))
+       (import-bindings ,mod ,@bindings))))
 
 (defmacro with-imports ((mod &key from as binding prefix (once t)) &body body)
   "A version of `import' with local scope."

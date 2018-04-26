@@ -83,6 +83,8 @@ Not every target type supports this."))
 (-> target= (t t) boolean)
 (defgeneric target= (target1 target2)
   (:documentation "Are TARGET1 and TARGET2 the same?")
+  ;; This is OK because we expect objects representing targets to be
+  ;; immutable.
   (:method (t1 t2)
     (eql t1 t2))
   (:method :around (t1 t2)
@@ -103,7 +105,11 @@ hash \(though the reverse is not necessarily true).")
     (sxhash target)))
 
 (defgeneric resolve-target (target &optional base)
-  (:documentation "Resolve any relative pathnames in TARGET.")
+  (:documentation "Resolve any relative pathnames in TARGET.
+
+TARGET may be returned unchanged if there are no pathnames to resolve,
+but it must not be mutated. If there are pathnames to resolve, TARGET
+should be copied.")
   (:method (target &optional base)
     (declare (ignore base))
     target))
@@ -120,6 +126,8 @@ hash \(though the reverse is not necessarily true).")
     (princ-to-string target)))
 
 
+
+;;; For internal use.
 
 (defgeneric build-script-target (script))
 
