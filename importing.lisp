@@ -127,9 +127,7 @@
                                   function-wrapper
                                   export-bindings)
                   &environment env)
-  "Syntax for importing from modules.
-
-Note you can do (import #'foo ...), and the module will be bound as a function."
+  "Syntax for importing from modules."
   ;; Ensure we have both the lang and the source.
   (receive (lang source bindings)
       (resolve-import-spec :lang lang
