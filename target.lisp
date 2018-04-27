@@ -594,10 +594,11 @@ inherit a method on `make-load-form', and need only specialize
          (fset:compare list1 list2)))))
 
 (defconstructor phony-target
-  (name symbol))
+  (name (or symbol delayed-symbol)))
 
 (defmethod fset:compare ((x phony-target) (y phony-target))
-  (fset:compare-slots x y #'phony-target-name))
+  (fset:compare (force-symbol (phony-target-name x))
+                (force-symbol (phony-target-name y))))
 
 (fset:define-cross-type-compare-methods phony-target)
 
@@ -845,12 +846,9 @@ treated as out-of-date, regardless of file metadata."))
                        (merge-pathnames* source
                                          (or base (base))))))))
 
-
-;;; Target table abstract data type.
-
 (defmethod target= ((x phony-target) (y phony-target))
-  (eql (phony-target-name x)
-       (phony-target-name y)))
+  (target= (phony-target-name x)
+           (phony-target-name y)))
 
 (defmethod target= ((x delayed-symbol) y)
   (target= (force-symbol x)
@@ -900,7 +898,7 @@ treated as out-of-date, regardless of file metadata."))
          (ref.name target))))
 
 (defmethod hash-target ((target phony-target))
-  (let ((name (phony-target-name target)))
+  (let ((name (force-symbol (phony-target-name target))))
     (dx-sxhash `(phony ,name))))
 
 (defun deduplicate-targets (targets &key (key #'identity))
@@ -1020,7 +1018,7 @@ treated as out-of-date, regardless of file metadata."))
        (phony-target target))))
 
 (defmethod target-build-script ((target phony-target))
-  (let* ((name (phony-target-name target))
+  (let* ((name (force-symbol (phony-target-name target)))
          (key `(phony ,name)))
     (or (gethash key *tasks*)
         (impossible-task target))))
@@ -1105,7 +1103,7 @@ treated as out-of-date, regardless of file metadata."))
   (:method ((target delayed-symbol) thunk script)
     (save-task (force-symbol target) thunk script))
   (:method ((target phony-target) thunk script)
-    (let* ((name (phony-target-name target))
+    (let* ((name (force-symbol (phony-target-name target)))
            (task (task target thunk script))
            (key `(phony ,name)))
       (setf (gethash key *tasks*) task))))
@@ -1164,7 +1162,7 @@ treated as out-of-date, regardless of file metadata."))
            path (string-downcase lang)))))
 
 (defmethod target-node-label ((target phony-target))
-  (let ((name (phony-target-name target)))
+  (let ((name (force-symbol (phony-target-name target))))
     (fmt "phony target ~a" name)))
 
 (defmethod target-node-label ((target pattern-ref))
@@ -1595,7 +1593,7 @@ specify the dependencies you want on build."
 
 (defmacro define-target-task (name &body script)
   "Lower-level version of `deftask'."
-  (let ((target `(phony-target ',name)))
+  (let ((target `(phony-target (delay-symbol ',name))))
     `(progn
        (eval-always
          (assert (not (boundp ',name))))
