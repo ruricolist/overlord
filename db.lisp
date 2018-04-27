@@ -15,6 +15,8 @@
     :merge-pathnames*
     :pathname-directory-pathname
     :delete-file-if-exists)
+  (:import-from :bordeaux-threads
+    :make-thread)
   (:import-from :trivial-file-size :file-size-in-octets)
   (:import-from :fset)
   (:import-from :local-time)
@@ -127,9 +129,12 @@
     (values))
 
   (:method db.sync (self)
-    (synchronized (self)
-      (log.update log last-saved-map current-map)
-      (setf last-saved-map current-map))))
+    (make-thread
+     (lambda ()
+       (synchronized (self)
+         (log.update log last-saved-map current-map)
+         (setf last-saved-map current-map)))
+     :name "Overlord: saving database")))
 
 (defclass dead-db (db)
   ())
@@ -302,11 +307,15 @@ the stack so the error itself can be printed."
              (log-file-size log))
     (receive (map map-count)
         (log.load log)
-      (squash-data log map map-count)
-      (make 'db
-            :current-map map
-            :last-saved-map map
-            :log log))))
+      (lret ((db (make 'db
+                       :current-map map
+                       :last-saved-map map
+                       :log log)))
+        (make-thread
+         (lambda ()
+           (synchronized (db)
+             (squash-data log map map-count)))
+         :name "Overlord: compacting log")))))
 
 (define-global-state *db* nil)
 
