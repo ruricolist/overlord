@@ -103,6 +103,10 @@ Here are some examples of how to make direct use of the build system:
    automatically fetched from the HTTPS Everywhere repository and
    compiled into Lisp code.
 
+2. [Proctor][]. Proctor treats tests as build targets, allowing you to
+   precisely specify their dependencies and re-run tests only when
+   necessary.
+
 ## Parallelism
 
 One thing that might not be obvious about Redo-style build systems is
