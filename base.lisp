@@ -164,7 +164,11 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
              (assure (satisfies asdf-system?)
                (ensure2 (gethash package *supplied-package-systems*)
                  (cerror* "Supply a system name"
-                          "Cannot infer a system for ~a" *package*)
+                          "Cannot infer a system for ~a.
+
+To avoid this error in the future, use ~s."
+                          *package*
+                          'set-package-base)
                  (read-system-by-name)))))))
 
 (defun read-system-by-name ()
