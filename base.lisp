@@ -134,7 +134,7 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
                (infer-system package :errorp errorp)))))
     (if (absolute-pathname-p base) base
         (and errorp
-             (error* "Cannot infer base.~%Package: ~a~%File: "
+             (error* "Cannot infer base.~%Package: ~a~%File: ~a"
                      package
                      (current-lisp-file))))))
 
