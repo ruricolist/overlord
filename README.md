@@ -391,6 +391,7 @@ You might want them again later. -->
 [dev]: https://github.com/TBRSS/overlord/tree/dev
 [Quicklisp]: https://www.quicklisp.org/beta/
 [wiki]: https://github.com/TBRSS/overlord/wiki
+[Proctor]: https://github.com/TBRSS/proctor
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
