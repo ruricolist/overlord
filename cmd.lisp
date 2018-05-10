@@ -71,8 +71,23 @@ process to change its own working directory."
                 ;; Ampersand is the command separator.
                 "&" ,command ,@args))))))
 
-(defun cmd (&rest args)
-  (multiple-value-bind (tokens plist) (parse-cmd-args args)
+(defun cmd (cmd &rest args)
+  "Run a program.
+
+CMD should be a string naming a program. This command will be run with
+its current directory set to the value of `overlord:current-dir!' in a
+thread-safe manner.
+
+A string in ARGS is interpreted as an argument for the command.
+
+A pathname in ARGS is translated to a native namestring as passed as
+an argument to the command. The native namestring is not permitted to
+start with a dash.
+
+A list of strings is treated as a list of arguments for the command.
+
+A property list is treated as a list of arguments to `uiop:run-program'."
+  (multiple-value-bind (tokens plist) (parse-cmd-args (cons cmd args))
     (flet ((cmd ()
              (multiple-value-call #'uiop:run-program
                (wrap-with-current-dir tokens)
