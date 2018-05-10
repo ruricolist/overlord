@@ -20,8 +20,12 @@
          (enq (stringify-pathname arg) tokens))
         (plist
          (qappend plist arg))
-        ((list-of string)
-         (qappend tokens arg))
+        ((list-of (or string pathname))
+         (qconc tokens
+                (loop for token in arg
+                      collect (etypecase token
+                                (string token)
+                                (pathname (stringify-pathname token))))))
         (t (error "Can't use ~a as a cmd argument." arg))))
     (values (qlist tokens)
             (qlist plist))))
@@ -78,13 +82,14 @@ CMD should be a string naming a program. This command will be run with
 its current directory set to the value of `overlord:current-dir!' in a
 thread-safe manner.
 
-A string in ARGS is interpreted as an argument for the command.
+A list of strings or pathnames is added to the list of arguments.
 
-A pathname in ARGS is translated to a native namestring as passed as
+A string in ARGS is split into a list of space-separated tokens. (To
+protect a string with spaces, enclose it in a singleton list.)
+
+A pathname in ARGS is translated to a native namestring and passed as
 an argument to the command. The native namestring is not permitted to
 start with a dash.
-
-A list of strings is treated as a list of arguments for the command.
 
 A property list is treated as a list of arguments to `uiop:run-program'."
   (multiple-value-bind (tokens plist) (parse-cmd-args (cons cmd args))
