@@ -92,6 +92,7 @@
           (ensure (target-table-ref table target)
             (make 'target-meta :target target))))))
 
+;;; Should target locks be stored in the database?
 (defun call-with-target-locked (target fn)
   (synchronized ((target-meta target))
     (funcall fn)))

@@ -29,6 +29,11 @@
    :delete-versioned-db))
 (in-package :overlord/db)
 
+;;; TODO The long-range plan is to rewrite this to use a binary
+;;; format, or at least for the database on disk to be gzipped. For
+;;; now, however, we use plain text for ease of extending and
+;;; debugging.
+
 (deftype db-key ()
   '(not null))
 

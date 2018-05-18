@@ -4,6 +4,7 @@
   (:import-from #:overlord/file-package #:ensure-file-package)
   (:import-from #:overlord/parallel #:make-resource #:with-resource-held)
   (:import-from #:overlord/asdf #:asdf-system-relative-pathname)
+  (:import-from #:trivial-macroexpand-all #:macroexpand-all)
   (:export #:compile-to-file #:load-as-module :fasl-ext :module))
 (in-package #:overlord/compile-to-file)
 
@@ -45,16 +46,21 @@
                         &aux (namestring (namestring source)))
   "Compile PROGRAM to a fasl."
   (check-type source absolute-pathname)
-  (let ((package *package*)
-        (*program-preamble*
-          ;; Ensure that a file package exists whenever compiling at
-          ;; the top level.
-          (and top-level
-               source
-               `(define-file-package ,source ,*language*)))
-        (*program*
-          (if top-level program
-              `(setq *module* ,program))))
+  ;; TODO Would it be worth it to macroexpand the program in
+  ;; advance with `macroexpand-all', to minimize time spent
+  ;; inside the compiler lock?
+  #+(or) (setf program (macroexpand-all program))
+  (let* ((package *package*)
+         (*program-preamble*
+           ;; Ensure that a file package exists whenever compiling at
+           ;; the top level.
+           (and top-level
+                source
+                `(define-file-package ,source ,*language*)))
+         (*program*
+           (if top-level
+               program
+               `(setq *module* ,program))))
     (with-resource-held (compiler-resource)
       ;; TODO The following is cribbed from the sources of Slime and Sly.
       (with-compilation-unit (:allow-other-keys t

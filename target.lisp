@@ -1335,6 +1335,9 @@ exists, and as a non-existent prereq if TARGET does not exist."
   "Like `use', but ordered."
   (use-all* targets))
 
+;;; TODO Set up a registry for script keywords and a way to extend it
+;;; (something like define-script-keyword-macro).
+
 (defmacro with-script ((&key) &body body)
   `(macrolet ( ;; Depending on things in general.
               (:depends-on (x &rest xs)

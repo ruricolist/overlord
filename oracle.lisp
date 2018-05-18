@@ -34,6 +34,10 @@
    :function-oracle))
 (in-package :overlord/oracle)
 
+;;; TODO Would it be worthwhile to provide oracles for optimization
+;;; qualities (speed, debug, safety)? You could get them through
+;;; introspect-environment.
+
 (deftype oracle-value ()
   '(or
     number

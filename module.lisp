@@ -30,6 +30,8 @@
 
 (in-package #:overlord/module)
 
+;;; TODO Would it be worthwhile/practical to support const-tables?
+
 ;;; Generic functions.
 
 (defcondition module-error (overlord-error)

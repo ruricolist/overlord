@@ -152,6 +152,8 @@
                          'fn)))
          (import-bindings ,module
            ,@bindings))
+       ;; BUG The function wrapper needs to be propagated into the
+       ;; update task.
        (import-task ,module
          :as ,lang :from ,source
          :values ,bindings)

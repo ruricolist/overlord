@@ -34,6 +34,9 @@
    #:clear-temp-prereqsne))
 (in-package :overlord/target-protocol)
 
+;;; TODO Add touch-target once you have a good implementation for
+;;; Windows.
+
 (defunit root-target
   "The root target.
 Building this builds all targets defined in this session \(not all targets in the database).")

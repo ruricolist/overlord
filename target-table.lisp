@@ -16,6 +16,11 @@
    :clear-target-table))
 (in-package :overlord/target-table)
 
+;;; TODO Rewrite this to use cl-custom-hash-table. I thought it would
+;;; be better to only have only implementation of a target table
+;;; (using Fset) to reduce the maintenance burden, but practically it
+;;; makes the implementation much more complicated.
+
 (defgeneric hash-friendly? (target)
   (:documentation "Can TARGET be used as a key in a EQUAL hash
   table?")
