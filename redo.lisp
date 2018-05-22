@@ -248,6 +248,10 @@ built it."
            (target-does-not-exist? (not (target-exists?/cache target)))
            (non-existent-prereqs-exist? (some #'target-exists?/cache prereqsne))
            (regular-prereqs-changed?
+            ;; If we were ever to adopt parallelism as the default, we
+            ;; could store information about which targets take
+            ;; longest to build and build them from slowest to
+            ;; fastest.
             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
                    (outdated (filter #'changed? reqs)))
               (redo-all outdated)

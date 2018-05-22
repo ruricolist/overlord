@@ -234,6 +234,10 @@ Works for SBCL, at least."
 (defmethod saved-prereq-target (p) (car p))
 (defmethod saved-prereq-stamp (p) (cdr p))
 
+;;; TODO Is there any value at this point to storing temporary prereqs
+;;; in the database? They could simply be stored in a special variable
+;;; in redo.lisp.
+
 (defplace temp-prereqs (target)
   (prop target prereqs-temp (fset:empty-map)))
 
@@ -1288,6 +1292,9 @@ value and NEW do not match under TEST."
       (redo root-target)
       (redo-all targets)))
 
+;;; TODO build-package-tree? That is, build a package and all of its
+;;; sub-packages \(packages beginning with $package/ or $package).
+
 (defun build-package (package)
   (build (find-package package)))
 
@@ -1438,6 +1445,12 @@ exists, and as a non-existent prereq if TARGET does not exist."
 ;;; file. If we did it for you, a dummy file would have to be involved
 ;;; anyway, and that is probably something it is better to be explicit
 ;;; about.
+
+;;; TODO Is it worth backing `defconfig' with an implicit file? Now
+;;; that we have a database there is an obvious place to put it. On
+;;; Lisps where fasls are reproducible we could even implement the
+;;; comparison by checking that the new value compiles to the same
+;;; code.
 
 (defmacro defconfig (name init &body body)
   "BODY can be either a string (a docstring) or keywords."
@@ -1612,6 +1625,10 @@ specify the dependencies you want on build."
 
 
 ;;; File targets.
+
+;;; TODO Should be enforce a single name for a file target? That is,
+;;; the same file should not be a target under two names, with two
+;;; scripts.
 
 (defun file-target-form (pathname script-form args)
   (ematch args

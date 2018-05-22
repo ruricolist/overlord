@@ -9,6 +9,9 @@
    :*message-stream*))
 (in-package :overlord/message)
 
+;;; TODO More logging levels? E.g. a level that just prints dots
+;;; instead of messages.
+
 (define-global-state *message-stream*
     (make-synonym-stream '*error-output*)
   "The stream printed to by the default message handler.")
