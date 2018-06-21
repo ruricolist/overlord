@@ -2307,11 +2307,7 @@ instead."
                      ;; There is an external symbol, but it's not
                      ;; fbound.
                      (error* "No binding for reader in package ~a" p))
-                    (t
-                     (unless (eql (symbol-package sym) p)
-                       (simple-style-warning "Package reader ~a in ~a is inherited from ~a."
-                                             sym p (symbol-package sym)))
-                     sym))))))))
+                    (t sym))))))))
 
 (defun reintern (s &aux (p *package*))
   (let ((s (string s)))
