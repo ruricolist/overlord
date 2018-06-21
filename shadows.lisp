@@ -133,6 +133,9 @@
 (deftype list ()
   'cl:list)
 
+(defsubst apply (function &rest args)
+  (cl:apply #'cl:apply function args))
+
 (defsubst list (&rest args)
   (apply #'cl:list args))
 
@@ -141,9 +144,6 @@
 
 (defsubst eval (form)
   (cl:eval form))
-
-(defsubst apply (function &rest args)
-  (cl:apply #'cl:apply function args))
 
 (defsubst funcall (function &rest args)
   (cl:apply #'cl:funcall function args))
