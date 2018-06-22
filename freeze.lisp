@@ -6,6 +6,8 @@
     :overlord/types)
   (:import-from :overlord/parallel
     :end-our-kernel)
+  (:import-from :overlord/specials
+    :*suppress-phonies*)
   (:export
    :freeze :freeze-policy
    :unfreeze
@@ -75,10 +77,11 @@ distributed."
                (deactivate-db)
                (dolist (fn *freeze-fmakunbound-hit-list*)
                  (fmakunbound fn))))
-      (ecase-of freeze-policy *freeze-policy*
-        ((nil))
-        ((t) (freeze))
-        (:hard (hard-freeze))))))
+      (let ((*suppress-phonies* t))
+        (ecase-of freeze-policy *freeze-policy*
+          ((nil))
+          ((t) (freeze))
+          (:hard (hard-freeze)))))))
 
 (uiop:register-image-dump-hook 'freeze)
 
