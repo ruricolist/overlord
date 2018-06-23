@@ -34,6 +34,7 @@
   (:use-reexport
    :overlord/base
    :overlord/target
+   :overlord/lang
    :overlord/importing
    :overlord/freeze
    :overlord/parsers

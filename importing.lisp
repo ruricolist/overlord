@@ -9,6 +9,7 @@
     :overlord/types
     :overlord/specials
     :overlord/target
+    :overlord/lang
     :uiop/filesystem
     :uiop/pathname)
   (:shadow :import)

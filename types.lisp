@@ -26,6 +26,7 @@
    #:hash-code
    #:delayed-symbol
    #:delay-symbol
+   #:maybe-delay-symbol
    #:force-symbol
    ;; Pathname types.
    #:wild-pathname
@@ -202,6 +203,21 @@ If the value of `*default-pathname-defaults*' and a call to
                       #'delayed-symbol-symbol-name))
 
 (define-cross-type-compare-methods delayed-symbol)
+
+(defun maybe-delay-symbol (symbol)
+  (cond ((not (symbolp symbol))
+         symbol)
+        ((built-in-symbol? symbol)
+         symbol)
+        (t (delay-symbol symbol))))
+
+(defun built-in-symbol? (symbol)
+  (and (symbolp symbol)
+       (or (keywordp symbol)
+           (cl-symbol-p symbol)
+           (let ((package (symbol-package symbol)))
+             (or (eq package (find-package :overlord/target))
+                 (eq package (find-package :overlord/lang)))))))
 
 
 ;;; Pathname types.
