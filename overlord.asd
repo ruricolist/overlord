@@ -4,7 +4,7 @@
 (assert (uiop:version< "3.1" (asdf:asdf-version)))
 
 (defsystem "overlord"
-  :description "Experimental build/module system."
+  :description "Experimental build system."
   :author "Paul M. Rodriguez <pmr@ruricolist.com>"
   :license "MIT"
   :version (:read-file-form "version.sexp")
