@@ -64,6 +64,9 @@ Here are some examples of how to make direct use of Overlord:
    precisely specify their dependencies and re-run tests only when
    necessary.
 
+3. [Vernacular][]. Provides a module system for embedding languages,
+   with arbitrary syntaxes, into Common Lisp systems.
+
 ## Parallelism
 
 One thing that might not be obvious about Redo-style build systems is
@@ -191,6 +194,7 @@ You might want them again later. -->
 [Quicklisp]: https://www.quicklisp.org/beta/
 [wiki]: https://github.com/ruricolist/overlord/wiki
 [Proctor]: https://github.com/ruricolist/proctor
+[Vernacular]: https://github.com/ruricolist/vernacular
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
