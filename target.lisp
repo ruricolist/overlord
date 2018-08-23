@@ -1125,9 +1125,10 @@ value and NEW do not match under TEST."
 
 (defun extension (ext)
   (assure pathname
-    (etypecase-of (or null string) ext
+    (etypecase-of (or null string pathname) ext
       (null *nil-pathname*)
-      (string (make-pathname :type ext)))))
+      (string (make-pathname :type ext))
+      (pathname ext))))
 
 (defun run (target &optional system-name)
   "Entry point for scripts."

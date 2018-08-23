@@ -486,9 +486,10 @@ interoperation with Emacs."
     (if p (pattern.input-defaults p) *nil-pathname*)))
 
 (defmethod pattern.input-defaults ((p package))
-  (let ((sym (find-symbol #.(string 'extension) p)))
-    (or (and sym (symbol-value sym))
-        *nil-pathname*)))
+  (extension
+   (let ((sym (find-symbol #.(string 'extension) p)))
+     (or (and sym (symbol-value sym))
+         *nil-pathname*))))
 
 (defmacro define-loader-language (package-name (source) &body (reader &key extension))
   (let* ((pn (string package-name)))
