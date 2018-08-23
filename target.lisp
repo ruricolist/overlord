@@ -521,13 +521,12 @@ inherit a method on `make-load-form', and need only specialize
   ;; TODO Should this be absolute?
   ;; Shouldn't this complain about relative vs. absolute?
   (ensure-pathnamef file)
-  (assure (or pattern-ref (list-of pattern-ref))
-    (if (wild-pathname-p file)
-        (mapcar (op (pattern-ref pattern _))
-                (directory* file))
-        (make 'pattern-ref
-              :pattern pattern
-              :input file))))
+  (if (wild-pathname-p file)
+      (mapcar (op (pattern-ref pattern _))
+              (directory* file))
+      (make 'pattern-ref
+            :pattern pattern
+            :input file)))
 
 (defconstructor phony-target
   (name (or symbol delayed-symbol)))

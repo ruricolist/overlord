@@ -555,7 +555,7 @@ interoperation with Emacs."
     (depends-on ref)))
 
 (defun lang-name (lang)
-  (assure lang-name
+  (assure keyword
     (etypecase-of (or keyword lang-name package) lang
       (keyword lang)
       (lang-name (make-keyword lang))
