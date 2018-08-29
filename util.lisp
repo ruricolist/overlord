@@ -18,10 +18,8 @@
   (:import-from :bit-smasher :octets->hex)
   (:export
    #:compare
-   #:package-exports
    #:locate-dominating-file
    #:quoted-symbol?
-   #:package-name-keyword
    #:find-external-symbol
    #:coerce-case
    #:eval*
@@ -55,11 +53,6 @@
                   (xs (mapcar accessor xs)))
              (every test xs (rest xs))))))
 
-(defun package-exports (p)
-  (collecting
-    (do-external-symbols (s p)
-      (collect s))))
-
 (defun locate-dominating-file (file name)
   (nlet rec ((dir (pathname-directory-pathname file))
              (name (pathname name)))
@@ -86,13 +79,6 @@
        (= (length x) 2)
        (eql (first x) 'quote)
        (symbolp (second x))))
-
-(defun package-name-keyword (x)
-  (assure keyword
-    (etypecase-of (or package string-designator) x
-      (package (make-keyword (package-name x)))
-      (keyword x)
-      ((or string character symbol) (make-keyword x)))))
 
 (defun find-external-symbol (name package)
   (multiple-value-bind (sym status)

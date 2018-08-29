@@ -6,7 +6,6 @@
   (:import-from :overlord/specials :*language*)
   (:import-from :overlord/digest :digest-string)
   (:import-from :s-base64 :encode-base64-bytes)
-  (:import-from :overlord/util :package-exports)
   (:export
    :find-file-package
    :ensure-file-package

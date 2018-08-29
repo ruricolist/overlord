@@ -203,10 +203,6 @@ To avoid this error in the future, use ~s."
   (when-let (guess (package-name-asdf-system name))
     (find-system guess nil)))
 
-(defun package-names (p)
-  (cons (package-name p)
-        (package-nicknames p)))
-
 (defun look-for-asd ()
   "Look for the nearest .asd file and return its name."
   (and-let* ((file (current-lisp-file))

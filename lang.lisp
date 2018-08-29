@@ -458,7 +458,7 @@ interoperation with Emacs."
 (defmethod module-static-exports (lang source)
   (check-type source absolute-pathname)
   (let ((lang (resolve-lang-package lang)))
-    (if-let (sym (find-external-symbol 'static-exports lang))
+    (if-let (sym (find-external-symbol (string 'static-exports) lang))
       ;; If the language exports a function to parse static exports,
       ;; use it.
       (values (funcall sym source) t)
@@ -517,7 +517,7 @@ interoperation with Emacs."
              package-name))
     (let ((syms (mapcar (op (find-symbol (string _) p))
                         (loader-language-exports)))
-          (keyword (package-name-keyword package-name)))
+          (keyword (make-keyword package-name)))
       (destructuring-bind (load read ext script) syms
         `(progn
            (declaim (notinline ,load ,read))
@@ -560,7 +560,7 @@ interoperation with Emacs."
     (etypecase-of (or keyword lang-name package) lang
       (keyword lang)
       (lang-name (make-keyword lang))
-      (package (package-name-keyword lang)))))
+      (package (make-keyword (package-name lang))))))
 
 ;;; This can't use `defpattern', for bootstrapping reasons.
 
