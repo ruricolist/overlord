@@ -118,6 +118,13 @@
   `(comment ,@body))
 
 
+;;; Syntax tests.
+
+(test skip-shebang
+  (with-input-from-string (in (fmt "#!/bin/sh~%#lang sh"))
+    (overlord/hash-lang-syntax:stream-hash-lang in)))
+
+
 ;;; Definition form tests.
 
 (overlord:defconfig +literal-string-file+ #p"tests/literal.txt")
