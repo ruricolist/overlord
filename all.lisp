@@ -7,8 +7,6 @@
     :module-ref :module-ref* :module-exports :module-static-exports)
   (:import-from :overlord/simple-module
     :simple-module)
-  (:import-from :overlord/hash-table-module
-    :hash-table-module)
   (:import-from :overlord/file-package
     :ensure-file-package
     :reset-file-package)
