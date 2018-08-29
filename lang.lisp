@@ -5,14 +5,12 @@
     :uiop/pathname
     :overlord/target-protocol
     :overlord/types
-    :overlord/specials
     :overlord/util
     :overlord/cache
     :overlord/stamp
     :overlord/module
     :overlord/asdf
     :overlord/base
-    :overlord/freeze
     :overlord/global-state
     ;; The #lang syntax.
     :overlord/hash-lang-syntax
@@ -25,6 +23,15 @@
   (:import-from :trivia
     :match :ematch :let-match1 :multiple-value-ematch
     :multiple-value-match)
+  (:import-from :overlord/specials
+    :*base*
+    :*language*
+    :*source*
+    :*input*
+    :*output*)
+  (:import-from :overlord/freeze
+    :frozen?
+    :*before-hard-freeze-hook*)
   (:export
    :lang :lang-name :hash-lang-name
    :load-module
