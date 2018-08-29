@@ -29,8 +29,7 @@
    #:redo-ifcreate-all
    #:redo-always
    #:*parents*
-   #:target-tree
-   #:building?))
+   #:target-tree))
 (in-package #:overlord/redo)
 
 ;;; NB This file is only concerned with the logic of the build system.
