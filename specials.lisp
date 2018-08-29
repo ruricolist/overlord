@@ -14,7 +14,6 @@
            #:*program*
            #:*program-preamble*
            #:*language*
-           #:*phase*
            #:*source*
            #:*db-version*
            #:db-version
