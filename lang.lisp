@@ -3,7 +3,6 @@
     :local-time
     :uiop/filesystem
     :uiop/pathname
-    :overlord/redo
     :overlord/target-protocol
     :overlord/types
     :overlord/specials
