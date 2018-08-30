@@ -27,7 +27,8 @@
    :overlord/target
    :overlord/freeze
    :overlord/message
-   :overlord/target-protocol))
+   :overlord/target-protocol
+   :overlord/oracle))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord/target)
