@@ -80,11 +80,6 @@
        (eql (first x) 'quote)
        (symbolp (second x))))
 
-(defun find-external-symbol (name package)
-  (multiple-value-bind (sym status)
-      (find-symbol (string name) package)
-    (and sym (eql status :external) sym)))
-
 (defun coerce-case (string &key (readtable *readtable*))
   (if (stringp string)
       (ecase-of case-mode (readtable-case readtable)
