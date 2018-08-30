@@ -10,11 +10,6 @@
            #:*cli*
            #:*input*
            #:*output*
-           #:*module*
-           #:*program*
-           #:*program-preamble*
-           #:*language*
-           #:*source*
            #:*db-version*
            #:db-version
            #:*suppress-phonies*
@@ -29,22 +24,10 @@
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
 
-(declaim (type absolute-pathname *input* *output* *source*))
+(declaim (type absolute-pathname *input* *output*))
 
 (defvar *cli* nil "Are we running on a CLI?")
 (declaim (type boolean *cli*))
-
-(defvar-unbound *module* "The module being returned.")
-(defvar-unbound *program* "The program to be compiled.")
-
-(defvar-unbound *program-preamble*
-  "A preamble to the program to be compiled.
-
-This would be something like a package declaration, that the reader
-has to see before the other forms.")
-
-(defvar-unbound *language* "The name (symbol) of the current language.")
-(declaim (type symbol *language*))
 
 (defparameter *db-version*
   (parse-integer

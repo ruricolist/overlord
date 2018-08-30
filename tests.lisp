@@ -1,6 +1,6 @@
 (uiop/package:define-package :overlord/tests
     (:use :fiveam)
-  (:mix :overlord/shadows :serapeum :alexandria)
+  (:mix :cl :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as
     :with-import-default :require-default)
   (:import-from :overlord/target :target-timestamp)
@@ -116,13 +116,6 @@
 
 (defmacro disable (&body body)
   `(comment ,@body))
-
-
-;;; Syntax tests.
-
-(test skip-shebang
-  (with-input-from-string (in (fmt "#!/bin/sh~%#lang sh"))
-    (overlord/hash-lang-syntax:stream-hash-lang in)))
 
 
 ;;; Definition form tests.
