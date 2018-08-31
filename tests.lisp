@@ -141,28 +141,28 @@
     (is (not (eq original +literal-string+)))))
 
 (test var/deps
-      (local
-        (def string1 *literal-string*)
-        (is (stringp string1))
+  (local
+    (def string1 *literal-string*)
+    (is (stringp string1))
 
-        (nap 1)
+    (nap 1)
 
-        (touch +literal-string-file+)
-        (overlord:build '*literal-string*)
-        (def string2 *literal-string*)
-        (is (stringp string2))
-        (is (not (eq string1 string2)))
+    (touch +literal-string-file+)
+    (overlord:build '*literal-string*)
+    (def string2 *literal-string*)
+    (is (stringp string2))
+    (is (not (eq string1 string2)))
 
-        (nap 1)
+    (nap 1)
 
-        (touch '+literal-string-file+)
-        (overlord:build '*literal-string*)
-        (def string3 *literal-string*)
-        (is (stringp string3))
-        (is (not (eq string2 string3)))))
+    (touch '+literal-string-file+)
+    (overlord:build '*literal-string*)
+    (def string3 *literal-string*)
+    (is (stringp string3))
+    (is (not (eq string2 string3)))))
 
 
 ;;; Sanity checks.
 
 (test db-exists
-      (is-true (file-exists-p (overlord/db::log-file-path))))
+  (is-true (file-exists-p (overlord/db::log-file-path))))
