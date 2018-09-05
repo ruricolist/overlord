@@ -103,6 +103,7 @@
     ((> =) t)))
 
 (defun version-compatible? (version spec)
+  "Is VERSION compatible with SPEC?"
   (let ((version (version version))
         (spec (version spec)))
     (dispatch-case ((version version-spec)
