@@ -17,6 +17,9 @@
    #:resolve-target
    #:target-build-script
    #:target-node-label
+   #:delay-target
+   #:force-target
+   #:handle-tag-data
    ;; Other methods.
    #:build-script-target
    #:run-script
@@ -126,6 +129,16 @@ should be copied.")
       (call-next-method)))
   (:method (target)
     (princ-to-string target)))
+
+(defgeneric delay-target (target)
+  (:method (target)
+    target))
+
+(defgeneric force-target (target)
+  (:method (target)
+    target))
+
+(defgeneric handle-tag-data (tag data))
 
 
 
