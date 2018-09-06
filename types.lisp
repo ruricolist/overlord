@@ -202,9 +202,8 @@ If the value of `*default-pathname-defaults*' and a call to
   (and (symbolp symbol)
        (or (keywordp symbol)
            (cl-symbol-p symbol)
-           (let ((package (symbol-package symbol)))
-             (or (eq package (find-package :overlord/target))
-                 (eq package (find-package :overlord/lang)))))))
+           (when-let ((package (symbol-package symbol)))
+             (eq package (find-package :overlord/target))))))
 
 
 ;;; Pathname types.
