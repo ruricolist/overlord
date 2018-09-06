@@ -20,9 +20,6 @@
     :digest-string)
   (:import-from :overlord/asdf
     :asdf-system-version)
-  (:import-from :overlord/version
-    :version
-    :version-spec)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -43,8 +40,7 @@
     number
     ;; NB boolean is a subtype of symbol.
     symbol
-    string
-    version-spec))
+    string))
 
 (defgeneric oracle-value (oracle))
 
@@ -226,27 +222,39 @@ A name is extracted using `named-readtable:readtable-name'."))
         :reader system-version-oracle.system-name
         :type string))
   (:documentation "Using a system version oracle, you can depend on
-the version of an ASDF system.
+the major version of an ASDF system.
 
 Note that if the system is not known to ASDF, then the version
 recorded is simply nil."))
 
 (defmethods system-version-oracle (self (name key))
   (:method target= (self (other system-version-oracle))
-    (string-equal name (system-version-oracle.system-name other)))
-
+    (let ((other-name
+            (system-version-oracle.system-name other)))
+      (string-equal name other-name)))
   (:method target-exists? (self)
     t)
   (:method oracle-value (self)
-    (version (asdf-system-version name)))
-  (:method target-stamp (self)
-    (oracle-value self))
-
+    (version-major-version (asdf-system-version name)))
   (:method target-node-label (self)
-    (fmt "versioned system ~a" name)))
+    (fmt "system major version ~a" name)))
 
 (defun system-version-oracle (name)
   (make 'system-version-oracle :name (string-downcase name)))
+
+(defun version-major-version (version)
+  (etypecase version
+    (null nil)
+    ((integer 0 *) version)
+    (string
+     (let ((version
+             (if (string^= "v" version)
+                 (subseq version 1)
+                 version)))
+       (assure (integer 0 *)
+         (parse-integer version
+                        :junk-allowed t
+                        :radix 10))))))
 
 
 ;;; Dist version oracles.

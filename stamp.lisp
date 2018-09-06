@@ -8,8 +8,8 @@
     :universal-time
     :file-pathname)
   (:import-from :overlord/util :compare)
-  (:import-from :overlord/version
-    :version :version-spec :version= :version-compatible?)
+  ;; (:import-from :overlord/version
+  ;;   :version :version-spec :version= :version-compatible?)
   (:import-from :fset)
   (:shadowing-import-from :trivial-file-size
     :file-size-in-octets)
@@ -114,7 +114,7 @@ shadowed."
        string
        file-meta
        file-hash
-       version-spec
+       ;; version-spec
        resolved-file))
 
 ;; NB Note that conversion from timestamp to universal rounds down
@@ -192,9 +192,9 @@ shadowed."
      (stamp= s1 (file-meta-timestamp s2)))
     ((file-meta stamp) nil)
 
-    ((version-spec version-spec)
-     (version= s1 s2))
-    ((version-spec stamp) nil)
+    ;; ((version-spec version-spec)
+    ;;  (version= s1 s2))
+    ;; ((version-spec stamp) nil)
 
     ((resolved-file resolved-file)
      (resolved-file= s1 s2))
@@ -208,7 +208,9 @@ same as) OLD?"
   ;; skew, &c.
   (dispatch-case ((new stamp)
                   (old stamp))
-    ((version version)
-     (version-compatible? new old))
+    ;; NB You may want to restore this if we end up supporting semver
+    ;; in the future.
+    #+(or) ((version version)
+            (version-compatible? new old))
     ((stamp stamp)
      (stamp= new old))))
