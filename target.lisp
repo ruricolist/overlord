@@ -211,7 +211,7 @@ Works for SBCL, at least."
   (error* "Not a target: ~a" target))
 
 (defmethod record-prereq ((target symbol))
-  (let ((target (maybe-delay-symbol target)))
+  (let ((target (delay-target target)))
     (if (symbolp target)
         (call-next-method)
         (record-prereq target))))
@@ -233,7 +233,7 @@ Works for SBCL, at least."
   (declare (ignore target)))
 
 (defmethod record-prereqne ((target symbol))
-  (let ((target (maybe-delay-symbol target)))
+  (let ((target (delay-target target)))
     (if (symbolp target)
         (call-next-method)
         (record-prereqne target))))
@@ -308,6 +308,12 @@ Works for SBCL, at least."
 
 
 ;;; Types.
+
+(defmethod delay-target ((target symbol))
+  (maybe-delay-symbol target))
+
+(defmethod force-target ((target delayed-symbol))
+  (force-symbol target))
 
 (defgeneric load-form-slot-names (self)
   (:method-combination append))
@@ -477,7 +483,7 @@ inherit a method on `make-load-form', and need only specialize
          (pattern (find-pattern pattern))
          (pattern-name (pattern-name pattern)))
     (if *print-escape*
-        (let* ((name (maybe-delay-symbol pattern-name))
+        (let* ((name (delay-target pattern-name))
                (name-form
                  (if (symbolp name)
                      `(quote ,name)
@@ -536,6 +542,14 @@ inherit a method on `make-load-form', and need only specialize
                 (force-symbol (phony-target-name y))))
 
 (fset:define-cross-type-compare-methods phony-target)
+
+(defmethod delay-target ((target phony-target))
+  (let ((name (phony-target-name target)))
+    (phony-target (delay-symbol name))))
+
+(defmethod force-target ((target phony-target))
+  (let ((name (phony-target-name target)))
+    (phony-target (force-symbol name))))
 
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
@@ -663,9 +677,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-exists? ((target symbol))
   (boundp target))
 
-(defmethod target-exists? ((target delayed-symbol))
-  (target-exists? (force-symbol target)))
-
 (defmethod target-exists? ((target cl:pathname))
   (pathname-exists? (resolve-target target)))
 
@@ -696,9 +707,6 @@ treated as out-of-date, regardless of file metadata."))
           now))
       never))
 
-(defmethod target-timestamp ((target delayed-symbol))
-  (target-timestamp (force-symbol target)))
-
 (defmethod target-timestamp ((target cl:pathname))
   (if (pathname-exists? target)
       (file-mtime target)
@@ -718,10 +726,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod (setf target-timestamp) (timestamp target)
   (declare (ignore timestamp))
   (error* "Cannot set timestamp for ~a" target))
-
-(defmethod (setf target-timestamp) (timestamp (target delayed-symbol))
-  (let ((target (force-symbol target)))
-    (setf (target-timestamp target) timestamp)))
 
 (defmethod (setf target-timestamp) (timestamp (target symbol))
   ;; Configurations need to set the timestamp while unbound
@@ -762,10 +766,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target= ((x phony-target) (y phony-target))
   (target= (phony-target-name x)
            (phony-target-name y)))
-
-(defmethod target= ((x delayed-symbol) y)
-  (target= (force-symbol x)
-           (force-symbol y)))
 
 (defmethod target= ((x cl:pathname) (y cl:pathname))
   (pathname-equal x y))
@@ -972,6 +972,11 @@ treated as out-of-date, regardless of file metadata."))
   (depends-on target))
 
 (defgeneric save-task* (target thunk script)
+  (:method :around (target thunk script)
+    (let ((f (force-target target)))
+      (if (eq f target)
+          (call-next-method)
+          (save-task* f thunk script))))
   (:method :before (target thunk script)
     (declare (ignore target thunk script))
     (check-not-frozen))
@@ -984,10 +989,8 @@ treated as out-of-date, regardless of file metadata."))
   (:method ((target cl:pathname) thunk script)
     (setf (gethash target *tasks*)
           (task target thunk script)))
-  (:method ((target delayed-symbol) thunk script)
-    (save-task (force-symbol target) thunk script))
   (:method ((target phony-target) thunk script)
-    (let* ((name (force-symbol (phony-target-name target)))
+    (let* ((name (phony-target-name target))
            (task (task target thunk script))
            (key `(phony ,name)))
       (setf (gethash key *tasks*) task))))
@@ -1022,9 +1025,6 @@ treated as out-of-date, regardless of file metadata."))
             (symbol-package target)))
       (fmt "'~s" target)))
 
-(defmethod target-node-label ((target delayed-symbol))
-  (target-node-label (force-symbol target)))
-
 (defmethod target-node-label ((target root-target))
   (progn "everything"))
 
@@ -1040,7 +1040,7 @@ treated as out-of-date, regardless of file metadata."))
   (progn "IMPOSSIBLE TARGET"))
 
 (defmethod target-node-label ((target phony-target))
-  (let ((name (force-symbol (phony-target-name target))))
+  (let ((name (phony-target-name target)))
     (fmt "phony target ~a" name)))
 
 (defmethod target-node-label ((target pattern-ref))
