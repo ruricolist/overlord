@@ -71,7 +71,7 @@
   (native-namestring
    (if (absolute-pathname-p file)
        file
-       (asdf-system-relative-pathname :overlord file))))
+       (uiop:merge-pathnames* file (overlord:base)))))
 
 (defun touch-file (file)
   (lret ((file-string (resolve-file file)))
