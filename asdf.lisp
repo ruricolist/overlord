@@ -14,7 +14,8 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
    :primary-asdf-system-name
    :asdf-system?
    :asdf-system-loaded?
-   :load-asdf-system))
+   :load-asdf-system
+   :asdf-system-base))
 (in-package :overlord/asdf)
 
 (defun find-asdf-system (system &key error)
@@ -48,3 +49,6 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
 
 (defun load-asdf-system (system)
   (asdf:load-system system))
+
+(defun asdf-system-base (system)
+  (asdf:system-relative-pathname system ""))

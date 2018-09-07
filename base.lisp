@@ -26,7 +26,8 @@
    :infer-system
    :ensure-absolute
    :with-current-dir
-   :package-base))
+   :package-base
+   :current-system))
 
 (in-package :overlord/base)
 
@@ -137,6 +138,9 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
              (error* "Cannot infer base.~%Package: ~a~%File: ~a"
                      package
                      (current-lisp-file))))))
+
+(defun current-system ()
+  (infer-system *package*))
 
 (defun find-system (system &optional error-p)
   (let ((*readtable* (find-readtable :standard))
