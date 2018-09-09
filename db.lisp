@@ -4,8 +4,10 @@
     :overlord/types
     :overlord/message
     :overlord/global-state
-    :overlord/cache)
+    :overlord/cache
+    :overlord/asdf)
   (:import-from :uiop
+    :implementation-type
     :with-temporary-file
     :rename-file-overwriting-target
     :file-exists-p
@@ -14,7 +16,10 @@
     :ensure-directory-pathname
     :merge-pathnames*
     :pathname-directory-pathname
-    :delete-file-if-exists)
+    :delete-file-if-exists
+    :directory-exists-p
+    :delete-directory-tree
+    :register-image-dump-hook)
   (:import-from :bordeaux-threads
     :make-thread)
   (:import-from :trivial-file-size :file-size-in-octets)
@@ -26,89 +31,176 @@
    :saving-database
    :unload-db
    :deactivate-db
-   :delete-versioned-db))
+   :delete-versioned-db
+   :register-extension-systems))
 (in-package :overlord/db)
 
-;;; TODO The long-range plan is to rewrite this to use a binary
-;;; format, or at least for the database on disk to be gzipped. For
-;;; now, however, we use plain text for ease of extending and
-;;; debugging.
+;;; The database is a single file, an append-only log. If the log is
+;;; too long, it is compacted during the initial load.
+
+;;; The log is stored at a path that incorporates the Lisp
+;;; implementation and version, as well as the Overlord version.
+;;; Different Lisps get their own databases, and changes to the Lisp
+;;; version, or the Overlord version, automatically result in a clean
+;;; database.
+
+;;; Any change to the database format should be accompanied by bumping
+;;; the Overlord version. (This is, in fact, why Overlord is
+;;; versioned.)
+
+;;; The database is thread-safe within a single Lisp instance, but it
+;;; should not be accessed from multiple Lisp instances
+;;; simultaneously.
+
+;;; At the moment database records are just Lisp objects, written with
+;;; `write' and read in with `read'. This is more than fast enough. If
+;;; this becomes an impediment, the next step would be to introduce
+;;; streaming compression, so each record is compressed as it is
+;;; written to disk. (This might require zlib.) Only if that becomes
+;;; an impediment would be worthwhile to introduce a binary format.
 
 (deftype db-key ()
+  "Type of database keys."
   '(not null))
 
 (deftype db-value ()
+  "Type for database values."
   't)
 
-(define-modify-macro withf (&rest item-or-tuple) fset:with)
-(define-modify-macro lessf (&rest item-or-tuple) fset:less)
+(define-modify-macro withf (&rest item-or-tuple) fset:with
+  "Modify macro for augmenting an Fset map or set.")
 
-(defgeneric db.ref (db key))
-(defgeneric (setf db.ref) (value db key))
-(defgeneric db.del (db key))
-(defgeneric db.sync (db))
+(define-modify-macro lessf (&rest item-or-tuple) fset:less
+  "Modify macro for removing from an Fset map or set.")
 
-(defunit tombstone)
+(defgeneric db.ref (db key)
+  (:documentation "Lookup KEY in DB."))
+
+(defgeneric (setf db.ref) (value db key)
+  (:documentation "Set the value of KEY in DB."))
+
+(defgeneric db.del (db key)
+  (:documentation "Delete a key in the database."))
+
+(defgeneric db.sync (db)
+  (:documentation "Sync the database to disk."))
+
+(defunit tombstone "A tombstone value.")
+
+(defconstructor system-list
+  "A set of system extensions for the database.
+The database may need to load systems so it can read symbols from
+those systems."
+  (items fset:set))
+
+(defgeneric make-system-list (systems)
+  (:documentation "Wrap SYSTEMS in a `system-list' object.")
+  (:method ((systems fset:set))
+    (~>> systems
+         (fset:image #'asdf-system-name-keyword)
+         system-list))
+  (:method ((systems sequence))
+    (make-system-list (fset:convert 'set systems))))
 
 (defstruct-read-only (log-record (:conc-name log-record.))
+  "A single record in a log file."
   (timestamp (get-universal-time) :type (integer 0 *))
   (data :type fset:map))
 
+(defstruct-read-only (log-data (:conc-name log-data.))
+  "The data recovered from a log file."
+  (map-count 0 :type (integer 0 *))
+  (map (fset:empty-map) :type fset:map)
+  (extensions (fset:empty-set) :type fset:set))
+
+(def no-log-data (make-log-data)
+  "An empty set of log data.")
+
 (defun delete-versioned-db (&optional (version (db-version)))
+  "Delete a specific version of the database.
+The database is always implicitly versioned."
   (let ((dir (current-cache-dir version)))
-    (when (uiop:directory-exists-p dir)
-      (uiop:delete-directory-tree
+    (when (directory-exists-p dir)
+      (delete-directory-tree
        dir
        :validate (op (subpathp _ (xdg-cache-home)))))))
 
-(locally (declare (optimize safety))
-  (defclass db ()
-    ((version
-      :initform (db-version)
-      :reader db.version)
-     (current-map
-      :initarg :current-map
-      :type fset:map
-      :accessor db.current-map)
-     (last-saved-map
-      :initarg :last-saved-map
-      :type fset:map
-      :accessor db.last-saved-map)
-     (log
-      :initarg :log
-      :type pathname
-      :reader db.log))
-    (:default-initargs
-     :current-map (fset:empty-map)
-     :last-saved-map (fset:empty-map)
-     :log (log-file-path))))
+(eval-always
+  (defun cas-friendly (type)
+    "Return a type that can be used for a CAS-friendly structure slot.
+This is necessary on SBCL, where CAS can only be used on structure slots of type T."
+    (if (eql (implementation-type) :sbcl) t
+        type)))
+
+(defstruct (db (:conc-name db.))
+  "The database."
+  (version (db-version) :read-only t)
+  (log-file (log-file-path) :type pathname :read-only t)
+  (current-map (fset:empty-map) :type fset:map)
+  (last-saved-map (fset:empty-map) :type fset:map)
+  (extensions (fset:empty-set) :type fset:set))
+
+(defun register-extension-systems (systems)
+  "Register SYSTEMs as systems that defines new target types.
+
+This is necessary so the new target types defined by the system can be
+recorded in the database (and the new target types can be read
+in.)
+
+Avoid using this if you possibly can. The preferred ways of extending
+Overlord are defining patterns (with `defpattern') or languages (with
+Vernacular)."
+  (when (emptyp systems)
+    (return-from register-extension-systems
+      systems))
+  (let ((names
+          (reduce (op (fset:with _ (asdf-system-name-keyword _)))
+                  systems
+                  :initial-value (fset:empty-set)))
+        (db (db)))
+    ;; Only added, never removed.
+    (unless (fset:subset? names (db.extensions db))
+      #+sbcl
+      (sb-ext:atomic-update (db.extensions db)
+                            (lambda (set)
+                              (fset:union set names)))
+      #-sbcl
+      (synchronized (db)
+        (callf #'fset:union (db.extensions db) names)))
+    (db.extensions db)))
 
 (defun db-alist (&optional (db (db)))
-  "For debugging."
+  "Return the database's data as an alist.
+For debugging."
   (let ((map (db.current-map db)))
     (collecting
       (fset:do-map (k v map)
         (collect (cons k v))))))
 
-(-> log-file-size (pathname) (integer 0 *))
-(defun log-file-size (log)
-  (if (file-exists-p log)
-      (file-size-in-octets log)
+(-> log-file-size (pathname)  (integer 0 *))
+(defun log-file-size (log-file)
+  "Return the size on disk of LOG-FILE."
+  (if (file-exists-p log-file)
+      (values (file-size-in-octets log-file))
       0))
 
-(defmethods db (self version current-map last-saved-map log)
-  (:method print-object (self stream)
-    (print-unreadable-object (self stream :type t)
+(defmethods db (db (version #'db.version)
+                   (log-file #'db.log-file)
+                   (current-map #'db.current-map)
+                   (last-saved-map #'db.last-saved-map)
+                   (extensions #'db.extensions))
+  (:method print-object (db stream)
+    (print-unreadable-object (db stream :type t)
       ;; version record-count byte-count saved or not?
       (format stream "v.~a ~d record~:p, ~:d byte~:p~@[ (~a)~]"
               version
               (fset:size current-map)
-              (log-file-size log)
+              (log-file-size log-file)
               (and (not (eql current-map last-saved-map))
                    "unsaved"))))
 
-  (:method db.ref (self key)
-    (multiple-value-bind (value bool)
+  (:method db.ref (db key)
+    (receive (value bool)
         (fset:lookup current-map
                      (assure db-key key))
       (if (eq value tombstone)
@@ -116,33 +208,49 @@
           (values (assure db-value value)
                   (assure boolean bool)))))
 
-  (:method (setf db.ref) (value self key)
+  (:method (setf db.ref) (value db key)
     (check-type key db-key)
     (check-type value db-value)
     (prog1 value
       ;; TODO More CAS.
       #+sbcl
-      (sb-ext:atomic-update (slot-value self 'current-map)
+      (sb-ext:atomic-update (db.current-map db)
                             (lambda (map)
                               (fset:with map key value)))
       #-sbcl
-      (synchronized (self)
+      (synchronized (db)
         (withf current-map key value))))
 
-  (:method db.del (self key)
-    (setf (db.ref self key) tombstone)
+  (:method db.del (db key)
+    (setf (db.ref db key) tombstone)
     (values))
 
-  (:method db.sync (self)
+  (:method db.sync (db)
     (make-thread
      (lambda ()
-       (synchronized (self)
-         (log.update log last-saved-map current-map)
+       (synchronized (db)
+         (append-to-log log-file
+                        extensions
+                        last-saved-map
+                        current-map)
          (setf last-saved-map current-map)))
      :name "Overlord: saving database")))
 
-(defclass dead-db (db)
-  ())
+(defgeneric load-required-systems (x)
+  (:documentation "Load any systems required by X.")
+  (:method ((db db))
+    (load-required-systems (db.extensions db)))
+  (:method ((set fset:set))
+    (load-required-systems (fset:convert 'list set)))
+  (:method ((x system-list))
+    (load-required-systems (system-list-items x)))
+  (:method ((seq sequence))
+    (do-each (system seq seq)
+      (require-asdf-system system))))
+
+(defstruct (dead-db (:include db)
+                    (:conc-name db.))
+  (state nil :type null :read-only t))
 
 (defmethods dead-db (self)
   (:method db.ref (self key)
@@ -157,12 +265,12 @@
   (:method db.sync (self)
     (values)))
 
-;;; TODO use a binary representation for the log.
-
 (def db-readtable
+  ;; Extend the readtable with local-time and fset.
   (lret ((*readtable*
           (copy-readtable fset::*fset-rereading-readtable*)))
-    (local-time:enable-read-macros)))
+    (local-time:enable-read-macros))
+  "The readtable for reading back the log.")
 
 (defun call/standard-io-syntax (fn)
   "Like `with-standard-io-syntax', but if there is an error, unwind
@@ -185,6 +293,7 @@ the stack so the error itself can be printed."
     `(call/standard-io-syntax ,body)))
 
 (defun db-write (obj stream)
+  "Write OBJ to STREAM using the database syntax."
   (with-standard-io-syntax*
     ;; It's possible a writer may look at the current readtable.
     (let ((*readtable* db-readtable))
@@ -193,117 +302,142 @@ the stack so the error itself can be printed."
                  :pretty nil
                  :circle nil))))
 
-(defun log.update (log last-saved-map current-map)
+(defun append-to-log (log extensions last-saved-map current-map)
+  "Compute the difference between CURRENT-MAP and LAST-SAVED-MAP and
+write it into LOG.
+
+If there is no difference, write nothing."
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
-        (let ((record (make-log-record :data diff)))
+        (let ((extensions (make-system-list extensions))
+              (record (make-log-record :data diff)))
           (with-output-to-file (out (ensure-directories-exist log)
                                     :element-type 'character
                                     :if-does-not-exist :create
                                     :if-exists :append)
+            (db-write extensions out)
             (db-write record out)
             (finish-output out)))))))
 
 (defun strip-tombstones (map)
+  "Strip key-value pairs with tombstone values from MAP."
   (let ((out map))
     (fset:do-map (k v map)
       (when (eq v tombstone)
         (lessf out k)))
     out))
 
-(defun log.load (log)
+(defun load-log-data (log-file)
+  "Load the data from LOG-FILE."
   (declare (optimize safety debug))
-  (if (not (file-exists-p log))
-      (values (fset:empty-map) 0)
+  (if (not (file-exists-p log-file))
+      no-log-data
       (tagbody
        :retry
          (restart-case
-             (return-from log.load
+             (return-from load-log-data
                (with-standard-input-syntax
-                 (let* ((*readtable* db-readtable)
-                        (records
-                          (with-input-from-file (in log :element-type 'character)
-                            ;; TODO ignore errors?
-                            (loop with eof = "eof"
-                                  for record = (read in nil eof)
-                                  until (eq record eof)
-                                  collect record)))
-                        (maps
-                          (mapcar #'log-record.data records))
-                        (map
-                          (reduce #'fset:map-union maps
-                                  :initial-value (fset:empty-map)))
-                        (map (strip-tombstones map)))
-                   (values map (length maps)))))
+                 (mvlet* ((*readtable* db-readtable)
+                          (records extensions
+                           (with-input-from-file (in log-file :element-type 'character)
+                             (let ((eof "eof"))
+                               (nlet rec ((records '())
+                                          (extensions (fset:empty-set)))
+                                 (let ((data (read in nil eof)))
+                                   (cond ((eq data eof)
+                                          (values (nreverse records)
+                                                  extensions))
+                                         ((typep data 'log-record)
+                                          (rec (cons data records)
+                                               extensions))
+                                         ((typep data 'system-list)
+                                          (load-required-systems data)
+                                          (let ((systems (system-list-items data)))
+                                            (rec records
+                                                 (fset:union systems extensions))))
+                                         (t
+                                          (error "Invalid database log entry: ~a" data))))))))
+                          (maps
+                           (mapcar #'log-record.data records))
+                          (map
+                           (reduce #'fset:map-union maps
+                                   :initial-value (fset:empty-map)))
+                          (map (strip-tombstones map)))
+                   (make-log-data
+                    :map map
+                    :map-count (length maps)
+                    :extensions extensions))))
            (retry ()
              :report "Try loading the database again."
              (go :retry))
            (truncate-db ()
              :report "Treat the database as corrupt and discard it."
-             (delete-file-if-exists log)
-             (return-from log.load
-               (values (fset:empty-map) 0)))))))
+             (delete-file-if-exists log-file)
+             no-log-data)))))
 
-(defun squash-data (log map map-count)
-  (let (temp)
+(defun squash-data (log-data log-file)
+  "If needed, write a compacted version of LOG-DATA into LOG-FILE."
+  (let ((map (log-data.map log-data))
+        (map-count (log-data.map-count log-data))
+        (extensions (log-data.extensions log-data))
+        temp)
     (when (> map-count 1)
-      (message "Compacting log")
-      (uiop:with-temporary-file (:stream s
-                                 :pathname p
-                                 :keep t
-                                 :direction :output
-                                 :element-type 'character
-                                 ;; Ensure the temp file is on the
-                                 ;; same file system as the log so the
-                                 ;; rename is atomic.
-                                 :directory (pathname-directory-pathname log))
+      (message "Compacting log-file")
+      (with-temporary-file (:stream s
+                            :pathname p
+                            :keep t
+                            :direction :output
+                            :element-type 'character
+                            ;; Ensure the temp file is on the
+                            ;; same file system as the log-file so the
+                            ;; rename is atomic.
+                            :directory (pathname-directory-pathname log-file))
         (setq temp p)
+        (db-write (make-system-list extensions) s)
         (db-write (make-log-record :data map) s))
-      (rename-file-overwriting-target temp log)))
-  log)
+      (rename-file-overwriting-target temp log-file))
+    log-file))
 
-(defun log.squash (log)
-  (receive (map map-count) (log.load log)
-    (squash-data log map map-count)))
-
-(defun empty-db ()
-  (make 'db))
-
-(defun log-file-path ()
+(defun log-file-path (&optional (version (db-version)))
+  "Compute the path of the log file for the current database version."
   (assure absolute-pathname
     (path-join
-     (current-cache-dir)
+     (current-cache-dir version)
      #p"log/"
      #p"log.sexp")))
 
 (defun reload-db ()
-  (let ((log (log-file-path)))
-    (message "Reloading database (~:d byte~:p)"
-             (log-file-size log))
-    (receive (map map-count)
-        (log.load log)
-      (lret ((db (make 'db
-                       :current-map map
-                       :last-saved-map map
-                       :log log)))
-        (make-thread
-         (lambda ()
-           (synchronized (db)
-             (squash-data log map map-count)))
-         :name "Overlord: compacting log")))))
+  "Reload the current version of the database from its log file."
+  (lret* ((log-file (log-file-path))
+          (log-data
+           (progn
+             (message "Reloading database (~:d byte~:p)"
+                      (log-file-size log-file))
+             (load-log-data log-file)))
+          (map (log-data.map log-data))
+          (extensions (log-data.extensions log-data))
+          (db (make-db
+               :log-file log-file
+               :current-map map
+               :last-saved-map map
+               :extensions extensions)))
+    (make-thread
+     (lambda ()
+       (synchronized (db)
+         (squash-data log-data log-file)))
+     :name "Overlord: compacting log file")))
 
-(define-global-state *db* nil)
+(define-global-state *db* nil
+  "The database.")
 
 (defun db ()
+  "Get the current database, loading it if necessary."
   (synchronized ('*db)
-    (ensure-db)
+    (ensure *db*
+      (reload-db))
     (check-version))
   *db*)
-
-(defun ensure-db ()
-  (ensure *db*
-    (reload-db)))
 
 (defun unload-db ()
   "Clear the DB out of memory in such a way that it can still be
@@ -315,9 +449,10 @@ reloaded on demand."
 (defun deactivate-db ()
   "Clear the DB out of memory in such a way that it will not be reloaded on demand."
   (synchronized ('*db*)
-    (setq *db* (make 'dead-db))))
+    (setq *db* (make-dead-db))))
 
 (defun check-version ()
+  "Check that the database version matches the Overlord version."
   (unless (= (db.version *db*)
              (db-version))
     (cerror "Load the correct database"
@@ -325,59 +460,73 @@ reloaded on demand."
     (setq *db* (reload-db))))
 
 (defplace db-ref* (key)
-  (db.ref (db) key))
-
-;;; But should be manipulating stored plists instead?
+  (db.ref (db) key)
+  "Access KEY in the current database.")
 
 (defun db-protect (x)
+  "Try to avoid writing symbols or package objects into the database.
+This allows the database to be reloaded without those packages being
+required."
   (typecase x
     (keyword x)
     (symbol
-     (eif (eql (symbol-package x)
-               #.(find-package :cl))
-          x
-          (let* ((p (symbol-package x)))
-            (cons (and p (package-name p))
-                  (symbol-name x)))))
+     (eif (memq (symbol-package x)
+                '#.(list (find-package :cl)
+                         (find-package :overlord/db)))
+         x
+         (let* ((p (symbol-package x)))
+           (cons (and p (package-name p))
+                 (symbol-name x)))))
     (package
      (cons :package (package-name x)))
     (otherwise x)))
 
 (defun prop-key (obj prop)
+  "Convert OBJ and PROP into a single key."
   (cons (db-protect obj)
         (db-protect prop)))
 
 (defplace prop-1 (obj prop)
-  (db.ref (db) (prop-key obj prop)))
+  (db.ref (db) (prop-key obj prop))
+  "Access the database record keyed by OBJ and PROP.")
 
 (defun prop (obj prop &optional default)
-  (multiple-value-bind (val val?) (prop-1 obj prop)
+  "Look up a property for an object in the database."
+  (receive (val val?) (prop-1 obj prop)
     (if val?
         (values val t)
         (values default nil))))
 
 (defun (setf prop) (value obj prop &optional default)
+  "Set an object's property in the database."
   (declare (ignore default))
   (setf (prop-1 obj prop) value))
 
 (defun has-prop? (obj prop &rest props)
+  "Test if an object has a property in the database."
   (some (op (nth-value 1 (prop-1 obj _)))
         (cons prop props)))
 
 (defun has-props? (obj prop &rest props)
+  "Check if an object in the database has all of the supplied
+properties."
   (every (op (nth-value 1 (prop-1 obj _)))
          (cons prop props)))
 
 (defun delete-prop (obj prop)
+  "Delete a property from OBJ."
   (db.del (db) (prop-key obj prop)))
 
 (defun save-database ()
+  "Save the current database."
   (db.sync (db))
   (values))
 
-(uiop:register-image-dump-hook 'save-database)
+(register-image-dump-hook 'save-database)
 
 (defun call/saving-database (thunk)
+  "Call THUNK, saving the database afterwards, unless a save is
+already pending."
   (if *save-pending*
       (funcall thunk)
       (let ((*save-pending* t))
@@ -386,5 +535,6 @@ reloaded on demand."
           (save-database)))))
 
 (defmacro saving-database (&body body)
+  "Macro wrapper for `call/saving-database'."
   (with-thunk (body)
     `(call/saving-database ,body)))

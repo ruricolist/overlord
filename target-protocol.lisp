@@ -17,6 +17,7 @@
    #:resolve-target
    #:target-build-script
    #:target-node-label
+   #:target-extensions
    ;; Other methods.
    #:build-script-target
    #:run-script
@@ -126,6 +127,12 @@ should be copied.")
       (call-next-method)))
   (:method (target)
     (princ-to-string target)))
+
+(defgeneric target-extensions (target)
+  (:documentation "Return a list of systems that must be loaded for TARGET to be read in.")
+  (:method (target)
+    (declare (ignore target))
+    nil))
 
 
 

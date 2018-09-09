@@ -15,7 +15,9 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
    :asdf-system?
    :asdf-system-loaded?
    :load-asdf-system
-   :asdf-system-base))
+   :asdf-system-base
+   :require-asdf-system
+   :asdf-system-name-keyword))
 (in-package :overlord/asdf)
 
 (defun find-asdf-system (system &key error)
@@ -41,6 +43,19 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
 (defun asdf-system? (system)
   (typep system 'asdf:system))
 
+(-> asdf-system-name-keyword ((or asdf:system string keyword)) keyword)
+(defun asdf-system-name-keyword (system)
+  (etypecase system
+    (asdf:system
+     (~> system
+         asdf:component-name
+         asdf-system-name-keyword))
+    (string
+     (~> system
+         string-upcase
+         make-keyword))
+    (keyword system)))
+
 (defun asdf-system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
     (and system
@@ -52,3 +67,8 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
 
 (defun asdf-system-base (system)
   (asdf:system-relative-pathname system ""))
+
+(defun require-asdf-system (system)
+  ;; For some reason (why?) asdf:require-system is deprecated.
+  (unless (asdf:component-loaded-p system)
+    (asdf:load-system system)))

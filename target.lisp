@@ -514,7 +514,10 @@ inherit a method on `make-load-form', and need only specialize
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
                         #'pattern-ref.input
-                        #'pattern-ref.pattern)))
+                        #'pattern-ref.pattern))
+
+  (:method target-extensions (self)
+    (target-extensions pattern)))
 
 (defun pattern-ref (pattern file)
   "Make a pattern reference, or a list of pattern references."
@@ -1648,7 +1651,7 @@ It has to have a name.
 
 A file pattern in Overlord must have a name. You use it like this:
 
-    (:depend-on (:pattern 'my-pattern \"file\"))
+    (:depends-on (:pattern 'my-pattern \"file\"))
 
 If you set the input pathname defaults, you don't have to give an
 extension to the file.
