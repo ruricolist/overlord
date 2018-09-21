@@ -113,6 +113,7 @@
    :task
    :pattern
    :merge-input-defaults
+   :merge-output-defaults
    :pattern.input-defaults
    :pattern.output-defaults
    :pattern-name
