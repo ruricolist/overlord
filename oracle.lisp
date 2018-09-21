@@ -48,7 +48,6 @@
 
 (defclass oracle ()
   ((key :initarg :key
-        :accessor oracle.key
         :reader oracle-name))
   (:documentation "Oracles let you depend on aspects of the Lisp or OS
 environment.
@@ -71,7 +70,7 @@ depend on the oracle are considered out of date."))
   (:method fset:compare (self (other oracle))
     (fset:compare-slots self other
                         #'class-name-of
-                        #'oracle.key))
+                        #'oracle-name))
   (:method target= (self (other oracle))
     (eql :equal (fset:compare self other)))
 
@@ -108,7 +107,7 @@ considered out of date if that changes."))
 
 (defmethods var-oracle (self (var key) sym)
   (:method initialize-instance :after (self &key var)
-    (setf (oracle.key self) (delay-symbol var)))
+    (setf var (delay-symbol var)))
   ;; Cache the symbol.
   (:method slot-unbound ((class t) self (slot-name (eql 'sym)))
     (setf sym (force-symbol var)))
