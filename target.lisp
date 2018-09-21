@@ -955,7 +955,7 @@ treated as out-of-date, regardless of file metadata."))
                   (*output* output))
               (let ((*base* (pathname-directory-pathname input)))
                 (depends-on input))
-              (pattern-build pattern)))
+              (pattern-build pattern input output)))
           (pattern.script pattern))))
 
 (defmethod build-script-target ((script task))
@@ -1625,8 +1625,9 @@ specify the dependencies you want on build."
 (defmethods unloaded-pattern (self name)
   (:method load-form-slot-names append (self)
     '(name))
-  (:method pattern-build (self)
-    (make (force-symbol name))))
+  (:method pattern-build (self input output)
+    (pattern-build (make (force-symbol name))
+                   input output)))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
