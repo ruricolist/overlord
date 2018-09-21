@@ -37,7 +37,8 @@
    #:file-mtime
    #:propagate-side-effect
    #:url-encode
-   #:byte-array-to-hex-string))
+   #:byte-array-to-hex-string
+   #:version-major-version))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with)
@@ -255,3 +256,17 @@ once."
 
 (defun byte-array-to-hex-string (ba)
   (octets->hex ba))
+
+(defun version-major-version (version)
+  (etypecase version
+    (null nil)
+    ((integer 0 *) version)
+    (string
+     (let ((version
+             (if (string^= "v" version)
+                 (subseq version 1)
+                 version)))
+       (assure (integer 0 *)
+         (parse-integer version
+                        :junk-allowed t
+                        :radix 10))))))

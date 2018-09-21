@@ -20,6 +20,8 @@
     :digest-string)
   (:import-from :overlord/asdf
     :asdf-system-version)
+  (:import-from :overlord/util
+    :version-major-version)
   (:import-from :fset)
   (:export
    :oracle :oracle-name
@@ -241,20 +243,6 @@ recorded is simply nil."))
 
 (defun system-version-oracle (name)
   (make 'system-version-oracle :name (string-downcase name)))
-
-(defun version-major-version (version)
-  (etypecase version
-    (null nil)
-    ((integer 0 *) version)
-    (string
-     (let ((version
-             (if (string^= "v" version)
-                 (subseq version 1)
-                 version)))
-       (assure (integer 0 *)
-         (parse-integer version
-                        :junk-allowed t
-                        :radix 10))))))
 
 
 ;;; Dist version oracles.
