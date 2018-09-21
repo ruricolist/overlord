@@ -27,7 +27,8 @@
    :ensure-absolute
    :with-current-dir
    :package-base
-   :current-system))
+   :current-system
+   :resolve-file))
 
 (in-package :overlord/base)
 
@@ -97,6 +98,10 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       (absolute-pathname pathname)
       (relative-pathname
        (merge-pathnames* pathname (base))))))
+
+(defun resolve-file (pathname &key (base (base)))
+  (let ((*base* base))
+    (ensure-absolute pathname)))
 
 (define-global-state *package-bases*
     (dict* (make-hash-table)
