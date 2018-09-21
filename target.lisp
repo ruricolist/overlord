@@ -1658,23 +1658,30 @@ extension to the file.
 
 Based on the pattern, the output file is calculated, and the result
 depends on that."
-  `(progn
-     (define-script-for ,class-name
-       ,in
-       ,out
-       ,@script)
-     (with-script ()
-       (defclass ,class-name (pattern)
-         ()
-         (:default-initargs
-          :script ',(script-for class-name)
-          ,@options)))
-     (defmethod pattern-build ((self ,class-name))
-       (let ((,in *input*)
-             (,out *output*))
+  (receive (class-options script)
+      (partition (op (keywordp (car-safe _)))
+                 script)
+    (loop for form in script
+          if (and (consp form)
+                  (keywordp (car form)))
+            collect form into class-options
+          else collect form into script
+          finally (return (values class-options script)))
+    `(progn
+       (define-script-for ,class-name
+         ,in
+         ,out
+         ,@script)
+       (with-script ()
+         (defclass ,class-name (pattern)
+           ()
+           (:default-initargs
+            :script ',(script-for class-name)
+            ,@options)
+           ,@class-options))
+       (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
          (call/temp-file-pathname ,out
                                   (lambda (,out)
                                     (with-script ()
                                       ,@script)))))))
-
