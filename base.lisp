@@ -17,7 +17,8 @@
     :chdir :getcwd :pathname-equal
     :*nil-pathname*)
   (:import-from :overlord/util
-    :locate-dominating-file)
+    :locate-dominating-file
+    :ensure-pathname*)
   (:export
    :current-dir!
    :*base* :base
@@ -99,8 +100,9 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       (relative-pathname
        (merge-pathnames* pathname (base))))))
 
-(defun resolve-file (pathname &key (base (base)))
-  (let ((*base* base))
+(defun resolve-file (file &key (base (base)))
+  (let ((*base* base)
+        (pathname (ensure-pathname* file)))
     (ensure-absolute pathname)))
 
 (define-global-state *package-bases*
