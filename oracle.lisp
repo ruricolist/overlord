@@ -30,7 +30,8 @@
    :system-version-oracle
    :feature-oracle
    :dist-version-oracle
-   :function-oracle))
+   :function-oracle
+   :name-oracle))
 (in-package :overlord/oracle)
 
 ;;; TODO Would it be worthwhile to provide oracles for optimization
@@ -154,7 +155,9 @@ considered out of date if that changes."))
   (:method oracle-value (self)
     name)
   (:method target-exists? (self)
-    t))
+    t)
+  (:method target= (self (other name-oracle))
+    (eql name (oracle-name other))))
 
 (defclass package-oracle (name-oracle)
   ((key :type string
