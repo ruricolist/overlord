@@ -119,7 +119,9 @@
    :pattern-name
    :pattern-build
    :pattern-ref
-   :define-script))
+   :define-script
+   :pattern-ref.input
+   :pattern-ref.output))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -494,10 +496,9 @@ inherit a method on `make-load-form', and need only specialize
 
 (defmethods pattern-ref (self (input name) output pattern)
   (:method initialize-instance :after (self &key)
-    (unless (absolute-pathname-p input)
-      (let* ((pattern (find-pattern pattern))
-             (abs-input (merge-input-defaults pattern input)))
-        (setf input abs-input))))
+    (let* ((pattern (find-pattern pattern))
+           (abs-input (merge-input-defaults pattern input)))
+      (setf input abs-input)))
 
   (:method print-object (self stream)
     (print-pattern-ref pattern self stream))
