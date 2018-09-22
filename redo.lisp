@@ -11,8 +11,7 @@
     #:overlord/target-table)
   (:import-from #:overlord/types #:error*)
   (:import-from #:overlord/db
-    #:saving-database
-    #:register-extension-systems)
+    #:saving-database)
   (:import-from #:overlord/parallel
     #:with-our-kernel)
   (:import-from #:overlord/stamp
@@ -184,7 +183,6 @@ built it."
 
 (defun redo-target (target)
   (setf target (resolve-target target))
-  (register-extension-systems (target-extensions target))
   (when-let (stamp (cached-stamp target))
     (return-from redo-target stamp))
   (with-target-locked (target)
@@ -271,7 +269,6 @@ built it."
 
 (defun redo-ifchange-target (target)
   (setf target (resolve-target target))
-  (register-extension-systems (target-extensions target))
   (when (changed? target)
     (redo target))
   (record-prereq target))

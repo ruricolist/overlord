@@ -31,8 +31,7 @@
    :saving-database
    :unload-db
    :deactivate-db
-   :delete-versioned-db
-   :register-extension-systems))
+   :delete-versioned-db))
 (in-package :overlord/db)
 
 ;;; The database is a single file, an append-only log. If the log is
@@ -87,21 +86,6 @@
 
 (defunit tombstone "A tombstone value.")
 
-(defconstructor system-list
-  "A set of system extensions for the database.
-The database may need to load systems so it can read symbols from
-those systems."
-  (items fset:set))
-
-(defgeneric make-system-list (systems)
-  (:documentation "Wrap SYSTEMS in a `system-list' object.")
-  (:method ((systems fset:set))
-    (~>> systems
-         (fset:image #'asdf-system-name-keyword)
-         system-list))
-  (:method ((systems sequence))
-    (make-system-list (fset:convert 'set systems))))
-
 (defstruct-read-only (log-record (:conc-name log-record.))
   "A single record in a log file."
   (timestamp (get-universal-time) :type (integer 0 *))
@@ -110,8 +94,7 @@ those systems."
 (defstruct-read-only (log-data (:conc-name log-data.))
   "The data recovered from a log file."
   (map-count 0 :type (integer 0 *))
-  (map (fset:empty-map) :type fset:map)
-  (extensions (fset:empty-set) :type fset:set))
+  (map (fset:empty-map) :type fset:map))
 
 (def no-log-data (make-log-data)
   "An empty set of log data.")
@@ -137,37 +120,7 @@ This is necessary on SBCL, where CAS can only be used on structure slots of type
   (version (db-version) :read-only t)
   (log-file (log-file-path) :type pathname :read-only t)
   (current-map (fset:empty-map) :type fset:map)
-  (last-saved-map (fset:empty-map) :type fset:map)
-  (extensions (fset:empty-set) :type fset:set))
-
-(defun register-extension-systems (systems)
-  "Register SYSTEMs as systems that defines new target types.
-
-This is necessary so the new target types defined by the system can be
-recorded in the database (and the new target types can be read
-in.)
-
-Avoid using this if you possibly can. The preferred ways of extending
-Overlord are defining patterns (with `defpattern') or languages (with
-Vernacular)."
-  (when (emptyp systems)
-    (return-from register-extension-systems
-      systems))
-  (let ((names
-          (reduce (op (fset:with _ (asdf-system-name-keyword _)))
-                  systems
-                  :initial-value (fset:empty-set)))
-        (db (db)))
-    ;; Only added, never removed.
-    (unless (fset:subset? names (db.extensions db))
-      #+sbcl
-      (sb-ext:atomic-update (db.extensions db)
-                            (lambda (set)
-                              (fset:union set names)))
-      #-sbcl
-      (synchronized (db)
-        (callf #'fset:union (db.extensions db) names)))
-    (db.extensions db)))
+  (last-saved-map (fset:empty-map) :type fset:map))
 
 (defun db-alist (&optional (db (db)))
   "Return the database's data as an alist.
@@ -187,8 +140,7 @@ For debugging."
 (defmethods db (db (version #'db.version)
                    (log-file #'db.log-file)
                    (current-map #'db.current-map)
-                   (last-saved-map #'db.last-saved-map)
-                   (extensions #'db.extensions))
+                   (last-saved-map #'db.last-saved-map))
   (:method print-object (db stream)
     (print-unreadable-object (db stream :type t)
       ;; version record-count byte-count saved or not?
@@ -230,23 +182,10 @@ For debugging."
      (lambda ()
        (synchronized (db)
          (append-to-log log-file
-                        extensions
                         last-saved-map
                         current-map)
          (setf last-saved-map current-map)))
      :name "Overlord: saving database")))
-
-(defgeneric load-required-systems (x)
-  (:documentation "Load any systems required by X.")
-  (:method ((db db))
-    (load-required-systems (db.extensions db)))
-  (:method ((set fset:set))
-    (load-required-systems (fset:convert 'list set)))
-  (:method ((x system-list))
-    (load-required-systems (system-list-items x)))
-  (:method ((seq sequence))
-    (do-each (system seq seq)
-      (require-asdf-system system))))
 
 (defstruct (dead-db (:include db)
                     (:conc-name db.))
@@ -302,7 +241,7 @@ the stack so the error itself can be printed."
                  :pretty nil
                  :circle nil))))
 
-(defun append-to-log (log extensions last-saved-map current-map)
+(defun append-to-log (log last-saved-map current-map)
   "Compute the difference between CURRENT-MAP and LAST-SAVED-MAP and
 write it into LOG.
 
@@ -310,13 +249,11 @@ If there is no difference, write nothing."
   (unless (eql last-saved-map current-map)
     (let ((diff (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
-        (let ((extensions (make-system-list extensions))
-              (record (make-log-record :data diff)))
+        (let ((record (make-log-record :data diff)))
           (with-output-to-file (out (ensure-directories-exist log)
                                     :element-type 'character
                                     :if-does-not-exist :create
                                     :if-exists :append)
-            (db-write extensions out)
             (db-write record out)
             (finish-output out)))))))
 
@@ -338,36 +275,27 @@ If there is no difference, write nothing."
          (restart-case
              (return-from load-log-data
                (with-standard-input-syntax
-                 (mvlet* ((*readtable* db-readtable)
-                          (records extensions
-                           (with-input-from-file (in log-file :element-type 'character)
-                             (let ((eof "eof"))
-                               (nlet rec ((records '())
-                                          (extensions (fset:empty-set)))
-                                 (let ((data (read in nil eof)))
-                                   (cond ((eq data eof)
-                                          (values (nreverse records)
-                                                  extensions))
-                                         ((typep data 'log-record)
-                                          (rec (cons data records)
-                                               extensions))
-                                         ((typep data 'system-list)
-                                          (load-required-systems data)
-                                          (let ((systems (system-list-items data)))
-                                            (rec records
-                                                 (fset:union systems extensions))))
-                                         (t
-                                          (error "Invalid database log entry: ~a" data))))))))
-                          (maps
-                           (mapcar #'log-record.data records))
-                          (map
-                           (reduce #'fset:map-union maps
-                                   :initial-value (fset:empty-map)))
-                          (map (strip-tombstones map)))
+                 (let* ((*readtable* db-readtable)
+                        (records
+                          (with-input-from-file (in log-file :element-type 'character)
+                            (let ((eof "eof"))
+                              (nlet rec ((records '()))
+                                (let ((data (read in nil eof)))
+                                  (cond ((eq data eof)
+                                         (nreverse records))
+                                        ((typep data 'log-record)
+                                         (rec (cons data records)))
+                                        (t
+                                         (error "Invalid database log entry: ~a" data))))))))
+                        (maps
+                          (mapcar #'log-record.data records))
+                        (map
+                          (reduce #'fset:map-union maps
+                                  :initial-value (fset:empty-map)))
+                        (map (strip-tombstones map)))
                    (make-log-data
                     :map map
-                    :map-count (length maps)
-                    :extensions extensions))))
+                    :map-count (length maps)))))
            (retry ()
              :report "Try loading the database again."
              (go :retry))
@@ -380,7 +308,6 @@ If there is no difference, write nothing."
   "If needed, write a compacted version of LOG-DATA into LOG-FILE."
   (let ((map (log-data.map log-data))
         (map-count (log-data.map-count log-data))
-        (extensions (log-data.extensions log-data))
         temp)
     (when (> map-count 1)
       (message "Compacting log-file")
@@ -394,7 +321,6 @@ If there is no difference, write nothing."
                             ;; rename is atomic.
                             :directory (pathname-directory-pathname log-file))
         (setq temp p)
-        (db-write (make-system-list extensions) s)
         (db-write (make-log-record :data map) s))
       (rename-file-overwriting-target temp log-file))
     log-file))
@@ -416,12 +342,10 @@ If there is no difference, write nothing."
                       (log-file-size log-file))
              (load-log-data log-file)))
           (map (log-data.map log-data))
-          (extensions (log-data.extensions log-data))
           (db (make-db
                :log-file log-file
                :current-map map
-               :last-saved-map map
-               :extensions extensions)))
+               :last-saved-map map)))
     (make-thread
      (lambda ()
        (synchronized (db)
@@ -452,7 +376,7 @@ reloaded on demand."
     (setq *db* (make-dead-db))))
 
 (defun check-version ()
-  "Check that the database version matches the Overlord version."
+  "Check that the database version matches the Overlord system version."
   (unless (= (db.version *db*)
              (db-version))
     (cerror "Load the correct database"
