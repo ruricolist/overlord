@@ -66,7 +66,7 @@ depend on the oracle are considered out of date."))
   (:method print-object (self stream)
     (format stream "~a~s"
             (read-eval-prefix self stream)
-            `(make ',(class-name-of self) :key ,key)))
+            `(make-instance ',(class-name-of self) :key ,key)))
 
   (:method fset:compare (self (other oracle))
     (fset:compare-slots self other
@@ -316,18 +316,25 @@ By default this is the Quicklisp dist itself."))
 (defclass function-oracle (oracle)
   ((key :initarg :function
         :type delayed-symbol
-        :reader function-oracle.delayed-symbol))
+        :reader function-oracle.delayed-symbol)
+   (args
+    :initarg :args
+    :type list
+    :reader function-oracle.args))
   (:documentation "An oracle for a user-supplied function.
 
 The function must be supplied by name."))
 
-(defmethods function-oracle (self key fn)
+(defmethods function-oracle (self (fn key) args)
   (:method target-exists? (self)
-    (ignore-errors
-     (fboundp (force-symbol key))))
+    (fboundp
+     (ignoring overlord-error
+       (force-symbol fn))))
   (:method oracle-value (self)
-    (funcall fn)))
+    (apply (force-symbol fn) args)))
 
-(defun function-oracle (function-name)
+(defun function-oracle (function-name &rest args)
   (check-type function-name symbol)
-  (make 'function-oracle :function (delay-symbol function-name)))
+  (make 'function-oracle
+        :function (delay-symbol function-name)
+        :args args))
