@@ -1600,9 +1600,9 @@ specify the dependencies you want on build."
     :type pathname
     :reader pattern.output-defaults)
    (script
-     :initarg :script
-     :type target
-     :reader pattern.script))
+    :initarg :script
+    :type target
+    :reader pattern.script))
   (:default-initargs
    :input-defaults *nil-pathname*
    :output-defaults *nil-pathname*
@@ -1614,6 +1614,12 @@ specify the dependencies you want on build."
 
 (defmethod pattern-name ((self pattern))
   (class-name-of self))
+
+(defmethod fset:compare ((x pattern) (y pattern))
+  (fset:compare-slots x y
+                      #'pattern.input-defaults
+                      #'pattern.output-defaults
+                      #'pattern.script))
 
 (defclass unloaded-pattern (pattern)
   ((name :initarg :name
