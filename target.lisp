@@ -396,6 +396,7 @@ inherit a method on `make-load-form', and need only specialize
     (pathname-equal path (directory-ref.path y)))
   (:method target-build-script (target)
     (let ((dir path))
+      (declare (notinline task))        ;for SBCL
       (task target
             (lambda ()
               (let ((dir (resolve-target dir)))
