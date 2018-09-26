@@ -147,21 +147,21 @@ considered out of date if that changes."))
   (:method target= (self (other cl-var-oracle))
     (eql var (oracle-question other))))
 
-(defclass name-oracle (oracle)
-  ((question :reader name-oracle.name))
+(defclass fixed-question-oracle (oracle)
+  ((question :reader fixed-question-oracle.name))
   (:documentation
    "Oracle that extracts a name from a value instead of recording the
 value directly. The question is also the answer."))
 
-(defmethods name-oracle (self (name question))
+(defmethods fixed-question-oracle (self (name question))
   (:method oracle-answer (self)
     name)
   (:method target-exists? (self)
     t)
-  (:method target= (self (other name-oracle))
+  (:method target= (self (other fixed-question-oracle))
     (eql name (oracle-question other))))
 
-(defclass package-oracle (name-oracle)
+(defclass package-oracle (fixed-question-oracle)
   ((question :type string
              :reader package-oracle.name
              :initform (package-name *package*)))
@@ -171,7 +171,7 @@ value directly. The question is also the answer."))
   (:method target= (self (other package-oracle))
     (string= name (package-oracle.name other))))
 
-(defclass readtable-oracle (name-oracle)
+(defclass readtable-oracle (fixed-question-oracle)
   ((question :type delayed-symbol
              :initform (delay-symbol (readtable-name *readtable*))))
   (:documentation "Oracle that wraps the current readtable.
@@ -180,7 +180,7 @@ A name is extracted using `named-readtable:readtable-name'."))
 
 (defmethods readtable-oracle (self (name question))
   (:method target= (self (other readtable-oracle))
-    (delayed-symbol= name (name-oracle.name other))))
+    (delayed-symbol= name (fixed-question-oracle.name other))))
 
 (defun var-oracle (var)
   (check-type var symbol)
