@@ -9,23 +9,18 @@
     #:overlord/specials
     #:overlord/target-protocol
     #:overlord/target-table)
-  (:import-from #:overlord/types #:error*)
+  (:import-from #:overlord/types #:error* #:cerror*)
   (:import-from #:overlord/db
     #:saving-database)
-  (:import-from #:overlord/parallel
-    #:with-our-kernel)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
-  (:import-from #:lparallel #:pmap)
   (:nicknames :redo)
   (:export
    #:building?
    #:redo
    #:redo-all
-   #:redo/parallel
    #:redo-ifchange
    #:redo-ifchange-all
-   #:redo-ifchange/parallel
    #:redo-ifcreate
    #:redo-ifcreate-all
    #:redo-always
@@ -41,98 +36,8 @@
   "The chain of parents being built.")
 
 (defun building? ()
+  "Return T if anything is being built."
   (true *parents*))
-
-(defvar *run-env*)
-
-(defclass run-env ()
-  ((lock :initform (bt:make-lock)
-         :reader serapeum:monitor)
-   (target-info
-    :initform (make-target-table)
-    :reader run-env.table)
-   (hits :initform 0
-         :accessor run-env.hits)
-   (misses :initform 0
-           :accessor run-env.misses))
-  (:documentation "Metadata for the build run."))
-
-(defclass target-meta ()
-  ((target :initarg :target
-           :reader target-meta.target)
-   (lock :initform (bt:make-lock)
-         :reader target-meta.lock
-         :reader monitor)
-   (stamp :accessor target-meta.stamp
-          :initform nil))
-  (:documentation "Run-scoped metadata for an individual target."))
-
-(defparameter *print-hit-or-miss* nil)
-
-(defun call/run-env (fn)
-  (if (boundp '*run-env*)
-      (funcall fn)
-      (let ((*run-env* (make 'run-env)))
-        (values (funcall fn)
-                (progn
-                  (when *print-hit-or-miss*
-                    (format t "~&Hit: ~a, Miss: ~a"
-                            (run-env.hits *run-env*)
-                            (run-env.misses *run-env*)))
-                  *run-env*)))))
-
-(defmacro with-run-env ((&key) &body body)
-  (with-thunk (body)
-    `(call/run-env ,body)))
-
-(defun target-meta (target)
-  (let* ((table (run-env.table *run-env*)))
-    (or (target-table-ref table target)
-        (synchronized (table)
-          (ensure (target-table-ref table target)
-            (make 'target-meta :target target))))))
-
-;;; Should target locks be stored in the database?
-(defun call-with-target-locked (target fn)
-  (synchronized ((target-meta target))
-    (funcall fn)))
-
-(defmacro with-target-locked ((target) &body body)
-  (with-thunk (body)
-    `(call-with-target-locked
-      ,target
-      ,body)))
-
-(defplace cached-stamp (target)
-  (target-meta.stamp (target-meta target)))
-
-(defun hit-or-miss (hit miss &aux (env *run-env*))
-  "Track cache hits and misses."
-  (if hit
-      (progn
-        (incf (run-env.hits env))
-        hit)
-      (progn
-        (incf (run-env.misses env))
-        miss)))
-
-(defun target-exists?/cache (target)
-  "Skip hitting the filesystem to check if a target exists if we
-already built it."
-  (if (not (boundp '*run-env*))
-      (target-exists? target)
-      (hit-or-miss
-       (true (cached-stamp target))
-       (target-exists? target))))
-
-(defun target-stamp/cache (target)
-  "Skip hitting the filesystem to check a target's stamp if we already
-built it."
-  (if (not (boundp '*run-env*))
-      (target-stamp target)
-      (hit-or-miss
-       (cached-stamp target)
-       (target-stamp target))))
 
 (defun target? (target)
   "Is TARGET actually a target (not a source file)?"
@@ -149,49 +54,23 @@ built it."
    ;; considered out of date if it has no presence in the DB.
    (target-has-build-script? target)))
 
-(defun redo (&rest args)
-  (redo-all (or args (list root-target))))
+(defun redo (&rest targets)
+  "Unconditionally build each target in TARGETS."
+  (redo-all (or targets (list root-target))))
 
-(defparameter *specials*
-  '(*parents*
-    *trace-output*                      ;For debugging.
-    *base*
-    *input*
-    *output*
-    *deps*
-    *source*
-    *language*
-    *program-preamble*
-    *default-pathname-defaults*
-    *compile-file-truename*
-    *load-truename*
-    *cli*
-    *suppress-phonies*
-    *save-pending*
-    *run-env*)
-  "Special variables whose bindings, if any, should be propagated into
-  subthreads.")
+(defun target-build-script-target (target)
+  (build-script-target
+   (target-build-script target)))
 
-(defun walk-targets (fn seq)
-  (let ((seq (reshuffle seq))
-        (fn (ensure-function fn)))
-    (if (use-threads-p)
-        (with-our-kernel ()
-          (pmap nil (dynamic-closure *specials* fn)
-                seq))
-        (map nil fn seq))))
+(defun target-has-build-script? (target)
+  (target-exists? (target-build-script-target target)))
 
 (defun redo-target (target)
+  "Unconditionally build TARGET."
   (setf target (resolve-target target))
-  (when-let (stamp (cached-stamp target))
-    (return-from redo-target stamp))
-  (with-target-locked (target)
-    (when (member target *parents* :test #'target=)
-      (error* "Recursive dependency: ~a depends on itself" target))
-    (unless (target? target)
-      (return-from redo-target
-        (setf (cached-stamp target)
-              (target-stamp target))))
+  (when (member target *parents* :test #'target=)
+    (error* "Recursive dependency: ~a depends on itself" target))
+  (when (target? target)
     (clear-temp-prereqs target)
     (clear-temp-prereqsne target)
     (let ((build-script (resolve-build-script target)))
@@ -201,30 +80,18 @@ built it."
              (run-script build-script))
         (save-temp-prereqs target)
         (save-temp-prereqsne target))
-      (setf (target-up-to-date? target) t
-            (cached-stamp target) (target-stamp target)))))
-
-(defun redo/parallel (targets)
-  (with-run-env ()
-    (saving-database
-      (if (single targets)
-          (redo-all targets)
-          (walk-targets #'redo-target targets)))))
+      (setf (target-up-to-date? target) t)))
+  (target-stamp target))
 
 (defun redo-all (targets)
-  (with-run-env ()
-    (saving-database
-      (do-each (target (reshuffle targets))
-        (redo-target target)))))
-
-(defun target-build-script-target (target)
-  (build-script-target
-   (target-build-script target)))
-
-(defun target-has-build-script? (target)
-  (target-exists? (target-build-script-target target)))
+  "Unconditionally build each target in TARGETS."
+  (saving-database
+    (do-each (target (reshuffle targets))
+      (redo-target target))))
 
 (defun resolve-build-script (target)
+  "Find a build script for TARGET, and depend on it.
+If there is no script for TARGET, signal an error."
   ;; TODO What directory should be current? Or should the script take care of that?
   (setf target (resolve-target target))
   (let* ((script (target-build-script target))
@@ -233,29 +100,36 @@ built it."
         (let ((*parents* (cons target *parents*)))
           (redo-ifchange script-target)
           script)
-        (error* "No script found for ~a" target))))
+        (progn
+          (cerror* "Retry"
+                   "No script found for ~a" target)
+          (resolve-build-script target)))))
 
-(defun unchanged? (saved-prereq)
+(defun prereq-changed? (saved-prereq)
+  "Take SAVED-PREREQ, which has slots for a target and its last stamp,
+and return T if the stamp has changed."
   (let* ((req (saved-prereq-target saved-prereq))
          (old-stamp (saved-prereq-stamp saved-prereq))
-         (new-stamp (target-stamp/cache req)))
-    (stamp-satisfies-p new-stamp old-stamp)))
+         (new-stamp (target-stamp req)))
+    (not (stamp-satisfies-p new-stamp old-stamp))))
 
-(-> changed? (t) boolean)
-(defun changed? (target)
+(defun out-of-date? (target)
+  "Return T if TARGET needs rebuilding.
+Note that this rebuilds any previously saved dependencies of TARGET
+that are themselves out of date."
   (mvlet* ((prereqsne (target-saved-prereqsne target))
            (prereqs (target-saved-prereqs target))
-           (target-does-not-exist? (not (target-exists?/cache target)))
-           (non-existent-prereqs-exist? (some #'target-exists?/cache prereqsne))
+           (target-does-not-exist? (not (target-exists? target)))
+           (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
            (regular-prereqs-changed?
             ;; If we were ever to adopt parallelism as the default, we
             ;; could store information about which targets take
             ;; longest to build and build them from slowest to
             ;; fastest.
             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
-                   (outdated (filter #'changed? reqs)))
+                   (outdated (filter #'out-of-date? reqs)))
               (redo-all outdated)
-              (notevery #'unchanged? prereqs)))
+              (some #'prereq-changed? prereqs)))
            (not-in-db?
             (and (target? target)
                  (not (target-in-db? target)))))
@@ -264,38 +138,38 @@ built it."
         regular-prereqs-changed?
         not-in-db?)))
 
-(defun redo-ifchange (&rest args)
-  (redo-ifchange-all args))
+(defun redo-ifchange (&rest targets)
+  "Rebuild each target in TARGETS if it is out of date."
+  (redo-ifchange-all targets))
 
 (defun redo-ifchange-target (target)
+  "Rebuild TARGET if it is out of date."
   (setf target (resolve-target target))
-  (when (changed? target)
+  (when (out-of-date? target)
     (redo target))
   (record-prereq target))
 
-(defun redo-ifchange-all (args)
-  (with-run-env ()
-    (do-each (i (reshuffle args))
-      (redo-ifchange-target i))))
-
-(defun redo-ifchange/parallel (targets)
-  (if (single targets)
-      (redo-ifchange-all targets)
-      (walk-targets #'redo-ifchange-target
-                    targets)))
+(defun redo-ifchange-all (targets)
+  "Rebuild each target in TARGETS if it is out of date."
+  (do-each (i (reshuffle targets))
+    (redo-ifchange-target i)))
 
 (defun redo-ifcreate (&rest targets)
+  "Depend on the non-existence of each target in TARGETS."
   (redo-ifcreate-all targets))
 
 (defun redo-ifcreate-all (targets)
-  (setf targets (map 'vector #'resolve-target targets))
-  (when-let (i (some #'target-exists?/cache targets))
-    (error* "Non-existent prerequisite ~a already exists" i))
-  (with-run-env ()
-    (do-each (i (reshuffle targets))
-      (record-prereqne i))))
+  "Depend on the non-existence of each target in TARGETS."
+  (let ((targets (map 'vector #'resolve-target targets)))
+    (do-each (target (reshuffle targets))
+      (assert (not (target-exists? target)) ()
+              "Target exists: ~a" target)
+      (record-prereqne target))))
 
 (defun redo-always ()
+  "Depend on an impossible prerequisite.
+This ensures that the script for the current target is always run, no
+matter what."
   (record-prereq impossible-prereq))
 
 (defun target-tree (&optional (target root-target))
