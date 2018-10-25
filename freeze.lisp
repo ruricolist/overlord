@@ -4,8 +4,6 @@
     :overlord/redo
     :overlord/db
     :overlord/types)
-  (:import-from :overlord/parallel
-    :end-our-kernel)
   (:import-from :overlord/specials
     :*suppress-phonies*)
   (:export
@@ -60,7 +58,6 @@ distributed."
 
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
-  (end-our-kernel)
   (unless (frozen?)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")

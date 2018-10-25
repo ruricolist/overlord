@@ -72,24 +72,9 @@ Here are some examples of how to make direct use of Overlord:
 One thing that might not be obvious about Redo-style build systems is
 that they afford unusually good opportunities for parallelism.
 
-Overlord supports building in parallel using threads. Targets can
-request that their dependencies be built in parallel by using
-`pdepends-on` instead of `depends-on`. However, threads are not
-enabled by default; this feature is still an experiment within an experiment.
-
-If you want to try building in parallel, execute:
-
-    (setf (overlord:use-threads-p) t)
-
-It is not recommended that you try parallelizing targets that call the
-Lisp compiler. (This includes importing modules.) On SBCL the Lisp
-compiler is protected by a global lock, and trying to use it from
-multiple threads can result in deadlock.
-
-Overlord only uses parallelism when it is explicitly requested, but
-even without parallelism, it tries to discourage reliance on side
-effects by, whenever possible, randomizing the order in which targets
-are built.
+Overlord does not currently support parallelism, but even without
+parallelism, it tries to discourage reliance on side effects by,
+whenever possible, randomizing the order in which targets are built.
 
 # Freezing the Lisp image
 

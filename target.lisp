@@ -97,10 +97,8 @@
 
    :depends-on
    :depends-on*
-   :pdepends-on
    :depends-on-all
    :depends-on-all*
-   :pdepends-on-all
    :depends-not
    :depends-not-all
    :use :use-all
@@ -1178,17 +1176,11 @@ value and NEW do not match under TEST."
 (defun depends-on-all* (targets)
   (map nil #'redo-ifchange targets))
 
-(defun pdepends-on-all (targets)
-  (redo-ifchange/parallel targets))
-
 (defun depends-on (&rest targets)
   (depends-on-all targets))
 
 (defun depends-on* (&rest targets)
   (depends-on-all* targets))
-
-(defun pdepends-on (&rest targets)
-  (pdepends-on-all targets))
 
 (defun depends-not-all (targets)
   (redo-ifcreate-all targets))
@@ -1251,17 +1243,11 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (define-script-keyword-macro :depends-on* (x &rest xs)
   `(depends-on* ,x ,@xs))
 
-(define-script-keyword-macro :pdepends-on (x &rest xs)
-  `(pdepends-on ,x ,@xs))
-
 (define-script-keyword-macro :depends-on-all (xs)
   `(depends-on-all ,xs))
 
 (define-script-keyword-macro :depends-on-all* (xs)
   `(depends-on-all* ,xs))
-
-(define-script-keyword-macro :pdepends-on-all (xs)
-  `(pdepends-on-all ,xs))
 
 (define-script-keyword-macro :depends-not (x &rest xs)
   `(depends-not ,x ,@xs))
