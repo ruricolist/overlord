@@ -8,14 +8,19 @@
   (:use #:cl #:alexandria #:serapeum
     #:overlord/specials
     #:overlord/target-protocol
-    #:overlord/target-table)
-  (:import-from #:overlord/types #:error* #:cerror*)
+    #:overlord/target-table
+    #:overlord/build-env)
+  (:import-from #:overlord/types
+    #:overlord-error
+    #:overlord-error-target)
   (:import-from #:overlord/db
     #:saving-database)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
   (:nicknames :redo)
   (:export
+   #:recursive-dependency
+   #:missing-script
    #:building?
    #:redo
    #:redo-all
@@ -31,6 +36,28 @@
 ;;; NB This file is only concerned with the logic of the build system.
 ;;; It is not concerned with what targets are, what timestamps are, or
 ;;; so forth.
+
+(defcondition target-error (overlord-error)
+  ((target :initarg :target
+           :reader overlord-error-target)))
+
+(defcondition recursive-dependency (target-error)
+  ()
+  (:report (lambda (c s)
+             (format s "Recursive dependency: ~a depends on itself"
+                     (overlord-error-target c)))))
+
+(defcondition missing-script (target-error)
+  ()
+  (:report (lambda (c s)
+             (format s "No script found for target ~a."
+                     (overlord-error-target c)))))
+
+(defcondition non-existent-exists (target-error)
+  ()
+  (:report (lambda (c s)
+             (format s "Non-existent prerequisite ~a exists."
+                     (overlord-error-target c)))))
 
 (defvar *parents* '()
   "The chain of parents being built.")
@@ -67,27 +94,32 @@
 
 (defun redo-target (target)
   "Unconditionally build TARGET."
-  (setf target (resolve-target target))
-  (when (member target *parents* :test #'target=)
-    (error* "Recursive dependency: ~a depends on itself" target))
-  (when (target? target)
-    (clear-temp-prereqs target)
-    (clear-temp-prereqsne target)
-    (let ((build-script (resolve-build-script target)))
-      (nix (target-up-to-date? target))
-      (unwind-protect
-           (let ((*parents* (cons target *parents*)))
-             (run-script build-script))
-        (save-temp-prereqs target)
-        (save-temp-prereqsne target))
-      (setf (target-up-to-date? target) t)))
-  (target-stamp target))
+  (let ((target (resolve-target target)))
+    (ensure (cached-stamp target)
+      ;; This only needs to be checked if we are actually building.
+      ;; E.g. `trivial-prereq'.
+      (when (member target *parents* :test #'target=)
+        (error 'recursive-dependency
+               :target target))
+      (when (target? target)
+        (clear-temp-prereqs target)
+        (clear-temp-prereqsne target)
+        (let ((build-script (resolve-build-script target)))
+          (nix (target-up-to-date? target))
+          (unwind-protect
+               (let ((*parents* (cons target *parents*)))
+                 (run-script build-script))
+            (save-temp-prereqs target)
+            (save-temp-prereqsne target))
+          (setf (target-up-to-date? target) t)))
+      (target-stamp target))))
 
 (defun redo-all (targets)
   "Unconditionally build each target in TARGETS."
-  (saving-database
-    (do-each (target (reshuffle targets))
-      (redo-target target))))
+  (with-build-env ()
+    (saving-database
+      (do-each (target (reshuffle targets))
+        (redo-target target)))))
 
 (defun resolve-build-script (target)
   "Find a build script for TARGET, and depend on it.
@@ -101,8 +133,9 @@ If there is no script for TARGET, signal an error."
           (redo-ifchange script-target)
           script)
         (progn
-          (cerror* "Retry"
-                   "No script found for ~a" target)
+          (cerror "Retry"
+                  'missing-script
+                  :target target)
           (resolve-build-script target)))))
 
 (defun prereq-changed? (saved-prereq)
@@ -110,7 +143,7 @@ If there is no script for TARGET, signal an error."
 and return T if the stamp has changed."
   (let* ((req (saved-prereq-target saved-prereq))
          (old-stamp (saved-prereq-stamp saved-prereq))
-         (new-stamp (target-stamp req)))
+         (new-stamp (target-stamp/cache req)))
     (not (stamp-satisfies-p new-stamp old-stamp))))
 
 (defun out-of-date? (target)
@@ -119,8 +152,8 @@ Note that this rebuilds any previously saved dependencies of TARGET
 that are themselves out of date."
   (mvlet* ((prereqsne (target-saved-prereqsne target))
            (prereqs (target-saved-prereqs target))
-           (target-does-not-exist? (not (target-exists? target)))
-           (non-existent-prereqs-exist? (some #'target-exists? prereqsne))
+           (target-does-not-exist? (not (target-exists?/cache target)))
+           (non-existent-prereqs-exist? (some #'target-exists?/cache prereqsne))
            (regular-prereqs-changed?
             ;; If we were ever to adopt parallelism as the default, we
             ;; could store information about which targets take
@@ -151,8 +184,9 @@ that are themselves out of date."
 
 (defun redo-ifchange-all (targets)
   "Rebuild each target in TARGETS if it is out of date."
-  (do-each (i (reshuffle targets))
-    (redo-ifchange-target i)))
+  (with-build-env ()
+    (do-each (i (reshuffle targets))
+      (redo-ifchange-target i))))
 
 (defun redo-ifcreate (&rest targets)
   "Depend on the non-existence of each target in TARGETS."
@@ -160,11 +194,12 @@ that are themselves out of date."
 
 (defun redo-ifcreate-all (targets)
   "Depend on the non-existence of each target in TARGETS."
-  (let ((targets (map 'vector #'resolve-target targets)))
-    (do-each (target (reshuffle targets))
-      (assert (not (target-exists? target)) ()
-              "Target exists: ~a" target)
-      (record-prereqne target))))
+  (with-build-env ()
+    (let ((targets (map 'vector #'resolve-target targets)))
+      (do-each (target (reshuffle targets))
+        (assert (not (target-exists?/cache target)) ()
+                "Target exists: ~a" target)
+        (record-prereqne target)))))
 
 (defun redo-always ()
   "Depend on an impossible prerequisite.
