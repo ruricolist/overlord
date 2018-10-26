@@ -13,7 +13,6 @@
            #:*db-version*
            #:db-version
            #:*suppress-phonies*
-           #:*save-pending*
            #:use-threads-p))
 (in-package #:overlord/specials)
 
@@ -52,4 +51,3 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defvar *suppress-phonies* nil)
 (declaim (type boolean *suppress-phonies*))
 
-(defvar *save-pending* nil)

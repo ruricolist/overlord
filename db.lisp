@@ -58,6 +58,9 @@
 ;;; written to disk. (This might require zlib.) Only if that becomes
 ;;; an impediment would be worthwhile to introduce a binary format.
 
+(defvar *save-pending* nil
+  "Is there a save pending?")
+
 (deftype db-key ()
   "Type of database keys."
   '(not null))
