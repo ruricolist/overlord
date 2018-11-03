@@ -3,8 +3,8 @@
 Overlord is an experimental build system for Common Lisp,
 inspired by [Redo][].
 
-Overlord addresses two problems which might seem unrelated, but
-which, on closer examination, turn out to the same problem:
+Overlord addresses two problems which might seem unrelated, but which,
+on closer examination, turn out to the same problem:
 
 1. It lets you reproducibly specify the desired state of a Lisp system
    which is to be saved as an image.
@@ -20,11 +20,6 @@ Redo and other build systems, [consult the wiki][wiki].
 
 ## Advice for users
 
-*Overlord is experimental*. For the most part, trying to document the
-API at this stage would be futile. Instead, this README discusses the
-concepts behind Overlord. If you’re looking for the current syntax,
-consult the [test suite](tests.lisp) and the [files it uses](tests/).
-
 Before loading Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
@@ -35,22 +30,13 @@ used instead).
 
 Overlord stores its persistent data structures in a cache directory.
 On Linux, this is `$XDG_CACHE_HOME/overlord`. The data structures
-stored there are versioned. Since this version number is increasing
-rapidly, it might worth checking the cache directory from time to time
-to delete obsolete files.
+stored there are versioned. It might worth checking the cache
+directory from time to time to delete obsolete files.
 
 Overlord is developed and tested on Clozure and SBCL. In the future it
-may support other Lisp implementations, but that is not a priority.
-Lisp implementations that do not support image-based persistence (e.g.
-ECL) are unlikely to receive support.
-
-When I say “experimental”, I mean it. Anything may change at any time.
-
-### About Quicklisp
-
-Overlord is now in [Quicklisp][]. This does not mean Overlord is done:
-it remains pre-alpha. But it does mean that development will now take
-place in a [separate `dev` branch][dev].
+may officially support other Lisp implementations, but that is not a
+priority. Lisp implementations that do not support image-based
+persistence (e.g. ECL) are unlikely to receive support.
 
 ## Examples
 
@@ -67,7 +53,7 @@ Here are some examples of how to make direct use of Overlord:
 3. [Vernacular][]. Provides a module system for embedding languages,
    with arbitrary syntaxes, into Common Lisp systems.
 
-## Parallelism
+## (Non-)Parallelism
 
 One thing that might not be obvious about Redo-style build systems is
 that they afford unusually good opportunities for parallelism.
@@ -80,14 +66,9 @@ whenever possible, randomizing the order in which targets are built.
 
 During development, as targets are defined and re-defined, and rebuilt
 or not rebuilt, the actual state of the Lisp world will drift away
-from the one specified by Overlord’s dependency graph. Before dumping
-an image such discrepancies must be resolved. It is obviously
-undesirable, for example, for an image built on one machine to try to
-lazy-load a module on another machine where the source of that module
-is unavailable. (Actually it would be a disaster, since that source
-file might be provided maliciously.)
-
-Thus, before an image is saved, Overlord needs to do two things:
+from the one specified by Overlord’s dependency graph. Before an image
+is saved, Overlord needs to do two things to resolve such
+discrepancies:
 
 1. Finalize the state of the image by making sure that all defined
    targets have been built.
@@ -95,8 +76,8 @@ Thus, before an image is saved, Overlord needs to do two things:
 2. Disable itself.
 
 If you use `uiop:dump-image` to save the image, you don’t need to do
-anything; Overlord will finalize the state of the image, and disable
-itself, automatically.
+anything else; Overlord will finalize the state of the image, and
+disable itself, automatically.
 
 If you are using implementation-specific means to save an image,
 however, you will need to arrange to call `overlord:freeze` before the
