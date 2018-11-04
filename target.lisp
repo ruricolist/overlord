@@ -1263,6 +1263,9 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (define-script-keyword-macro :file (file)
   `(:path ,file))
 
+(define-script-keyword-macro :files (files)
+  `(map 'vector #'path ,files))
+
 (define-script-keyword-macro :file-digest (file)
   `(file-digest-ref (path ,file)))
 
