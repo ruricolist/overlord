@@ -84,6 +84,7 @@
    :define-target-config
    :var-target
    :define-target-var
+   :define-var-once
    :file-target
 
    :ensure-absolute
@@ -1453,6 +1454,12 @@ rebuilt."
             `(setf (documentation ',name 'variable)
                    ,docstring)))
        ',name)))
+
+(defmacro define-var-once (name expr &optional docstring)
+  "Like `defvar', but also re-evaluate if EXPR changes."
+  (check-type docstring (or null string))
+  `(define-target-var ,name ,expr
+     ,@(unsplice docstring)))
 
 ;;; NB There is no `config-target' because configuration variables
 ;;; must always be bound.
