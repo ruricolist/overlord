@@ -1552,6 +1552,7 @@ specify the dependencies you want on build."
        ,pathname
        (lambda (,$3)
          (let ((,$1 ,pathname))
+           (declare (ignorable ,$1))
            ,script-form))))))
 
 (defmacro file-target (name pathname (&optional (in nil in?) (temp nil temp?)) &body script)
