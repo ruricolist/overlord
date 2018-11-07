@@ -1215,6 +1215,9 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (defvar *script-keyword-macros*
   (make-hash-table))
 
+(defun script-keyword? (k)
+  (nth-value 1 (gethash k *script-keyword-macros*)))
+
 (defun script-keyword-macro (name)
   (@ *script-keyword-macros*
      (assure keyword name)))
