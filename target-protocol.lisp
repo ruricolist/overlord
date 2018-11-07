@@ -135,7 +135,8 @@ should be copied.")
 
 (defgeneric run-script (task))
 
-(defgeneric record-prereq (target))
+(defgeneric record-prereq (target)
+  (:documentation "Record TARGET as a prerequisite of the current parent."))
 
 (defgeneric save-temp-prereqs (target))
 
@@ -143,7 +144,8 @@ should be copied.")
 
 (defgeneric save-temp-prereqsne (target))
 
-(defgeneric target-in-db? (target))
+(defgeneric target-in-db? (target)
+  (:documentation "Has TARGET been built before?"))
 
 (defgeneric target-saved-prereqs (target))
 

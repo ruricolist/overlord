@@ -131,8 +131,8 @@
 (deftype pathname ()
   'cl:pathname)
 
-;;; This confuses CCL: it thinks our `pathname' is a built-in type and
-;;; won't compile the above `deftype' form.
+;;; This would be nice, but it confuses CCL: it thinks our `pathname'
+;;; is a built-in type and won't compile the above `deftype' form.
 
 ;; (setf (find-class 'pathname)
 ;;       (find-class 'cl:pathname))
@@ -161,13 +161,16 @@ Works for SBCL, at least."
        ,slots
        ,@options)))
 
-(defun check-generic-function (method-name)
-  (unless (and (fboundp method-name)
-               (typep (fdefinition method-name)
+(defun check-generic-function (name)
+  "Check that NAME is bound to a generic function."
+  (unless (and (fboundp name)
+               (typep (fdefinition name)
                       'generic-function))
-    (error "No generic function for ~a" method-name)))
+    (error "No generic function for ~a" name)))
 
 (defmacro defmethod (name &body body)
+  "Like `cl:defmethod', but raise an error is NAME is not already
+bound as a generic function."
   `(progn
      (check-generic-function ',name)
      (cl:defmethod ,name ,@body)))
@@ -175,6 +178,7 @@ Works for SBCL, at least."
 
 ;;; Auxiliary functions for Redo.
 
+;;; Define properties for targets in the database.
 (defconst nonexist       :nonexist)
 (defconst prereqs        :prereqs)
 (defconst prereqs-temp   :prereqs-temp)
@@ -184,6 +188,7 @@ Works for SBCL, at least."
 (defconst uptodate       :uptodate)
 
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
+  "Make a saved prereq object."
   (cons x (assure stamp stamp)))
 
 (defmethod saved-prereq-target (p) (car p))
@@ -200,6 +205,8 @@ Works for SBCL, at least."
   (prop target prereqsne-temp (fset:empty-set)))
 
 (defun current-parent ()
+  "The current parent. If we are building, it is the target being
+built; otherwise it is the current package."
   (or (first *parents*)
       *package*))
 
@@ -219,6 +226,7 @@ Works for SBCL, at least."
         (record-prereq target))))
 
 (defgeneric record-parent-prereq (parent target)
+  (:documentation "Record TARGET as a prerequisite of PARENT.")
   (:method ((parent root-target) target)
     (declare (ignore target)))
   (:method ((parent package) target)
@@ -246,8 +254,9 @@ Works for SBCL, at least."
 (defmethod target-in-db? (target)
   (has-prop? target
              ;; The uptodate key is sort of a fallback for a target
-             ;; that, for whatever reason, has no prerequisites. Such
-             ;; a target would be built once, and then never again.
+             ;; that, for whatever reason, has no prerequisites.
+             ;; Otherwise such a target would be built once, and then
+             ;; never again.
              uptodate
              prereqs
              prereqs-temp
@@ -1559,7 +1568,14 @@ specify the dependencies you want on build."
            ,script-form))))))
 
 (defmacro file-target (name pathname (&optional (in nil in?) (temp nil temp?)) &body script)
-  "If TMP is null, no temp file is used."
+  "Define PATHNAME as a target.
+
+NAME is not a target; it is a lexical binding that serves as a
+convenient handle for the name of the target. (It is also necessary to
+be able to recognize that the file is out of date when the definition
+changes.)
+
+If TMP is not provided, no temp file is used."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (let* ((args (cond (temp? (list in temp))
