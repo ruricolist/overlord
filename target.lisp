@@ -1566,6 +1566,7 @@ specify the dependencies you want on build."
          (dir (pathname-directory-pathname pathname))
          (script-form
            `(with-current-dir (,dir)
+              ,pathname
               ,@script)))
     `(progn
        ;; Make the task accessible by name.
