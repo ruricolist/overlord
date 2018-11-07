@@ -17,8 +17,12 @@
     :missing-script
     :building?
     :redo-always)
-  (:import-from :overlord/build-env
-    :*use-build-cache*)
+
+  (:import-from :overlord/build-env :*use-build-cache*)
+  (:export :*use-build-cache*)
+
+  (:import-from :overlord/cmd :cmd)
+  (:export :cmd)
   (:export
    :recursive-dependency :missing-script
    :module-ref :module-ref* :module-exports :module-static-exports
@@ -28,7 +32,6 @@
    :write-file-if-changed :copy-file-if-changed
    :use-threads-p
    :building? :redo-always
-   :*use-build-cache*
    :overlord-error-target :overlord-error)
   (:use-reexport
    :overlord/base
