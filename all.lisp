@@ -39,5 +39,4 @@
    :overlord/oracle))
 
 (defpackage :overlord-user
-  (:use :cl :alexandria :serapeum :overlord/target)
-  (:shadowing-import-from :overlord/target :import :define-constant))
+  (:use :cl :alexandria :serapeum :overlord))
