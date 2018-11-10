@@ -6,7 +6,7 @@
     :overlord/global-state
     :overlord/asdf)
   (:import-from :overlord/specials
-    :*base* :*cli* :use-threads-p)
+    :*base* :*cli*)
   (:import-from :named-readtables
     :find-readtable)
   (:import-from :uiop
@@ -14,7 +14,7 @@
     :absolute-pathname-p
     :directory-pathname-p
     :merge-pathnames*
-    :chdir :getcwd :pathname-equal
+    :pathname-equal
     :*nil-pathname*)
   (:import-from :overlord/util
     :locate-dominating-file
@@ -56,33 +56,14 @@
 If `*default-pathname-defaults*' is an absolute directory pathname, return that.
 
 Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `*default-pathname-defaults*' to the new value, and return the new value."
-  (if (use-threads-p)
-      ;; If threading, just resolve *d-p-d*.
-      (let ((dpd *default-pathname-defaults*))
-        (if (absolute-directory-pathname? dpd) dpd
-            (setf *default-pathname-defaults*
-                  (absolute-directory-pathname dpd))))
-      ;; If not threading, make *d-p-d* and the working dir agree.
-      (lret ((dpd *default-pathname-defaults*)
-             (cwd (getcwd-safe)))
-        (unless (pathname-equal cwd dpd)
-          (setf *default-pathname-defaults* cwd)))))
-
-(defun getcwd-safe ()
-  "Like `getcwd', but default to your home directory if the directory
-  has been deleted."
-  (handler-case
-      (getcwd)
-    (serious-condition ()
-      (user-homedir-pathname))))
+  (let ((dpd *default-pathname-defaults*))
+    (if (absolute-directory-pathname? dpd) dpd
+        (setf *default-pathname-defaults*
+              (absolute-directory-pathname dpd)))))
 
 (defun (setf current-dir!) (dir)
   (lret ((dir (absolute-directory-pathname dir)))
     (ensure-directories-exist dir)
-    ;; Only change the OS working directory if we are single-threaded.
-    (unless (use-threads-p)
-      (unless (pathname-equal dir (getcwd-safe))
-        (chdir dir)))
     (unless (pathname-equal dir *default-pathname-defaults*)
       (setf *default-pathname-defaults* dir))))
 
