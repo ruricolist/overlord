@@ -1328,7 +1328,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (define-script-keyword-macro :extension (ext)
   `(extension ,ext))
 
-(define-script-keyword-macro :cmd (&rest args)
+(define-script-keyword-macro :run (&rest args)
   `(cmd ,@args))
 
 (define-script-keyword-macro :message (control-string &rest args)
