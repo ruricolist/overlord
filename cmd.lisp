@@ -47,35 +47,34 @@
 The OS-level current directory is per-process, not per thread. Using
 `chdir' could lead to race conditions. Instead, we arrange for the new
 process to change its own working directory."
-  (if (not (use-threads-p)) tokens
-      (destructuring-bind (command . args) tokens
-        (let ((dir (stringify-pathname (current-dir!))))
-          (if (not (os-windows-p))
-              `("/bin/sh"
-                "-c"
-                ;; Use Bernstein chaining; change to the directory in
-                ;; $1, shift, and exec the rest of the argument array.
-                ;; (If only there were a standard tool to do this,
-                ;; along the lines of chroot or su, so we wouldn't
-                ;; have to spin up a shell. Hopefully your distro uses
-                ;; something lighter than bash for /bin/sh.)
-                "cd $1; shift; exec \"$@\""
-                ;; Terminate processing of shell options; everything
-                ;; after this is passed through.
-                "--"
-                ,dir
-                ,command
-                ,@args)
-              ;; This looks weird, but it actually works, because the
-              ;; Windows API to start a process is called with a
-              ;; string rather than an array. We could just as well
-              ;; pass a string, but then we would have to do our own
-              ;; escaping.
-              `("cmd"
-                "/c"
-                "cd" ,dir
-                ;; Ampersand is the command separator.
-                "&" ,command ,@args))))))
+  (destructuring-bind (command . args) tokens
+    (let ((dir (stringify-pathname (current-dir!))))
+      (if (not (os-windows-p))
+          `("/bin/sh"
+            "-c"
+            ;; Use Bernstein chaining; change to the directory in
+            ;; $1, shift, and exec the rest of the argument array.
+            ;; (If only there were a standard tool to do this,
+            ;; along the lines of chroot or su, so we wouldn't
+            ;; have to spin up a shell. Hopefully your distro uses
+            ;; something lighter than bash for /bin/sh.)
+            "cd $1; shift; exec \"$@\""
+            ;; Terminate processing of shell options; everything
+            ;; after this is passed through.
+            "--"
+            ,dir
+            ,command
+            ,@args)
+          ;; This looks weird, but it actually works, because the
+          ;; Windows API to start a process is called with a
+          ;; string rather than an array. We could just as well
+          ;; pass a string, but then we would have to do our own
+          ;; escaping.
+          `("cmd"
+            "/c"
+            "cd" ,dir
+            ;; Ampersand is the command separator.
+            "&" ,command ,@args)))))
 
 (defun cmd (cmd &rest args)
   "Run a program.
