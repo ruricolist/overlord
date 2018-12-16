@@ -1481,6 +1481,7 @@ rebuilt."
           (when (stringp docstring)
             `(setf (documentation ',name 'variable)
                    ,docstring)))
+       (record-package-prereq* ',name)
        ',name)))
 
 (defmacro define-var-once (name expr &optional docstring)
@@ -1531,6 +1532,7 @@ rebuilt."
        (save-task ',name
                   (rebuild-symbol ',name (script-thunk ,@script)))
        (depends-on ',name)
+       (record-package-prereq* ',name)
        ',name)))
 
 
@@ -1613,6 +1615,7 @@ If TMP is not provided, no temp file is used."
                        (script-thunk
                          ,(file-target-form pathname script-form args))
                        (script-for ',name))
+       (record-package-prereq* ,pathname)
        ',pathname)))
 
 
