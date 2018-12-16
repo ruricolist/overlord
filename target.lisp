@@ -89,6 +89,7 @@
 
    :ensure-absolute
    :extension
+   :change-extension
    :defpattern
 
    :find-pattern
@@ -1140,6 +1141,9 @@ value and NEW do not match under TEST."
       (null *nil-pathname*)
       (string (make-pathname :type ext))
       (pathname ext))))
+
+(defun change-extension (file ext)
+  (merge-pathnames* (extension ext) file))
 
 (defun run (target &optional system-name)
   "Entry point for scripts."
