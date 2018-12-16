@@ -1021,7 +1021,7 @@ treated as out-of-date, regardless of file metadata."))
          (spaces (make-string depth :initial-element #\Space))
          ;; In case we are saving the database.
          (*print-readably*))
-    (message "~a→ ~a"
+    (message "~a@ ~a"
              spaces
              (target-node-label target))))
 
