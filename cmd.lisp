@@ -102,7 +102,12 @@ A property list is treated as a list of arguments to `uiop:run-program'."
                :error-output *message-stream*)))
       (if (use-threads-p)
           ;; If using threads, buffer stdout.
-          (write-string
-           (with-output-to-string (*standard-output*)
-             (cmd)))
+          (let ((stream (make-string-output-stream)))
+            (unwind-protect
+                 (let ((*standard-output* stream))
+                   (cmd))
+              (progn
+                (let ((string (get-output-stream-string stream)))
+                  (close stream)
+                  (write-string string)))))
           (cmd)))))
