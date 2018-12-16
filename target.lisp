@@ -122,7 +122,9 @@
    :pattern-ref
    :define-script
    :pattern-ref.input
-   :pattern-ref.output))
+   :pattern-ref.output
+   :clear-package-prereqs
+   :list-package-prereqs))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -879,20 +881,38 @@ treated as out-of-date, regardless of file metadata."))
           (setf (target-table-member new-table target) t))))))
 
 (defun list-package-prereqs (package)
+  "List the current prerequisites of PACKAGE."
   (~> package
+      find-package
       package-prereqs-table
       target-table-keys))
 
+(defun clear-package-prereqs (package)
+  "Clear the current prerequisites of PACKAGE.
+Return PACKAGE."
+  (let* ((package (find-package package))
+         (table (package-prereqs-table package)))
+    (clear-target-table table)
+    package))
+
 (defun record-package-prereq (package target)
-  (setf (target-package target) package))
+  "Save TARGET as a prerequisite of PACKAGE.
+Return TARGET."
+  (setf (target-package target) package)
+  target)
 
 (defun record-package-prereq* (target)
+  "Save TARGET as a prerequisite of the current PACKAGE.
+Return TARGET."
   (record-package-prereq *package* target))
 
 (defun ensure-target-recorded (target)
+  "Ensure that TARGET is recorded as a prerequisite.
+If there is no current parent, make TARGET a prerequisite of the
+current package."
   (if *parents*
       (record-prereq target)
-      (record-package-prereq *package* target)))
+      (record-package-prereq* target)))
 
 (defmethod target-saved-prereqs ((rt root-target))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
