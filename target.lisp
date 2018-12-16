@@ -94,6 +94,7 @@
 
    :find-pattern
    :build
+   :force-build
    :build-package
    :run
 
@@ -253,16 +254,17 @@ built; otherwise it is the current package."
   (withf (temp-prereqsne parent) target))
 
 (defmethod target-in-db? (target)
-  (has-prop? target
-             ;; The uptodate key is sort of a fallback for a target
-             ;; that, for whatever reason, has no prerequisites.
-             ;; Otherwise such a target would be built once, and then
-             ;; never again.
-             uptodate
-             prereqs
-             prereqs-temp
-             prereqsne
-             prereqsne-temp))
+  (and (not *force*)
+       (has-prop? target
+                  ;; The uptodate key is sort of a fallback for a target
+                  ;; that, for whatever reason, has no prerequisites.
+                  ;; Otherwise such a target would be built once, and then
+                  ;; never again.
+                  uptodate
+                  prereqs
+                  prereqs-temp
+                  prereqsne
+                  prereqsne-temp)))
 
 (defmethod target-in-db? ((target root-target)) t)
 (defmethod target-in-db? ((target package)) t)
@@ -1178,11 +1180,16 @@ value and NEW do not match under TEST."
       (redo root-target)
       (redo-all targets)))
 
+(defun force-build (&rest targets)
+  (let ((*force* t))
+    (apply #'build targets)))
+
 ;;; TODO build-package-tree? That is, build a package and all of its
 ;;; sub-packages \(packages beginning with $package/ or $package).
 
-(defun build-package (package)
-  (build (find-package package)))
+(defun build-package (package &key force)
+  (let ((*force* force))
+    (build (find-package package))))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))

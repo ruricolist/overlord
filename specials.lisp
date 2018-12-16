@@ -13,7 +13,8 @@
            #:*db-version*
            #:db-version
            #:*suppress-phonies*
-           #:use-threads-p))
+           #:use-threads-p
+           #:*force*))
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
@@ -51,3 +52,5 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defvar *suppress-phonies* nil)
 (declaim (type boolean *suppress-phonies*))
 
+(defvar *force* nil
+  "Whether to force rebuilding.")
