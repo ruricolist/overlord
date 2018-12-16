@@ -1198,16 +1198,21 @@ value and NEW do not match under TEST."
   (map nil #'redo-ifchange targets))
 
 (defun depends-on (&rest targets)
-  (depends-on-all targets))
+  "Depend on each target in TARGETS, in no particular order.
+Descends into lists."
+  (depends-on-all (flatten targets)))
 
 (defun depends-on* (&rest targets)
-  (depends-on-all* targets))
+  "Like `depends-on', but in order."
+  (depends-on-all* (flatten targets)))
 
 (defun depends-not-all (targets)
   (redo-ifcreate-all targets))
 
 (defun depends-not (&rest targets)
-  (depends-not-all targets))
+  "Depend on the targets in TARGETS not existing.
+Descends into lists."
+  (depends-not-all (flatten targets)))
 
 (defun use-all* (targets)
   "Depend on each target in TARGET -- as a normal prereq if TARGET
@@ -1223,11 +1228,11 @@ exists, and as a non-existent prereq if TARGET does not exist."
 
 (defun use (&rest targets)
   "Like `use-all', but variadic."
-  (use-all targets))
+  (use-all (flatten targets)))
 
 (defun use* (&rest targets)
   "Like `use', but ordered."
-  (use-all* targets))
+  (use-all* (flatten targets)))
 
 
 ;;; Registry for with-script.
