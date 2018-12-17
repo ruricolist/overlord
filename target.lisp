@@ -357,6 +357,12 @@ inherit a method on `make-load-form', and need only specialize
   (:method load-form-slot-names append (self)
     '(name))
 
+  (:method print-object (self stream)
+    (if (not *print-escape*)
+        (print-unreadable-object (self stream :type t)
+          (format t "~a" name))
+        (call-next-method)))
+
   (:method fset:compare (self (other ref))
     (fset:compare-slots self other #'class-name-of #'ref.name))
 
@@ -418,7 +424,13 @@ inherit a method on `make-load-form', and need only specialize
   (:method target-node-label (target)
     (fmt "directory ~a" path))
   (:method hash-target (target)
-    (dx-sxhash (list 'directory-ref path))))
+    (dx-sxhash (list 'directory-ref path)))
+  (:method print-object (target stream)
+    (if (not *print-escape*)
+        (call-next-method)
+        (format stream "~a~s"
+                (read-eval-prefix target stream)
+                `(directory-ref ,path)))))
 
 (defclass file-digest-ref (ref)
   ((name :type pathname
@@ -450,7 +462,13 @@ inherit a method on `make-load-form', and need only specialize
   (:method target-build-script (target)
     (target-build-script file))
   (:method target-node-label (target)
-    (target-node-label file)))
+    (target-node-label file))
+  (:method print-object (target stream)
+    (if (not *print-escape*)
+        (call-next-method)
+        (format stream "~a~s"
+                (read-eval-prefix target stream)
+                `(file-digest-ref ,file)))))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
