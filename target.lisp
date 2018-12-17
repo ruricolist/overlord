@@ -124,7 +124,8 @@
    :pattern-ref.input
    :pattern-ref.output
    :clear-package-prereqs
-   :list-package-prereqs))
+   :list-package-prereqs
+   :directory-ref))
 
 (in-package :overlord/target)
 (in-readtable :standard)
