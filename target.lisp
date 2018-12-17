@@ -1764,6 +1764,10 @@ depends on that."
        (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
          (call/temp-file-pathname ,out
-                                  (lambda (,out)
-                                    (with-script ()
-                                      ,@script)))))))
+                                  ,(receive (script decls docs)
+                                       (parse-body script)
+                                     (declare (ignore docs))
+                                     `(lambda (,out)
+                                        ,@decls
+                                        (with-script ()
+                                          ,@script))))))))
