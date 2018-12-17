@@ -74,6 +74,13 @@ process to change its own working directory."
             ;; Ampersand is the command separator.
             "&" ,command ,@args)))))
 
+(defun maybe-strip-carriage-returns (string)
+  (if #.(os-windows-p)
+      (string-replace-all #.(coerce (list #\Return #\Newline) 'string)
+                          string
+                          #.(string #\Newline))
+      string))
+
 (defun cmd (cmd &rest args)
   "Run a program.
 
@@ -107,5 +114,6 @@ A property list is treated as a list of arguments to `uiop:run-program'."
               (progn
                 (let ((string (get-output-stream-string stream)))
                   (close stream)
-                  (write-string string)))))
+                  (let ((string (maybe-strip-carriage-returns string)))
+                    (write-string string))))))
           (cmd)))))
