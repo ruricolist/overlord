@@ -9,8 +9,6 @@
   (:export :cmd))
 (cl:in-package :overlord/cmd)
 
-;;; TODO Should cmd convert newlines to spaces (like Make does)?
-
 (defun parse-cmd-args (args)
   (let ((tokens (queue))
         (plist (queue)))
