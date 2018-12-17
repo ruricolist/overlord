@@ -548,8 +548,8 @@ inherit a method on `make-load-form', and need only specialize
   (name (or symbol delayed-symbol)))
 
 (defmethod fset:compare ((x phony-target) (y phony-target))
-  (fset:compare (force-symbol (phony-target-name x))
-                (force-symbol (phony-target-name y))))
+  (fset:compare (phony-target-name x)
+                (phony-target-name y)))
 
 (fset:define-cross-type-compare-methods phony-target)
 
