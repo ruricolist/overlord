@@ -382,7 +382,8 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun directory-ref (name)
   "Wrap NAME as a directory reference."
-  (etypecase-of (or string directory-pathname) name
+  (etypecase-of (or string directory-pathname relative-pathname) name
+    (relative-pathname (directory-ref (ensure-absolute name)))
     (string (directory-ref (ensure-pathname name :want-pathname t)))
     (directory-pathname (make 'directory-ref :path name))))
 
