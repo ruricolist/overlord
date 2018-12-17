@@ -44,7 +44,12 @@
     (unwind-protect
          (funcall fn)
       (when (equal (overlord/specials:db-version) version)
-        (overlord/db:delete-versioned-db)))))
+        ;; Busy-wait until we can actually delete the temp db (we may
+        ;; still be writing to it, regardless of `finish-output').
+        (loop (ignore-errors
+               (overlord/db:delete-versioned-db)
+               (return))
+              (sleep 1))))))
 
 (defmacro with-temp-db ((&key) &body body)
   (with-thunk (body)
