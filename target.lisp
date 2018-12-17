@@ -1753,6 +1753,7 @@ depends on that."
        (define-script-for ,class-name
          ,in
          ,out
+         ,@options
          ,@script)
        (with-script ()
          (defclass ,class-name (pattern)
