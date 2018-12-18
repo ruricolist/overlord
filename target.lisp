@@ -1762,7 +1762,9 @@ depends on that."
            ()
            (:default-initargs
             :script ',(script-for class-name)
-            ,@options)
+            ;; Save the base around initforms.
+            ,@(loop for (initarg initform) in (batches options 2)
+                    append `(,initarg ,(save-base initform))))
            ,@class-options))
        (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
