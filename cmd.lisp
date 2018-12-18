@@ -111,9 +111,8 @@ A property list is treated as a list of arguments to `uiop:run-program'."
             (unwind-protect
                  (let ((*standard-output* stream))
                    (cmd))
-              (progn
-                (let ((string (get-output-stream-string stream)))
-                  (close stream)
-                  (let ((string (maybe-strip-carriage-returns string)))
-                    (write-string string))))))
+              (let ((string (get-output-stream-string stream)))
+                (close stream)
+                (let ((string (maybe-strip-carriage-returns string)))
+                  (write-string string)))))
           (cmd)))))
