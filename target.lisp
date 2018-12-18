@@ -89,7 +89,7 @@
 
    :ensure-absolute
    :extension
-   :change-extension
+   :change-pathname-type
    :defpattern
 
    :find-pattern
@@ -1184,7 +1184,7 @@ value and NEW do not match under TEST."
       (string (make-pathname :type ext))
       (pathname ext))))
 
-(defun change-extension (file ext)
+(defun change-pathname-type (file ext)
   (merge-pathnames* (extension ext) file))
 
 (defun run (target &optional system-name)
