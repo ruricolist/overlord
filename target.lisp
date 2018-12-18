@@ -1504,6 +1504,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
        (defvar ,name)
        (save-task ',name
                   (rebuild-symbol ',name (script-thunk ,@script)))
+       (record-package-prereq* ',name)
        ',name)))
 
 (defmacro define-target-var (name expr &body deps)
@@ -1523,7 +1524,6 @@ rebuilt."
           (when (stringp docstring)
             `(setf (documentation ',name 'variable)
                    ,docstring)))
-       (record-package-prereq* ',name)
        ',name)))
 
 (defmacro define-var-once (name expr &optional docstring)
