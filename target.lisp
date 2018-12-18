@@ -506,10 +506,10 @@ inherit a method on `make-load-form', and need only specialize
     (merge-pathnames* (pattern.input-defaults pattern)
                       input)))
 
-(defgeneric merge-output-defaults (pattern input)
-  (:method (pattern input)
+(defgeneric merge-output-defaults (pattern output)
+  (:method (pattern output)
     (merge-pathnames (pattern.output-defaults pattern)
-                     input)))
+                     output)))
 
 (defun print-pattern-ref (pattern ref stream)
   (let* ((input (pattern-ref.input ref))
@@ -554,17 +554,17 @@ inherit a method on `make-load-form', and need only specialize
                         #'pattern-ref.input
                         #'pattern-ref.pattern)))
 
-(defun pattern-ref (pattern file)
+(defun pattern-ref (pattern input)
   "Make a pattern reference, or a list of pattern references."
   ;; TODO Should this be absolute?
   ;; Shouldn't this complain about relative vs. absolute?
-  (ensure-pathnamef file)
-  (if (wild-pathname-p file)
+  (ensure-pathnamef input)
+  (if (wild-pathname-p input)
       (mapcar (op (pattern-ref pattern _))
-              (directory* file))
+              (directory* input))
       (make 'pattern-ref
             :pattern pattern
-            :input file)))
+            :input input)))
 
 (defconstructor phony-target
   (name (or symbol delayed-symbol)))
