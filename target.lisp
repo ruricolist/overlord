@@ -1469,7 +1469,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
   (setf (gethash (assure symbol name) *scripts*) t))
 
 (defun clear-scripts ()
-  "Nix all symbols registered as script."
+  "Nix all symbols registered as scripts."
   (let ((scripts (shiftf *scripts* (make-hash-table))))
     (do-hash-table (k v scripts)
       (declare (ignore v))
