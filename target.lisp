@@ -1497,6 +1497,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
   (similar? x y))
 
 (defmacro var-target (name expr &body deps)
+  "Like `define-target-var', but does not actually evaluate anything."
   (let ((script (append1 deps expr)))
     `(progn
        (define-script-for ,name
