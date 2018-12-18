@@ -1564,6 +1564,7 @@ rebuilt."
            (script-thunk (rebuild-symbol name script-thunk)))
       (save-task name script-thunk))
     (depends-on name))
+  (assert (boundp name))
   (let ((init (symbol-value name))
         (timestamp (target-timestamp name)))
     `(progn
