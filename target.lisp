@@ -123,6 +123,7 @@
    :define-script
    :pattern-ref.input
    :pattern-ref.output
+   :pattern-ref-output
    :clear-package-prereqs
    :list-package-prereqs
    :directory-ref))
@@ -487,6 +488,7 @@ inherit a method on `make-load-form', and need only specialize
     :accessor pattern-ref.input)
    (output
     :type pathname
+    :reader pattern-ref-output
     :reader pattern-ref.output)))
 
 ;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
