@@ -6,6 +6,8 @@
     :overlord/types)
   (:import-from :overlord/specials
     :*suppress-phonies*)
+  (:import-from :overlord/kernel
+    :end-our-kernel)
   (:export
    :freeze :freeze-policy
    :unfreeze
@@ -59,6 +61,7 @@ distributed."
 (defun freeze ()
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
+    (end-our-kernel)
     (labels ((freeze ()
                (format t "~&Overlord: freezing image...~%")
                (redo)
