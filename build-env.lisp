@@ -11,7 +11,8 @@
    #:*use-build-cache*
    #:cached-stamp
    #:target-exists?/cache
-   #:target-stamp/cache))
+   #:target-stamp/cache
+   #:build-env-closure))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -22,6 +23,12 @@ non-caching behavior is desired.")
 
 (defvar-unbound *build-env*
   "Environment for the current build.")
+
+(defun build-env-closure (fn)
+  (dynamic-closure
+   '(*use-build-cache*
+     *build-env*)
+   fn))
 
 (defsubst use-build-cache? ()
   *use-build-cache*)

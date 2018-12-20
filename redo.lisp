@@ -10,6 +10,10 @@
     #:overlord/target-protocol
     #:overlord/target-table
     #:overlord/build-env)
+  (:import-from #:overlord/kernel
+    #:with-our-kernel)
+  (:import-from #:lparallel
+    #:psome)
   (:import-from #:overlord/types
     #:overlord-error
     #:overlord-error-target)
@@ -146,6 +150,14 @@ and return T if the stamp has changed."
          (new-stamp (target-stamp/cache req)))
     (not (stamp-satisfies-p new-stamp old-stamp))))
 
+(defun some* (fn seq)
+  "Like `some', but possibly parallel."
+  (if (use-threads-p)
+      (with-our-kernel ()
+        (psome (build-env-closure fn)
+               seq))
+      (some fn seq)))
+
 (defun out-of-date? (target)
   "Return T if TARGET needs rebuilding.
 Note that this rebuilds any previously saved dependencies of TARGET
@@ -153,7 +165,8 @@ that are themselves out of date."
   (mvlet* ((prereqsne (target-saved-prereqsne target))
            (prereqs (target-saved-prereqs target))
            (target-does-not-exist? (not (target-exists?/cache target)))
-           (non-existent-prereqs-exist? (some #'target-exists?/cache prereqsne))
+           (non-existent-prereqs-exist?
+            (some* #'target-exists?/cache prereqsne))
            (regular-prereqs-changed?
             ;; If we were ever to adopt parallelism as the default, we
             ;; could store information about which targets take
@@ -162,7 +175,7 @@ that are themselves out of date."
             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
                    (outdated (filter #'out-of-date? reqs)))
               (redo-all outdated)
-              (some #'prereq-changed? prereqs)))
+              (some* #'prereq-changed? prereqs)))
            (not-in-db?
             (and (target? target)
                  (not (target-in-db? target)))))
