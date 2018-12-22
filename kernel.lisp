@@ -10,46 +10,46 @@
   (:import-from #:uiop
     #:register-image-dump-hook)
   (:export
-   #:with-our-kernel
-   #:end-our-kernel
+   #:with-meta-kernel
+   #:end-meta-kernel
    #:make-resource
    #:with-resource-held))
 (in-package :overlord/kernel)
 
-(defconst threads 8)
+(defconst meta-thread-count 8)
 
-(defvar-unbound *our-kernel*
-  "Lparallel kernel for Overlord.")
+(defvar-unbound *meta-kernel*
+  "Lparallel kernel for fetching target metadata.")
 
-(defun call/our-kernel (thunk)
+(defun call/meta-kernel (thunk)
   (if (use-threads-p)
-      (let ((*kernel* (ensure-our-kernel)))
+      (let ((*kernel* (ensure-meta-kernel)))
         (funcall thunk))
       (funcall thunk)))
 
-(defmacro with-our-kernel ((&key) &body body)
+(defmacro with-meta-kernel ((&key) &body body)
   (with-thunk (body)
-    `(call/our-kernel ,body)))
+    `(call/meta-kernel ,body)))
 
-(defun ensure-our-kernel ()
-  (start-our-kernel)
-  *our-kernel*)
+(defun ensure-meta-kernel ()
+  (start-meta-kernel)
+  *meta-kernel*)
 
-(defun start-our-kernel ()
-  (unless (boundp '*our-kernel*)
-    (synchronized ('*our-kernel*)
-      (unless (boundp '*our-kernel*)
-        (message "Initializing thread pool")
-        (setf *our-kernel*
-              (make-kernel threads
-                           :name "Overlord worker"))))))
+(defun start-meta-kernel ()
+  (unless (boundp '*meta-kernel*)
+    (synchronized ('*meta-kernel*)
+      (unless (boundp '*meta-kernel*)
+        (message "Initializing metadata thread pool")
+        (setf *meta-kernel*
+              (make-kernel meta-thread-count
+                           :name "Overlord metadata fetcher"))))))
 
-(defun end-our-kernel ()
+(defun end-meta-kernel ()
   "Terminate the Overlord kernel."
-  (when (boundp '*our-kernel*)
-    (synchronized ('*our-kernel*)
-      (when-let (*kernel* (bound-value '*our-kernel*))
-        (message "Terminating Overlord thread pool")
+  (when (boundp '*meta-kernel*)
+    (synchronized ('*meta-kernel*)
+      (when-let (*kernel* (bound-value '*meta-kernel*))
+        (message "Terminating Overlord metadata thread pool")
         (end-kernel :wait t)))))
 
-(register-image-dump-hook 'end-our-kernel)
+(register-image-dump-hook 'end-meta-kernel)

@@ -11,7 +11,7 @@
     #:overlord/target-table
     #:overlord/build-env)
   (:import-from #:overlord/kernel
-    #:with-our-kernel)
+    #:with-meta-kernel)
   (:import-from #:lparallel
     #:psome)
   (:import-from #:overlord/types
@@ -153,9 +153,8 @@ and return T if the stamp has changed."
 (defun some* (fn seq)
   "Like `some', but possibly parallel."
   (if (use-threads-p)
-      (with-our-kernel ()
-        (psome (build-env-closure fn)
-               seq))
+      (with-meta-kernel ()
+        (psome (build-env-closure fn) seq))
       (some fn seq)))
 
 (defun out-of-date? (target)
