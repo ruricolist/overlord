@@ -1,5 +1,5 @@
-(defpackage :overlord/build-env
-  (:documentation "Environment for builds, including (but not limited
+(uiop:define-package :overlord/build-env
+    (:documentation "Environment for builds, including (but not limited
   to) caching already built targets.")
   (:use :cl :alexandria :serapeum
     :overlord/target-table
@@ -52,7 +52,8 @@ non-caching behavior is desired.")
             (:constructor make-target-meta (target)))
   (target (error "No target")
    :read-only t)
-  (stamp nil))
+  (stamp nil)
+  (lock (bt:make-lock)))
 
 (defun call-in-build-env (fn)
   (if (build-env-bound?)
@@ -70,6 +71,22 @@ non-caching behavior is desired.")
         (synchronized (table)
           (ensure (target-table-ref table target)
             (make-target-meta target))))))
+
+(defmacro with-target-meta-locked ((target &key) &body body)
+  (with-thunk (body)
+    `(call-with-target-meta-locked ,target ,body)))
+
+(defun call-with-target-meta-locked (target fn)
+  (if (not (build-env-bound?)) (funcall fn)
+      (let* ((meta (target-meta target))
+             (lock (target-meta.lock meta)))
+        (bt:with-lock-held (lock)
+          (funcall fn)))))
+
+(defmethod call-with-target-locked (target fn)
+  "Make call-with-target-meta-locked the default for call-with-target-locked."
+  (with-target-meta-locked (target)
+    (funcall fn)))
 
 (defun cached-stamp (target)
   (when (build-env-bound?)

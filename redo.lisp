@@ -102,21 +102,22 @@
     (ensure (cached-stamp target)
       ;; This only needs to be checked if we are actually building.
       ;; E.g. `trivial-prereq'.
-      (when (member target *parents* :test #'target=)
-        (error 'recursive-dependency
-               :target target))
-      (when (target? target)
-        (clear-temp-prereqs target)
-        (clear-temp-prereqsne target)
-        (let ((build-script (resolve-build-script target)))
-          (nix (target-up-to-date? target))
-          (unwind-protect
-               (let ((*parents* (cons target *parents*)))
-                 (run-script build-script))
-            (save-temp-prereqs target)
-            (save-temp-prereqsne target))
-          (setf (target-up-to-date? target) t)))
-      (target-stamp target))))
+      (with-target-locked (target)
+        (when (member target *parents* :test #'target=)
+          (error 'recursive-dependency
+                 :target target))
+        (when (target? target)
+          (clear-temp-prereqs target)
+          (clear-temp-prereqsne target)
+          (let ((build-script (resolve-build-script target)))
+            (nix (target-up-to-date? target))
+            (unwind-protect
+                 (let ((*parents* (cons target *parents*)))
+                   (run-script build-script))
+              (save-temp-prereqs target)
+              (save-temp-prereqsne target))
+            (setf (target-up-to-date? target) t)))
+        (target-stamp target)))))
 
 (defun redo-all (targets)
   "Unconditionally build each target in TARGETS."

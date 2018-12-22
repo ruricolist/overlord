@@ -433,7 +433,10 @@ inherit a method on `make-load-form', and need only specialize
         (call-next-method)
         (format stream "~a~s"
                 (read-eval-prefix target stream)
-                `(directory-ref ,path)))))
+                `(directory-ref ,path))))
+  (:method call-with-target-locked (target fn)
+    "Lock the directory (file), not target."
+    (call-with-target-locked path fn)))
 
 (defclass file-digest-ref (ref)
   ((name :type pathname
@@ -471,7 +474,9 @@ inherit a method on `make-load-form', and need only specialize
         (call-next-method)
         (format stream "~a~s"
                 (read-eval-prefix target stream)
-                `(file-digest-ref ,file)))))
+                `(file-digest-ref ,file))))
+  (:method call-with-target-locked (target fn)
+    (call-with-target-locked file fn)))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -552,7 +557,10 @@ inherit a method on `make-load-form', and need only specialize
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
                         #'pattern-ref.input
-                        #'pattern-ref.pattern)))
+                        #'pattern-ref.pattern))
+
+  (:method call-with-target-locked (self fn)
+    (call-with-target-locked output fn)))
 
 (defun pattern-ref (pattern input)
   "Make a pattern reference, or a list of pattern references."
@@ -572,6 +580,11 @@ inherit a method on `make-load-form', and need only specialize
 (defmethod fset:compare ((x phony-target) (y phony-target))
   (fset:compare (phony-target-name x)
                 (phony-target-name y)))
+
+(defmethod call-with-target-locked ((target phony-target) fn)
+  (let* ((name (phony-target-name target))
+         (target (force-symbol name)))
+    (call-with-target-locked target fn)))
 
 (fset:define-cross-type-compare-methods phony-target)
 
@@ -601,7 +614,10 @@ inherit a method on `make-load-form', and need only specialize
     (equal (relative-file-truename self)
            (relative-file-truename other)))
   (:method target-build-script (self)
-    (target-build-script (relative-file-truename self))))
+    (target-build-script (relative-file-truename self)))
+  (:method call-with-locked-target (self fn)
+    (let ((file (relative-file-truename self)))
+      (call-with-locked-target file fn))))
 
 (defclass system-resource (relative-file-target)
   ((system
@@ -857,6 +873,24 @@ treated as out-of-date, regardless of file metadata."))
                      0))))
             (when (= count 1)
               (collect target))))))))
+
+
+(defmethod call-with-target-locked ((target root-target) fn)
+  (funcall fn))
+
+(defmethod call-with-target-locked ((target trivial-prereq) fn)
+  (funcall fn))
+
+(defmethod call-with-target-locked ((target impossible-prereq) fn)
+  (funcall fn))
+
+(defmethod call-with-target-locked ((target delayed-symbol) fn)
+  (let ((target (force-symbol target)))
+    (call-with-target-locked target fn)))
+
+(defmethod call-with-target-locked ((target cl:pathname) fn)
+  (let ((target (resolve-target target)))
+    (call-with-target-locked target fn)))
 
 
 ;;; Building targets (scripts).

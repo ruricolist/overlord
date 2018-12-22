@@ -1,5 +1,5 @@
-(defpackage :overlord/target-protocol
-  (:use :cl :alexandria :serapeum)
+(uiop:define-package :overlord/target-protocol
+    (:use :cl :alexandria :serapeum)
   (:import-from :overlord/stamp :target-timestamp :never)
   (:import-from :overlord/types :hash-code :error*)
   (:import-from :fset :compare :define-cross-type-compare-methods)
@@ -17,6 +17,8 @@
    #:resolve-target
    #:target-build-script
    #:target-node-label
+   #:call-with-target-locked
+   #:with-target-locked
    ;; Other methods.
    #:build-script-target
    #:run-script
@@ -126,6 +128,13 @@ should be copied.")
       (call-next-method)))
   (:method (target)
     (princ-to-string target)))
+
+(defgeneric call-with-target-locked (target fn)
+  (:documentation "Call FN with TARGET locked."))
+
+(defmacro with-target-locked ((target &key) &body body)
+  (with-thunk (body)
+    `(call-with-target-locked ,target ,body)))
 
 
 
