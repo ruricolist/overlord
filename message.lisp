@@ -2,7 +2,6 @@
   (:use :cl :alexandria :serapeum
     :overlord/global-state)
   (:import-from :overlord/types :overlord-condition)
-  (:import-from :overlord/specials :use-threads-p)
   (:export
    :overlord-message
    :message
@@ -22,16 +21,7 @@
            (if (stringp control)
                (string-right-trim "." control)
                control)))
-    (flet ((message (stream)
-             (format stream "~&[Overlord] ~?~%" control args)))
-      (if (use-threads-p)
-          ;; Write the message en bloc to try to avoid interleaving
-          ;; messages.
-          (write-string
-           (with-output-to-string (stream)
-             (message stream))
-           stream)
-          (message stream)))))
+    (format stream "~&[Overlord] ~?~%" control args)))
 
 (define-compiler-macro message (&whole call format-control &rest format-arguments)
   (if (not (stringp format-control)) call

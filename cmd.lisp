@@ -1,7 +1,6 @@
 (cl:defpackage :overlord/cmd
   (:use :cl :alexandria :serapeum)
   (:shadowing-import-from :serapeum :collecting :summing :in)
-  (:import-from :overlord/specials :use-threads-p)
   (:import-from :overlord/base :base :current-dir!)
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream*)
@@ -99,20 +98,8 @@ start with a dash.
 
 A property list is treated as a list of arguments to `uiop:run-program'."
   (multiple-value-bind (tokens plist) (parse-cmd-args (cons cmd args))
-    (flet ((cmd ()
-             (multiple-value-call #'uiop:run-program
-               (wrap-with-current-dir tokens)
-               (values-list plist)
-               :output t
-               :error-output *message-stream*)))
-      (if (use-threads-p)
-          ;; If using threads, buffer stdout.
-          (let ((stream (make-string-output-stream)))
-            (unwind-protect
-                 (let ((*standard-output* stream))
-                   (cmd))
-              (let ((string (get-output-stream-string stream)))
-                (close stream)
-                (let ((string (maybe-strip-carriage-returns string)))
-                  (write-string string)))))
-          (cmd)))))
+    (multiple-value-call #'uiop:run-program
+      (wrap-with-current-dir tokens)
+      (values-list plist)
+      :output t
+      :error-output *message-stream*)))
