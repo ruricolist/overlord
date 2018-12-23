@@ -5,7 +5,13 @@
     :overlord/target-table
     :overlord/target-protocol)
   (:import-from :bordeaux-threads
-    :make-lock)
+    :make-lock :make-recursive-lock
+    :with-lock-held :with-recursive-lock-held)
+  (:import-from :overlord/kernel :nproc)
+  (:import-from :overlord/specials :use-threads-p)
+  (:import-from :overlord/message :message)
+  (:import-from :overlord/db :saving-database)
+  (:import-from :lparallel :make-kernel :*kernel*)
   (:export
    #:with-build-env
    #:*use-build-cache*
@@ -20,6 +26,8 @@
 
 Note that this can safely be rebound around part of a build when
 non-caching behavior is desired.")
+
+(defvar *build-id* 0)
 
 (defvar-unbound *build-env*
   "Environment for the current build.")
@@ -39,10 +47,23 @@ non-caching behavior is desired.")
 (defclass build-env ()
   ((lock :initform (make-recursive-lock)
          :reader monitor)
+   (id :type (integer 1 *)
+       :initform (synchronized ()
+                   (incf *build-id*)))
    (table
     :initform (make-target-table)
-    :reader build-env.table))
+    :reader build-env.table)
+   (kernel :initform nil
+           :reader build-env.kernel))
   (:documentation "Metadata for the build run."))
+
+(defmethod initialize-instance :after ((env build-env) &key)
+  (with-slots (id kernel) env
+    (when (use-threads-p)
+      (message "Initializing threads for build ~a." id)
+      (setf kernel
+            (make-kernel nproc
+                         :name (fmt "Kernel for build ~a." id))))))
 
 (defsubst make-build-env ()
   (make 'build-env))
@@ -58,8 +79,16 @@ non-caching behavior is desired.")
 (defun call-in-build-env (fn)
   (if (build-env-bound?)
       (funcall fn)
-      (let ((*build-env* (make-build-env)))
-        (funcall fn))))
+      (let* ((env (make-build-env)))
+        (with-slots (kernel id) env
+          (let ((*build-env* env)
+                (*kernel* kernel))
+            (saving-database
+              (unwind-protect
+                   (funcall fn)
+                (when kernel
+                  (message "Terminating threads for build ~a." id)
+                  (lparallel:end-kernel :wait t)))))))))
 
 (defmacro with-build-env ((&key) &body body)
   (with-thunk (body)

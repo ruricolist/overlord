@@ -1,5 +1,5 @@
-(defpackage :overlord/kernel
-  (:use #:cl #:alexandria #:serapeum)
+(uiop:define-package :overlord/kernel
+    (:use #:cl #:alexandria #:serapeum)
   (:import-from #:overlord/message #:message)
   (:import-from #:overlord/specials #:use-threads-p)
   (:import-from #:lparallel
@@ -12,8 +12,7 @@
   (:export
    #:with-meta-kernel
    #:end-meta-kernel
-   #:make-resource
-   #:with-resource-held))
+   #:nproc))
 (in-package :overlord/kernel)
 
 (defconst meta-thread-count 8)

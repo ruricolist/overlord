@@ -170,4 +170,6 @@
 ;;; Sanity checks.
 
 (test db-exists
-  (is-true (file-exists-p (overlord/db::log-file-path))))
+  (let ((path (overlord/db::log-file-path)))
+    (is-true (file-exists-p (overlord/db::log-file-path))
+             "DB log does not exist: ~a" path)))

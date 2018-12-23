@@ -11,14 +11,15 @@
     #:overlord/target-table
     #:overlord/build-env)
   (:import-from #:overlord/kernel
-    #:with-meta-kernel)
+    #:with-meta-kernel
+    #:nproc)
   (:import-from #:lparallel
-    #:psome)
+    #:psome #:pmap #:*kernel*)
   (:import-from #:overlord/types
     #:overlord-error
     #:overlord-error-target)
   (:import-from #:overlord/db
-    #:saving-database)
+    #:*db*)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
   (:nicknames :redo)
@@ -119,12 +120,27 @@
             (setf (target-up-to-date? target) t)))
         (target-stamp target)))))
 
+(defvar *specials*
+  '(*parents*
+    *force*
+    *base*
+    *standard-output*
+    *trace-output*
+    *error-output*
+    *kernel*
+    *db*
+    *db-version*)
+  "Specials that need to be propagated when to worker threads.")
+
 (defun redo-all (targets)
   "Unconditionally build each target in TARGETS."
   (with-build-env ()
-    (saving-database
-      (do-each (target (reshuffle targets))
-        (redo-target target)))))
+    (let* ((targets (reshuffle targets)))
+      (if (use-threads-p)
+          (let* ((fn (build-env-closure #'redo-target))
+                 (fn (dynamic-closure *specials* fn)))
+            (pmap nil fn targets))
+          (map nil #'redo-target targets)))))
 
 (defun resolve-build-script (target)
   "Find a build script for TARGET, and depend on it.
