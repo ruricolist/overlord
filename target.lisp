@@ -889,8 +889,10 @@ treated as out-of-date, regardless of file metadata."))
     (call-with-target-locked target fn)))
 
 (defmethod call-with-target-locked ((target cl:pathname) fn)
-  (let ((target (resolve-target target)))
-    (call-with-target-locked target fn)))
+  (let ((resolved (resolve-target target)))
+    (if (equal target resolved)
+        (call-next-method)
+        (call-with-target-locked target fn))))
 
 
 ;;; Building targets (scripts).
