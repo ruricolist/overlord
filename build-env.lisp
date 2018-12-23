@@ -37,7 +37,7 @@ non-caching behavior is desired.")
   (boundp '*build-env*))
 
 (defclass build-env ()
-  ((lock :initform (make-lock)
+  ((lock :initform (make-recursive-lock)
          :reader monitor)
    (table
     :initform (make-target-table)
