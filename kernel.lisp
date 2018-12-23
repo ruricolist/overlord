@@ -15,7 +15,7 @@
    #:nproc))
 (in-package :overlord/kernel)
 
-(defconst meta-thread-count 8)
+(defconst thread-count-cap 20)
 
 (defun nproc-string ()
   (handler-case
@@ -42,6 +42,10 @@
 (def nproc
   (nproc))
 
+(def meta-kernel-size
+  (min thread-count-cap
+       (* 2 nproc)))
+
 (defvar-unbound *meta-kernel*
   "Lparallel kernel for fetching target metadata.")
 
@@ -65,7 +69,7 @@
       (unless (boundp '*meta-kernel*)
         (message "Initializing metadata thread pool")
         (setf *meta-kernel*
-              (make-kernel meta-thread-count
+              (make-kernel meta-kernel-size
                            :name "Overlord metadata fetcher"))))))
 
 (defun end-meta-kernel ()
