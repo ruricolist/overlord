@@ -94,7 +94,6 @@
 
    :find-pattern
    :build
-   :force-build
    :build-package
    :run
 
@@ -1253,16 +1252,12 @@ value and NEW do not match under TEST."
       (build (intern (string target) package))
       (values target system-name package))))
 
-(defun build (&rest targets)
-  (if (null targets)
-      (redo root-target)
-      (redo-all targets)))
+(defun build (target/s &key force)
+  "Build TARGET/S, a single target or a list of targets."
+  (let ((*force* force))
+    (redo-all (ensure-list target/s))))
 
-(defun force-build (&rest targets)
-  (let ((*force* t))
-    (apply #'build targets)))
-
-;;; TODO build-package-tree? That is, build a package and all of its
+;;; build-package-tree? That is, build a package and all of its
 ;;; sub-packages \(packages beginning with $package/ or $package).
 
 (defun build-package (package &key force)
