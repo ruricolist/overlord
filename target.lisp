@@ -1039,11 +1039,9 @@ current package."
          (pattern (find-pattern (pattern-ref.pattern target))))
     (task output
           (lambda ()
-            (let ((*input* input)
-                  (*output* output))
-              (let ((*base* (pathname-directory-pathname input)))
-                (depends-on input))
-              (pattern-build pattern input output)))
+            (let ((*base* (pathname-directory-pathname input)))
+              (depends-on input))
+            (pattern-build pattern input output))
           (pattern.script pattern))))
 
 (defmethod build-script-target ((script task))

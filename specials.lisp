@@ -8,8 +8,6 @@
     :asdf-system-version)
   (:export #:*base*
            #:*cli*
-           #:*input*
-           #:*output*
            #:*db-version*
            #:db-version
            #:*suppress-phonies*
@@ -18,13 +16,8 @@
 (in-package #:overlord/specials)
 
 (defvar-unbound *base* "The current base.")
-(defvar-unbound *input* "Input of a pattern.")
-(defvar-unbound *output* "Output of a pattern.")
-(defvar-unbound *source* "Source file being compiled.")
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
-
-(declaim (type absolute-pathname *input* *output*))
 
 (defvar *cli* nil "Are we running on a CLI?")
 (declaim (type boolean *cli*))
