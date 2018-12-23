@@ -47,6 +47,9 @@ Incrementing this should be sufficient to invalidate old fasls.")
   *use-threads*)
 
 (defun (setf use-threads-p) (value)
+  (when value
+    (unless bt:*supports-threads-p*
+      (error "This Lisp implementation does not support threads.")))
   (setf *use-threads* (true value)))
 
 (defvar *suppress-phonies* nil)
