@@ -183,14 +183,15 @@ For debugging."
     (values))
 
   (:method db.sync (db)
-    (make-thread
-     (lambda ()
-       (synchronized (db)
-         (append-to-log log-file
-                        last-saved-map
-                        current-map)
-         (setf last-saved-map current-map)))
-     :name "Overlord: saving database")))
+    (flet ((sync ()
+             (synchronized (db)
+               (append-to-log log-file
+                              last-saved-map
+                              current-map)
+               (setf last-saved-map current-map))))
+      (if (use-threads-p)
+          (make-thread #'sync :name "Overlord: saving database")
+          (sync)))))
 
 (defstruct (dead-db (:include db)
                     (:conc-name db.))
