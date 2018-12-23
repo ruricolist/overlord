@@ -132,15 +132,20 @@
     *db-version*)
   "Specials that need to be propagated when to worker threads.")
 
+(defun walk-targets (fn targets)
+  (assert (build-env-bound?))
+  (let ((targets (reshuffle targets)))
+    (if (and (use-threads-p)
+             (>= (length targets) nproc))
+        (let* ((fn (build-env-closure fn))
+               (fn (dynamic-closure *specials* fn)))
+          (pmap nil fn :parts nproc targets))
+        (map nil fn targets))))
+
 (defun redo-all (targets)
   "Unconditionally build each target in TARGETS."
   (with-build-env ()
-    (let* ((targets (reshuffle targets)))
-      (if (use-threads-p)
-          (let* ((fn (build-env-closure #'redo-target))
-                 (fn (dynamic-closure *specials* fn)))
-            (pmap nil fn targets))
-          (map nil #'redo-target targets)))))
+    (walk-targets #'redo-target targets)))
 
 (defun resolve-build-script (target)
   "Find a build script for TARGET, and depend on it.
@@ -214,8 +219,7 @@ that are themselves out of date."
 (defun redo-ifchange-all (targets)
   "Rebuild each target in TARGETS if it is out of date."
   (with-build-env ()
-    (do-each (i (reshuffle targets))
-      (redo-ifchange-target i))))
+    (walk-targets #'redo-ifchange-target targets)))
 
 (defun redo-ifcreate (&rest targets)
   "Depend on the non-existence of each target in TARGETS."
@@ -223,6 +227,7 @@ that are themselves out of date."
 
 (defun redo-ifcreate-all (targets)
   "Depend on the non-existence of each target in TARGETS."
+  ;; Probably not worth parallelizing.
   (with-build-env ()
     (let ((targets (map 'vector #'resolve-target targets)))
       (do-each (target (reshuffle targets))

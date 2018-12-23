@@ -15,6 +15,7 @@
   (:export
    #:with-build-env
    #:*use-build-cache*
+   #:build-env-bound?
    #:cached-stamp
    #:target-exists?/cache
    #:target-stamp/cache
