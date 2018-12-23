@@ -118,6 +118,8 @@ This is necessary on SBCL, where CAS can only be used on structure slots of type
     (if (eql (implementation-type) :sbcl) t
         type)))
 
+;;; NB. This is a structure rather than a CLOS class so the slots work
+;;; with SBCL's compare-and-swap.
 (defstruct (db (:conc-name db.))
   "The database."
   (version (db-version) :read-only t)
