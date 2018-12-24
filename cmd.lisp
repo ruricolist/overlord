@@ -9,25 +9,26 @@
 (cl:in-package :overlord/cmd)
 
 (defun parse-cmd-args (args)
-  (let ((tokens (queue))
-        (plist (queue)))
-    (dolist (arg args)
-      (typecase arg
-        (string
-         (qconc tokens (tokens arg)))
-        (pathname
-         (enq (stringify-pathname arg) tokens))
-        (plist
-         (qappend plist arg))
-        ((list-of (or string pathname))
-         (qconc tokens
-                (loop for token in arg
-                      collect (etypecase token
-                                (string token)
-                                (pathname (stringify-pathname token))))))
-        (t (error "Can't use ~a as a cmd argument." arg))))
-    (values (qlist tokens)
-            (qlist plist))))
+  (multiple-value-bind (tokens plist)
+      (mvfold (lambda (tokens plist arg)
+                (typecase arg
+                  (string
+                   (nreconc (tokens arg) tokens))
+                  (pathname
+                   (cons (stringify-pathname arg) tokens))
+                  (plist
+                   (revappend arg plist))
+                  (sequence
+                   (nreconc (collecting
+                              (do-each (token arg)
+                                (collect (etypecase token
+                                           (string token)
+                                           (pathname (stringify-pathname token))))))
+                            tokens))
+                  (t (error "Can't use ~a as a cmd argument." arg))))
+              args '() '())
+    (values (nreverse tokens)
+            (nreverse plist))))
 
 (defun stringify-pathname (arg)
   (lret ((string (uiop:native-namestring arg)))
