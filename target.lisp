@@ -1755,7 +1755,9 @@ If TMP is not provided, no temp file is used."
              (errorp (error* "No such pattern: ~s" pattern))
              (t nil))))))
 
-(defmacro defpattern (class-name (in out)
+(defmacro defpattern (class-name (in out
+                                  &optional (dest (string-gensym 'dest)
+                                                  dest-supplied?))
                       (&rest options &key &allow-other-keys)
                       &body script)
   "Define a file pattern named NAME.
@@ -1799,11 +1801,13 @@ depends on that."
            ,@class-options))
        (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
-         (call/temp-file-pathname ,out
-                                  ,(receive (script decls docs)
-                                       (parse-body script)
-                                     (declare (ignore docs))
-                                     `(lambda (,out)
-                                        ,@decls
-                                        (with-script ()
-                                          ,@script))))))))
+         (let ((,dest ,out))
+           (declare ,@(unsplice (unless dest-supplied? `(ignorable ,dest))))
+           (call/temp-file-pathname ,out
+                                    ,(receive (script decls docs)
+                                         (parse-body script)
+                                       (declare (ignore docs))
+                                       `(lambda (,out)
+                                          ,@decls
+                                          (with-script ()
+                                            ,@script)))))))))
