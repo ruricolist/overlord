@@ -119,9 +119,10 @@
    :pattern-name
    :pattern-build
    :pattern-ref
+   :pattern-from
+   :pattern-into
    :define-script
-   :pattern-ref.input
-   :pattern-ref.output
+   :pattern-ref-inputs
    :pattern-ref-output
    :clear-package-prereqs
    :list-package-prereqs
@@ -417,7 +418,7 @@ inherit a method on `make-load-form', and need only specialize
     (pathname-equal path (directory-ref.path y)))
   (:method target-build-script (target)
     (let ((dir path))
-      (declare (notinline task))        ;for SBCL
+      #+sbcl (declare (notinline task))
       (task target
             (lambda ()
               (let ((dir (resolve-target dir)))
@@ -485,15 +486,17 @@ inherit a method on `make-load-form', and need only specialize
   ((pattern
     :initarg :pattern
     :type (or symbol standard-object delayed-symbol)
-    :accessor pattern-ref.pattern)
+    :reader pattern-ref-pattern)
    (name
-    :type pathname
-    :initarg :input
-    :accessor pattern-ref.input)
+    :initarg :inputs
+    :type vector
+    :reader pattern-ref-inputs)
    (output
     :type pathname
-    :reader pattern-ref-output
-    :reader pattern-ref.output)))
+    :initarg :output
+    :reader pattern-ref-output))
+  (:default-initargs
+   :inputs #()))
 
 ;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
 ;;; pathnames seems to work, as long as we're careful about how we
@@ -505,18 +508,28 @@ inherit a method on `make-load-form', and need only specialize
 ;;; merge-output-defaults, we want to be able to redirect to the
 ;;; output to a different host, so we use good old cl:merge-pathnames.
 
-(defgeneric merge-input-defaults (pattern input)
-  (:method (pattern input)
+(defgeneric merge-input-defaults (pattern input/s)
+  (:method (pattern (input string))
+    (merge-input-defaults pattern (path input)))
+  (:method (pattern (input cl:pathname))
     (merge-pathnames* (pattern.input-defaults pattern)
-                      input)))
+                      input))
+  (:method (pattern (inputs sequence))
+    (map 'vector
+         (lambda (input)
+           (merge-input-defaults pattern input))
+         inputs)))
 
 (defgeneric merge-output-defaults (pattern output)
-  (:method (pattern output)
+  (:method (pattern (output string))
+    (merge-output-defaults pattern (cl:pathname output)))
+  (:method (pattern (output cl:pathname))
     (merge-pathnames (pattern.output-defaults pattern)
                      output)))
 
 (defun print-pattern-ref (pattern ref stream)
-  (let* ((input (pattern-ref.input ref))
+  (let* ((inputs (pattern-ref-inputs ref))
+         (output (pattern-ref-output ref))
          (pattern (find-pattern pattern))
          (pattern-name (pattern-name pattern)))
     (if *print-escape*
@@ -527,18 +540,21 @@ inherit a method on `make-load-form', and need only specialize
                      name)))
           (format stream "~a~s"
                   (read-eval-prefix ref stream)
-                  `(pattern-ref ,name-form
-                                ,input)))
+                  `(make 'pattern-ref
+                         :pattern ,name-form
+                         :inputs ,inputs
+                         :output ,output)))
         (print-unreadable-object (ref stream :type t)
-          (format stream "~a (~a)"
+          (format stream "~a ~a -> ~a"
                   pattern-name
-                  input)))))
+                  inputs
+                  output)))))
 
-(defmethods pattern-ref (self (input name) output pattern)
+(defmethods pattern-ref (self (inputs name) output pattern)
   (:method initialize-instance :after (self &key)
     (let* ((pattern (find-pattern pattern))
-           (abs-input (merge-input-defaults pattern input)))
-      (setf input abs-input)))
+           (abs-input (merge-input-defaults pattern inputs)))
+      (setf inputs abs-input)))
 
   (:method print-object (self stream)
     (print-pattern-ref pattern self stream))
@@ -547,6 +563,7 @@ inherit a method on `make-load-form', and need only specialize
     (declare (ignore class))
     ;; Since this is idempotent I see no reason to lock.
     (let* ((pattern (find-pattern pattern))
+           (input (first-elt inputs))
            (abs-output (merge-output-defaults pattern input)))
       (setf output abs-output)))
 
@@ -555,23 +572,36 @@ inherit a method on `make-load-form', and need only specialize
 
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
-                        #'pattern-ref.input
-                        #'pattern-ref.pattern))
+                        #'pattern-ref-inputs
+                        #'pattern-ref-output
+                        #'pattern-ref-pattern))
 
   (:method call-with-target-locked (self fn)
     (call-with-target-locked output fn)))
 
-(defun pattern-ref (pattern input)
-  "Make a pattern reference, or a list of pattern references."
-  ;; TODO Should this be absolute?
-  ;; Shouldn't this complain about relative vs. absolute?
-  (ensure-pathnamef input)
-  (if (wild-pathname-p input)
-      (mapcar (op (pattern-ref pattern _))
-              (directory* input))
-      (make 'pattern-ref
-            :pattern pattern
-            :input input)))
+(defun pattern-ref (pattern input/s)
+  "Make a pattern reference."
+  (pattern-from pattern input/s))
+
+(defun pattern-from (pattern input/s)
+  (etypecase-of (or pathname string sequence) input/s
+    (pathname
+     (if (wild-pathname-p input/s)
+         (pattern-ref pattern (directory* input/s))
+         (pattern-ref pattern (vector input/s))))
+    (string
+     (pattern-ref pattern (path input/s)))
+    (sequence
+     (if (length>= input/s 1)
+         (make 'pattern-ref
+               :pattern pattern
+               :inputs (coerce input/s 'vector))
+         (error "A pattern without an output must have at least one input.")))))
+
+(defun pattern-into (pattern output)
+  (make 'pattern-ref
+        :pattern pattern
+        :output (path output)))
 
 (defconstructor phony-target
   (name (or symbol delayed-symbol)))
@@ -724,7 +754,7 @@ treated as out-of-date, regardless of file metadata."))
 
 (defmethod target-exists? ((target pattern-ref))
   (~> target
-      pattern-ref.output
+      pattern-ref-output
       pathname-exists?))
 
 (defmethod target-timestamp ((target root-target))
@@ -758,7 +788,7 @@ treated as out-of-date, regardless of file metadata."))
       never))
 
 (defmethod target-timestamp ((target pattern-ref))
-  (with-accessors ((output pattern-ref.output)) target
+  (with-accessors ((output pattern-ref-output)) target
     (if (pathname-exists? output)
         (file-mtime output)
         never)))
@@ -806,11 +836,14 @@ treated as out-of-date, regardless of file metadata."))
             path))))
 
 (defmethod resolve-target ((target pattern-ref) &optional base)
-  (let ((input (pattern-ref.input target)))
-    (if (absolute-pathname-p input) target
-        (pattern-ref (pattern-ref.pattern target)
-                     (merge-pathnames* input
-                                       (or base (base)))))))
+  (let ((inputs (pattern-ref-inputs target)))
+    (if (every #'absolute-pathname-p inputs) target
+        (pattern-ref (pattern-ref-pattern target)
+                     (map 'vector
+                          (lambda (input)
+                            (merge-pathnames* input
+                                              (or base (base))))
+                          inputs)))))
 
 (defmethod target= ((x phony-target) (y phony-target))
   (target= (phony-target-name x)
@@ -824,10 +857,11 @@ treated as out-of-date, regardless of file metadata."))
   (pathname-equal x y))
 
 (defmethod target= ((x pattern-ref) (y pattern-ref))
-  (and (equal (pattern-ref.input x)
-              (pattern-ref.input y))
-       (eql (pattern-ref.pattern x)
-            (pattern-ref.pattern y))))
+  (and (vector= (pattern-ref-inputs x)
+                (pattern-ref-inputs y)
+                :test #'target=)
+       (eql (pattern-ref-pattern x)
+            (pattern-ref-pattern y))))
 
 (defmethod hash-target ((target root-target))
   (load-time-value (sxhash root-target)))
@@ -849,7 +883,7 @@ treated as out-of-date, regardless of file metadata."))
 
 (defmethod hash-target ((target pattern-ref))
   (dx-sxhash
-   (list 'package-ref
+   (list 'pattern-ref
          (ref.name target))))
 
 (defmethod hash-target ((target phony-target))
@@ -1034,14 +1068,15 @@ current package."
         trivial-prereq))
 
 (defmethod target-build-script ((target pattern-ref))
-  (let* ((input (pattern-ref.input target))
-         (output (pattern-ref.output target))
-         (pattern (find-pattern (pattern-ref.pattern target))))
+  (let* ((inputs (pattern-ref-inputs target))
+         (output (pattern-ref-output target))
+         (pattern (find-pattern (pattern-ref-pattern target))))
     (task output
           (lambda ()
-            (let ((*base* (pathname-directory-pathname input)))
-              (depends-on input))
-            (pattern-build pattern input output))
+            (depends-on-all inputs)
+            (if (single inputs)
+                (pattern-build pattern (first-elt inputs) output)
+                (pattern-build pattern inputs output)))
           (pattern.script pattern))))
 
 (defmethod build-script-target ((script task))
@@ -1134,7 +1169,7 @@ current package."
 
 (defmethod target-node-label ((target pattern-ref))
   (native-namestring
-   (pattern-ref.output target)))
+   (pattern-ref-output target)))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
@@ -1233,7 +1268,8 @@ value and NEW do not match under TEST."
                      (and symbol-name (type string-designator)))
                (values symbol-name package-name))))
            (system-name
-            (string-downcase            ;What ASDF wants.
+            ;; What ASDF wants.
+            (string-downcase
              (or system-name package-name))))
     (unless (asdf-system-loaded? system-name)
       (restart-case
