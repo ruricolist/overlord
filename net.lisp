@@ -65,15 +65,15 @@
               (when (= status 200)
                 (write-byte-vector-into-file body file))))
         (online-only ()
-                     (let ((fwd (file-mtime file)))
-                       (multiple-value-bind (body status)
-                           (http-request/binary
-                            url
-                            :additional-headers
-                            `((:if-modified-since . ,(format-mtime fwd))))
-                         (when (= status 200)
-                           (unless (vector= body (read-file-into-byte-vector file))
-                             (write-byte-vector-into-file body file :if-exists :supersede)))))))))
+          (let ((fwd (file-mtime file)))
+            (multiple-value-bind (body status)
+                (http-request/binary
+                 url
+                 :additional-headers
+                 `((:if-modified-since . ,(format-mtime fwd))))
+              (when (= status 200)
+                (unless (vector= body (read-file-into-byte-vector file))
+                  (write-byte-vector-into-file body file :if-exists :supersede)))))))))
 
 (defun ensure-file-from-url (file url)
   "Unlike `update-file-from-url' this does not preserve URL's
