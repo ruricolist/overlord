@@ -3,7 +3,9 @@
   (:use #:cl #:alexandria #:serapeum
     #:overlord/types
     #:overlord/global-state)
-  (:import-from #:overlord/util #:file-mtime)
+  (:import-from #:overlord/util
+    #:file-mtime
+    #:write-file-if-changed)
   (:import-from #:cl-strftime #:format-time)
   (:import-from #:drakma #:http-request)
   (:import-from #:overlord/base #:ensure-absolute)
@@ -56,24 +58,22 @@
          args))
 
 (defun update-file-from-url (file url)
-  (lret ((file
-          (ensure-absolute file)))
+  (lret ((file (ensure-absolute file)))
     (if (not (uiop:file-exists-p file))
         (if *offline*
             (error* "Offline: cannot retrieve ~a" file)
-            (multiple-value-bind (body status) (http-request/binary url)
+            (multiple-value-bind (data status) (http-request/binary url)
               (when (= status 200)
-                (write-byte-vector-into-file body file))))
+                (write-byte-vector-into-file data file))))
         (online-only ()
           (let ((fwd (file-mtime file)))
-            (multiple-value-bind (body status)
+            (multiple-value-bind (data status)
                 (http-request/binary
                  url
                  :additional-headers
                  `((:if-modified-since . ,(format-mtime fwd))))
               (when (= status 200)
-                (unless (vector= body (read-file-into-byte-vector file))
-                  (write-byte-vector-into-file body file :if-exists :supersede)))))))))
+                (write-file-if-changed data file))))))))
 
 (defun ensure-file-from-url (file url)
   "Unlike `update-file-from-url' this does not preserve URL's
