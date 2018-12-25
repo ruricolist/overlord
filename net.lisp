@@ -65,15 +65,23 @@
             (multiple-value-bind (data status) (http-request/binary url)
               (when (= status 200)
                 (write-byte-vector-into-file data file))))
-        (online-only ()
-          (let ((fwd (file-mtime file)))
-            (multiple-value-bind (data status)
-                (http-request/binary
-                 url
-                 :additional-headers
-                 `((:if-modified-since . ,(format-mtime fwd))))
-              (when (= status 200)
-                (write-file-if-changed data file))))))))
+        (if *offline*
+            (message "File ~a exists, not updating because offline."
+                     file)
+            (online-only ()
+              (let ((fwd (file-mtime file)))
+                (multiple-value-bind (data status)
+                    (http-request/binary
+                     url
+                     :additional-headers
+                     `((:if-modified-since . ,(format-mtime fwd))))
+                  (if (= status 200)
+                      (progn
+                        (message "File ~a was changed remotely." file)
+                        (write-file-if-changed data file))
+                      (message "File ~a was not modified (code ~a)."
+                               file
+                               status)))))))))
 
 (defun ensure-file-from-url (file url)
   "Unlike `update-file-from-url' this does not preserve URL's
