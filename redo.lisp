@@ -122,7 +122,7 @@
             (setf (target-up-to-date? target) t)))
         (target-stamp target)))))
 
-(defparameter *specials*
+(defparameter *worker-specials*
   '(*parents*
     *force*
     *base*
@@ -132,7 +132,7 @@
     *kernel*
     *db*
     *db-version*)
-  "Specials that need to be propagated when to worker threads.")
+  "Specials that need to be propagated to worker threads.")
 
 (defun walk-targets (fn targets)
   (assert (build-env-bound?))
@@ -141,7 +141,7 @@
         ;; parallelism or not, to prevent reliance on side-effects.
         (fn (~>> fn
                  build-env-closure
-                 (dynamic-closure *specials*))))
+                 (dynamic-closure *worker-specials*))))
     (if (and (use-threads-p)
              (>= (length targets) nproc))
         (task-handler-bind ((error #'invoke-transfer-error))
