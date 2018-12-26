@@ -134,12 +134,15 @@
 
 (defun walk-targets (fn targets)
   (assert (build-env-bound?))
-  (let ((targets (reshuffle targets)))
+  (let ((targets (reshuffle targets))
+        ;; We wrap the FN regardless of whether we are using
+        ;; parallelism or not, to prevent reliance on side-effects.
+        (fn (~>> fn
+                 build-env-closure
+                 (dynamic-closure *specials*))))
     (if (and (use-threads-p)
              (>= (length targets) nproc))
-        (let* ((fn (build-env-closure fn))
-               (fn (dynamic-closure *specials* fn)))
-          (pmap nil fn :parts nproc targets))
+        (pmap nil fn :parts nproc targets)
         (map nil fn targets))))
 
 (defun redo-all (targets)
