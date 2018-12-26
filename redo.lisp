@@ -14,6 +14,8 @@
     #:with-meta-kernel
     #:nproc)
   (:import-from #:lparallel
+    #:invoke-transfer-error
+    #:task-handler-bind
     #:psome #:pmap #:*kernel*)
   (:import-from #:overlord/types
     #:overlord-error
@@ -120,7 +122,7 @@
             (setf (target-up-to-date? target) t)))
         (target-stamp target)))))
 
-(defvar *specials*
+(defparameter *specials*
   '(*parents*
     *force*
     *base*
@@ -142,7 +144,8 @@
                  (dynamic-closure *specials*))))
     (if (and (use-threads-p)
              (>= (length targets) nproc))
-        (pmap nil fn :parts nproc targets)
+        (task-handler-bind ((error #'invoke-transfer-error))
+          (pmap nil fn :parts nproc targets))
         (map nil fn targets))))
 
 (defun redo-all (targets)
@@ -179,7 +182,8 @@ and return T if the stamp has changed."
   "Like `some', but possibly parallel."
   (if (use-threads-p)
       (with-meta-kernel ()
-        (psome (build-env-closure fn) seq))
+        (task-handler-bind ((error #'invoke-transfer-error))
+          (psome (build-env-closure fn) seq)))
       (some fn seq)))
 
 (defun out-of-date? (target)
