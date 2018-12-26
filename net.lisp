@@ -10,6 +10,8 @@
   (:import-from #:drakma #:http-request)
   (:import-from #:overlord/base #:ensure-absolute)
   (:import-from #:serapeum #:make-octet-vector)
+  (:import-from #:overlord/message
+    #:message)
   (:export #:update-file-from-url
            #:ensure-file-from-url
            #:go-offline
