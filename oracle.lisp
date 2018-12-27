@@ -23,6 +23,10 @@
   (:import-from :overlord/util
     :version-major-version)
   (:import-from :fset)
+  (:import-from #:cl-strftime
+    #:format-time)
+  (:import-from #:local-time
+    #:now)
   (:export
    :oracle
    :oracle-question
@@ -32,7 +36,8 @@
    :system-version-oracle
    :feature-oracle
    :dist-version-oracle
-   :function-oracle))
+   :function-oracle
+   :daily-oracle))
 (in-package :overlord/oracle)
 
 ;;; TODO Would it be worthwhile to provide oracles for optimization
@@ -312,6 +317,19 @@ By default this is the Quicklisp dist itself.")
     t)
   (:method target= (self (other feature-oracle))
     (eql feature (feature-oracle.feature other))))
+
+
+;;; Date oracles.
+
+;;; For targets that should only be built once a day.
+
+(defun todays-date-string ()
+  (format-time nil "%F" (now)))
+
+(defun daily-oracle ()
+  "Depend on today's date.
+This is for targets that should be no more than one a day."
+  (function-oracle 'todays-date-string))
 
 
 ;;; Function oracles.
