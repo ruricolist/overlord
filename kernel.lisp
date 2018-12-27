@@ -67,7 +67,7 @@
   (unless (boundp '*meta-kernel*)
     (synchronized ('*meta-kernel*)
       (unless (boundp '*meta-kernel*)
-        (message "Initializing metadata thread pool")
+        (message "Initializing metadata thread pool for session")
         (setf *meta-kernel*
               (make-kernel meta-kernel-size
                            :name "Overlord metadata fetcher"))))))
