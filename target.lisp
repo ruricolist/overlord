@@ -1199,8 +1199,10 @@ current package."
     (let* ((file (resolve-target file base))
            (old (target-timestamp file)))
       (funcall thunk)
-      ;; Since we depend on the granularity of the timestamps, all we can
-      ;; be sure of is that is not older than the old timestamp.
+      ;; Since we do not control the granularity of timestamps (and
+      ;; since the user may choose not to update the file), all we can
+      ;; be certain of is that the new timestamp is not older than the
+      ;; old timestamp.
       (assert (not (timestamp-newer? old (target-timestamp file)))))))
 
 (defun save-file-task (file thunk script)
