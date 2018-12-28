@@ -794,8 +794,7 @@ treated as out-of-date, regardless of file metadata."))
         never)))
 
 (defmethod (setf target-timestamp) :before (timestamp target)
-  (declare (ignore target))
-  (check-type timestamp target-timestamp)
+  (declare (ignore target timestamp))
   (check-not-frozen))
 
 (defmethod (setf target-timestamp) (timestamp target)
@@ -1189,10 +1188,15 @@ current package."
          (target-timestamp target))
         (t never)))
 
-(defun rebuild-symbol (symbol thunk)
+(defun rebuild-symbol (symbol thunk &key config)
   (lambda ()
-    (setf (symbol-value symbol)     (funcall thunk)
-          (target-timestamp symbol) (now))))
+    (let* ((value (funcall thunk))
+           (stamp
+             (if config
+                 (config-stamp value)
+                 (now))))
+      (setf (symbol-value symbol) value
+            (target-timestamp symbol) stamp))))
 
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
@@ -1212,15 +1216,43 @@ current package."
              (rebuild-file file thunk (base))
              script))
 
+(defun config-stamp (value &optional (name :unknown))
+  "Compute a stamp for a config.
+If VALUE is simple enough to hash, return a hash.
+
+Otherwise nil."
+  (flet ((digest-as-printed (x)
+           (let* ((string
+                    (with-standard-io-syntax
+                      (prin1-to-string x)))
+                  (digest-bytes
+                    (digest-string string))
+                  (digest-string
+                    (byte-array-to-hex-string digest-bytes)))
+             digest-string)))
+    (cl:typecase value
+      ((or string cl:pathname number character keyword)
+       (digest-as-printed value))
+      (otherwise
+       (let ((digest
+               (ignore-errors
+                (digest-as-printed value))))
+         (or digest
+             (progn
+               (message "Cannot use digest for ~a." name)
+               nil)))))))
+
 (defun update-config-if-changed (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
 value and NEW do not match under TEST."
   (let ((old (symbol-value name)))
-    (if (funcall test old new)
-        old
+    (if (funcall test old new) old
         (progn
           (simple-style-warning "Redefining configuration ~s" name)
-          (funcall (rebuild-symbol name (lambda () new)))))))
+          (setf (symbol-value name) new
+                (target-timestamp name)
+                (or (config-stamp new)
+                    (now)))))))
 
 
 ;;; Freezing the build system.
@@ -1470,31 +1502,22 @@ exists, and as a non-existent prereq if TARGET does not exist."
      (with-current-dir (*base*)
        ,form)))
 
-;;; `defconfig' is extremely important and rather tricky. It is one of
-;;; the only two types of targets that have inherent timestamps (the
-;;; other being files). Semantically is it closer to `defconstant'
-;;; than `defvar' -- the provided expression is evaluated at compile
-;;; time -- but unlike `defconstant' it can always be redefined.
+;;; `defconfig' is extremely important and rather tricky. Semantically
+;;; is it closer to `defconstant' than `defvar' -- the provided
+;;; expression is evaluated at compile time -- but unlike
+;;; `defconstant' it can always be redefined.
 
-;;; How does `defconfig' have its own timestamp? When `defconfig' is
-;;; being compiled, the current timestamp is dumped directly into the
-;;; emitted code, so it persists when the fasl is reloaded.
+(defun update-config-stamp (name val)
+  "Update the stamp for NAME with VAL."
+  (let ((stamp
+          (if (boundp name)
+              (target-timestamp name)
+              (or (config-stamp val)
+                  (now)))))
+    (touch-target name stamp)
+    val))
 
-;;; Note that while configuration timestamps persist across loads,
-;;; they do not persist across compilations. If that is the behavior
-;;; you need, you should use `define-target-config' and depend on a dummy
-;;; file. If we did it for you, a dummy file would have to be involved
-;;; anyway, and that is probably something it is better to be explicit
-;;; about.
-
-;;; TODO Is it worth backing `defconfig' with an implicit file? Now
-;;; that we have a database there is an obvious place to put it. On
-;;; Lisps where fasls are reproducible we could even implement the
-;;; comparison by checking that the new value compiles to the same
-;;; code.
-
-(defmacro defconfig (name init &body body)
-  "BODY can be either a string (a docstring) or keywords."
+(defmacro defconfig (name &body (init &body body))
   (check-type name symbol)
   (mvlet* ((test documentation
              (ematch body
@@ -1509,12 +1532,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
     `(progn
        (eval-always
          (define-global-var ,name
-             (prog1 ,init
-               (touch-target ',name
-                             ,(if (boundp name)
-                                  (assure target-timestamp
-                                    (target-timestamp name))
-                                  (now))))
+             (update-config-stamp ',name ,init)
            ,@(unsplice documentation)))
        (eval-always
          (save-task ',name (constantly ,init) trivial-prereq))
@@ -1629,7 +1647,7 @@ rebuilt."
   (unless (boundp name)
     (let* ((*base* (base))
            (script-thunk (eval* `(script-thunk ,@script)))
-           (script-thunk (rebuild-symbol name script-thunk)))
+           (script-thunk (rebuild-symbol name script-thunk :config t)))
       (save-task name script-thunk))
     (depends-on name))
   (assert (boundp name))
@@ -1641,7 +1659,8 @@ rebuilt."
              (setf (target-timestamp ',name) ,timestamp)
              ',init))
        (save-task ',name
-                  (rebuild-symbol ',name (script-thunk ,@script)))
+                  (rebuild-symbol ',name (script-thunk ,@script)
+                                  :config t))
        (depends-on ',name)
        (record-package-prereq* ',name)
        ',name)))
