@@ -345,7 +345,9 @@ This is for targets that should be no more than one a day."
     :reader function-oracle.args))
   (:documentation "An oracle for a user-supplied function.
 
-The function must be supplied as a symbol."))
+The function must be supplied as a symbol.")
+  (:default-initargs
+   :args nil))
 
 (defmethods function-oracle (self (fn question) args)
   (:method target-exists? (self)
@@ -353,7 +355,13 @@ The function must be supplied as a symbol."))
      (ignoring overlord-error
        (force-symbol fn))))
   (:method oracle-answer (self)
-    (apply (force-symbol fn) args)))
+    (apply (force-symbol fn) args))
+  (:method print-object (self stream)
+    (format stream "~a~s"
+            (read-eval-prefix self stream)
+            `(make-instance 'function-oracle
+                            :function ,fn
+                            :args '(,@args)))))
 
 (defun function-oracle (function-name &rest args)
   (check-type function-name symbol)
