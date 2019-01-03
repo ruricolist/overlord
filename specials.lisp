@@ -1,9 +1,5 @@
-(in-package #:cl-user)
-
 (defpackage #:overlord/specials
-  (:use #:cl :overlord/types)
-  (:import-from :serapeum :defvar-unbound :assure :~> :true)
-  (:import-from :alexandria :read-file-into-string)
+  (:use #:cl :overlord/types :alexandria :serapeum)
   (:import-from :overlord/asdf
     :asdf-system-version)
   (:export #:*base*
@@ -12,10 +8,58 @@
            #:db-version
            #:*suppress-phonies*
            #:use-threads-p
-           #:*force*))
+           #:*force*
+           #:worker-specials
+           #:register-worker-special
+           #:unregister-worker-special
+           #:register-worker-specials
+           #:unregister-worker-specials
+           #:wrap-worker-specials))
 (in-package #:overlord/specials)
 
+(defvar *worker-specials* '())
+
+(defun worker-specials ()
+  *worker-specials*)
+
+(defun (setf worker-specials) (value)
+  (check-type value list)
+  (assert (every #'symbolp value))
+  (assert (setp value))
+  (setf *worker-specials* value))
+
+(defun register-worker-special (var)
+  (check-type var symbol)
+  (pushnew var (worker-specials)))
+
+(defun unregister-worker-special (var)
+  (check-type var symbol)
+  (removef var (worker-specials)))
+
+(defun register-worker-specials (vars)
+  (mapc #'register-worker-special vars))
+
+(defun unregister-worker-specials (vars)
+  (mapc #'unregister-worker-special vars))
+
+(defun wrap-worker-specials (fn)
+  (dynamic-closure (worker-specials) fn))
+
+(register-worker-specials
+ '(*package*
+   *readtable*
+   *read-base*
+   *read-eval*
+   *read-default-float-format*
+   *default-pathname-defaults*
+
+   *standard-output*
+   ;; Propagating trace output makes debugging much easier.
+   *trace-output*
+   *error-output*))
+
 (defvar-unbound *base* "The current base.")
+(register-worker-special '*base*)
 
 (declaim (type (and directory-pathname absolute-pathname) *base*))
 
@@ -28,6 +72,7 @@
   "Versioning for fasls.
 Incrementing this should be sufficient to invalidate old fasls.")
 (declaim (type db-version *db-version*))
+(register-worker-special '*db-version*)
 
 (defun db-version ()
   (assure db-version *db-version*))
@@ -47,6 +92,8 @@ Incrementing this should be sufficient to invalidate old fasls.")
 
 (defvar *suppress-phonies* nil)
 (declaim (type boolean *suppress-phonies*))
+(register-worker-special '*suppress-phonies*)
 
 (defvar *force* nil
   "Whether to force rebuilding.")
+(register-worker-special '*force*)

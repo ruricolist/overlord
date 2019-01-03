@@ -360,6 +360,7 @@ If there is no difference, write nothing."
 
 (define-global-state *db* nil
   "The database.")
+(register-worker-special '*db*)
 
 (defun db ()
   "Get the current database, loading it if necessary."

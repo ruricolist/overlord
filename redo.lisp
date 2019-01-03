@@ -68,6 +68,7 @@
 
 (defvar *parents* '()
   "The chain of parents being built.")
+(register-worker-special '*parents*)
 
 (defun building? ()
   "Return T if anything is being built."
@@ -122,26 +123,12 @@
             (setf (target-up-to-date? target) t)))
         (target-stamp target)))))
 
-(defparameter *worker-specials*
-  '(*parents*
-    *force*
-    *base*
-    *standard-output*
-    *trace-output*
-    *error-output*
-    *kernel*
-    *db*
-    *db-version*)
-  "Specials that need to be propagated to worker threads.")
-
 (defun walk-targets (fn targets)
   (assert (build-env-bound?))
   (let ((targets (reshuffle targets))
         ;; We wrap the FN regardless of whether we are using
         ;; parallelism or not, to prevent reliance on side-effects.
-        (fn (~>> fn
-                 build-env-closure
-                 (dynamic-closure *worker-specials*))))
+        (fn (wrap-worker-specials fn)))
     (if (and (use-threads-p)
              (>= (length targets) nproc))
         (task-handler-bind ((error #'invoke-transfer-error))
@@ -180,11 +167,12 @@ and return T if the stamp has changed."
 
 (defun some* (fn seq)
   "Like `some', but possibly parallel."
-  (if (use-threads-p)
-      (with-meta-kernel ()
-        (task-handler-bind ((error #'invoke-transfer-error))
-          (psome (build-env-closure fn) seq)))
-      (some fn seq)))
+  (let ((fn (wrap-worker-specials fn)))
+    (if (use-threads-p)
+        (with-meta-kernel ()
+          (task-handler-bind ((error #'invoke-transfer-error))
+            (psome fn seq)))
+        (some fn seq))))
 
 (defun out-of-date? (target)
   "Return T if TARGET needs rebuilding.

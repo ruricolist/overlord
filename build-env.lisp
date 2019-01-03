@@ -8,7 +8,9 @@
     :make-lock :make-recursive-lock
     :with-lock-held :with-recursive-lock-held)
   (:import-from :overlord/kernel :nproc)
-  (:import-from :overlord/specials :use-threads-p)
+  (:import-from :overlord/specials
+    :use-threads-p
+    :register-worker-special)
   (:import-from :overlord/message :message)
   (:import-from :overlord/db :saving-database)
   (:import-from :lparallel :make-kernel :*kernel*)
@@ -18,8 +20,7 @@
    #:build-env-bound?
    #:cached-stamp
    #:target-exists?/cache
-   #:target-stamp/cache
-   #:build-env-closure))
+   #:target-stamp/cache))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -27,17 +28,13 @@
 
 Note that this can safely be rebound around part of a build when
 non-caching behavior is desired.")
+(register-worker-special '*use-build-cache*)
 
 (defvar *build-id* 0)
 
 (defvar-unbound *build-env*
   "Environment for the current build.")
-
-(defun build-env-closure (fn)
-  (dynamic-closure
-   '(*use-build-cache*
-     *build-env*)
-   fn))
+(register-worker-special '*build-env*)
 
 (defsubst use-build-cache? ()
   *use-build-cache*)
