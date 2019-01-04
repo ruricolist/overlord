@@ -63,7 +63,11 @@ lexically closes over the current dynamic value of every special that has been r
    *standard-output*
    ;; Propagating trace output makes debugging much easier.
    *trace-output*
-   *error-output*))
+   *error-output*
+
+   ;; Guard against someone trying to alter the list of worker
+   ;; specials from within a worker.
+   *worker-specials*))
 
 (defvar-unbound *base* "The current base.")
 (register-worker-special '*base*)
