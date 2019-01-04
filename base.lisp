@@ -84,10 +84,8 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       (relative-pathname
        (merge-pathnames* pathname (base))))))
 
-(defun resolve-file (file &key (base (base)))
-  (let ((*base* base)
-        (pathname (ensure-pathname* file)))
-    (ensure-absolute pathname)))
+(defun resolve-file (file)
+  (ensure-absolute (ensure-pathname* file)))
 
 (define-global-state *package-bases*
     (dict* (make-hash-table)
@@ -108,9 +106,6 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
                         ,@(if system-supplied? (list system) nil))))
 
 (define-global-state *supplied-package-systems* (make-hash-table))
-
-(defun base-relative-pathname (pathname)
-  (merge-pathnames pathname (base)))
 
 (defun base ()
   #+(or) (or *compile-file-truename*
