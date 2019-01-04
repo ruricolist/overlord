@@ -17,7 +17,8 @@
            #:wrap-worker-specials))
 (in-package #:overlord/specials)
 
-(defvar *worker-specials* '())
+(defvar *worker-specials* '()
+  "List of special variables that should be propagated into worker threads.")
 
 (defun worker-specials ()
   *worker-specials*)
@@ -29,20 +30,26 @@
   (setf *worker-specials* value))
 
 (defun register-worker-special (var)
+  "Register VAR as a variable that should be propagated into worker threads."
   (check-type var symbol)
   (pushnew var (worker-specials)))
 
 (defun unregister-worker-special (var)
+  "Stop VAR from being propagated into worker threads."
   (check-type var symbol)
   (removef var (worker-specials)))
 
 (defun register-worker-specials (vars)
+  "Register each var in VARS, as with `register-worker-special'."
   (mapc #'register-worker-special vars))
 
 (defun unregister-worker-specials (vars)
+  "Unregister each var in VARS as with `unregister-worker-special'."
   (mapc #'unregister-worker-special vars))
 
 (defun wrap-worker-specials (fn)
+  "Return a function suitable for passing to a worker that, that
+lexically closes over the current dynamic value of every special that has been registered for propagation to worker threads."
   (dynamic-closure (worker-specials) fn))
 
 (register-worker-specials
