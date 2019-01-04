@@ -50,7 +50,14 @@
 (defun wrap-worker-specials (fn)
   "Return a function suitable for passing to a worker that, that
 lexically closes over the current dynamic value of every special that has been registered for propagation to worker threads."
-  (dynamic-closure (worker-specials) fn))
+  (let* ((symbols (worker-specials))
+         (symbols (filter #'boundp symbols))
+         (values (mapcar #'symbol-value symbols)))
+    (assert (length= symbols values))
+    (lambda (&rest args)
+      (declare (dynamic-extent args))
+      (progv symbols values
+        (apply fn args)))))
 
 (register-worker-specials
  '(*package*
