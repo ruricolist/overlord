@@ -20,6 +20,10 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
    :asdf-system-name-keyword))
 (in-package :overlord/asdf)
 
+;;; Did you know that, in SBCL, calls to `asdf:find-system' from
+;;; multiple threads can result in a deadlock, due to the fact that
+;;; `uiop:coerce-class' calls `subtypep', which can lead to taking the
+;;; world lock? Anyway, we shouldn't assume ASDF is thread-safe.
 (defun find-asdf-system (system &key error)
   (asdf:find-system system (not error)))
 
@@ -32,6 +36,7 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
   (asdf:system-relative-pathname system pathname))
 
 (defun package-name-asdf-system (n)
+  ;; XXX Internal symbol.
   (asdf/package-inferred-system::package-name-system n))
 
 (defun package-inferred-asdf-system? (system)
