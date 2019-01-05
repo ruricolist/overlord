@@ -787,10 +787,10 @@ treated as out-of-date, regardless of file metadata."))
       (file-mtime target)
       never))
 
-(defmethod target-timestamp ((target pattern-ref))
+(defmethod target-stamp ((target pattern-ref))
   (with-accessors ((output pattern-ref-output)) target
     (if (pathname-exists? output)
-        (file-mtime output)
+        (target-stamp output)
         never)))
 
 (defmethod (setf target-timestamp) :before (timestamp target)
