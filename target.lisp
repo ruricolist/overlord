@@ -1784,6 +1784,7 @@ If TMP is not provided, no temp file is used."
 
 (defmethod fset:compare ((x pattern) (y pattern))
   (fset:compare-slots x y
+                      #'pattern-name
                       #'pattern.input-defaults
                       #'pattern.output-defaults
                       #'pattern.script))
