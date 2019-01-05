@@ -190,17 +190,10 @@ If the value of `*default-pathname-defaults*' and a call to
                       #'delayed-symbol-symbol-name))
 
 (defmethod compare ((d delayed-symbol) (s symbol))
-  (and (fset:compare
-        (delayed-symbol-package-name d)
-        (symbol-package s))
-       (fset:compare
-        (delayed-symbol-symbol-name d)
-        (symbol-name s))))
+  (fset:compare d (delay-symbol s)))
 
 (defmethod compare ((s symbol) (d delayed-symbol))
   (compare d s))
-
-(define-cross-type-compare-methods delayed-symbol)
 
 (defun maybe-delay-symbol (symbol)
   (cond ((not (symbolp symbol))
