@@ -394,23 +394,22 @@ reloaded on demand."
   (db.ref (db) key)
   "Access KEY in the current database.")
 
-(defun db-protect (x)
-  "Try to avoid writing symbols or package objects into the database.
+(defgeneric db-protect (x)
+  (:documentation "Try to avoid writing symbols or package objects into the database.
 This allows the database to be reloaded without those packages being
-required."
-  (typecase x
-    (keyword x)
-    (symbol
-     (eif (memq (symbol-package x)
-                '#.(list (find-package :cl)
-                         (find-package :overlord/db)))
-         x
-         (let* ((p (symbol-package x)))
-           (cons (and p (package-name p))
-                 (symbol-name x)))))
-    (package
-     (cons :package (package-name x)))
-    (otherwise x)))
+required.")
+  (:method ((x symbol))
+    (eif (memq (symbol-package x)
+               '#.(list (find-package :keyword)
+                        (find-package :cl)
+                        (find-package :overlord/db)))
+        x
+        (let* ((p (symbol-package x)))
+          (cons (and p (package-name p))
+                (symbol-name x)))))
+  (:method ((x package))
+    (cons :package (package-name x)))
+  (:method (x) x))
 
 (defun prop-key (obj prop)
   "Convert OBJ and PROP into a single key."
