@@ -12,7 +12,7 @@
     :use-threads-p
     :register-worker-special)
   (:import-from :overlord/message :message)
-  (:import-from :overlord/db :saving-database)
+  (:import-from :overlord/db :saving-database :db-loaded?)
   (:import-from :lparallel :make-kernel :*kernel*)
   (:export
    #:with-build-env
@@ -82,6 +82,8 @@ non-caching behavior is desired.")
           (let ((*build-env* env)
                 (*kernel* kernel))
             (saving-database
+              ;; The DB cannot be loaded from within worker threads.
+              (assert (db-loaded?))
               (unwind-protect
                    (funcall fn)
                 (when kernel

@@ -25,13 +25,16 @@
   (:import-from :trivial-file-size :file-size-in-octets)
   (:import-from :fset)
   (:import-from :local-time)
+  (:import-from :lparallel
+    :kernel-worker-index)
   (:export
    :prop :has-prop? :delete-prop
    :save-database
    :saving-database
    :unload-db
    :deactivate-db
-   :delete-versioned-db))
+   :delete-versioned-db
+   :db-loaded?))
 (in-package :overlord/db)
 
 ;;; The database is a single file, an append-only log. If the log is
@@ -341,6 +344,8 @@ If there is no difference, write nothing."
 
 (defun reload-db ()
   "Reload the current version of the database from its log file."
+  (when (in-worker?)
+    (error "Cannot load the DB from within a worker."))
   (lret* ((log-file (log-file-path))
           (log-data
            (progn
@@ -362,6 +367,9 @@ If there is no difference, write nothing."
   "The database.")
 (register-worker-special '*db*)
 
+(defun in-worker? ()
+  (true (kernel-worker-index)))
+
 (defun db ()
   "Get the current database, loading it if necessary."
   (synchronized ('*db)
@@ -369,6 +377,9 @@ If there is no difference, write nothing."
       (reload-db))
     (check-version))
   *db*)
+
+(defun db-loaded? ()
+  (not (null *db*)))
 
 (defun unload-db ()
   "Clear the DB out of memory in such a way that it can still be
@@ -460,6 +471,7 @@ already pending."
   (if *save-pending*
       (funcall thunk)
       (let ((*save-pending* t))
+        (db)                            ;Ensure the DB is loaded.
         (unwind-protect
              (funcall thunk)
           (save-database)))))
