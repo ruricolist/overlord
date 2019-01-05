@@ -156,11 +156,9 @@ If the value of `*default-pathname-defaults*' and a call to
     (match symbol
       ((delayed-symbol) symbol)
       ((and _ (type symbol))
-       (let ((package-name
-               (~> symbol
-                   symbol-package
-                   package-name))
-             (symbol-name (symbol-name symbol)))
+       (let* ((package (symbol-package symbol))
+              (package-name (package-name package))
+              (symbol-name (symbol-name symbol)))
          (delayed-symbol package-name symbol-name)))
       (otherwise symbol))))
 
