@@ -37,7 +37,7 @@
 (defun unregister-worker-special (var)
   "Stop VAR from being propagated into worker threads."
   (check-type var symbol)
-  (removef var (worker-specials)))
+  (removef (worker-specials) var))
 
 (defun register-worker-specials (vars)
   "Register each var in VARS, as with `register-worker-special'."
