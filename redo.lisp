@@ -195,10 +195,16 @@ that are themselves out of date."
            (not-in-db?
             (and (target? target)
                  (not (target-in-db? target)))))
-    (or target-does-not-exist?
-        non-existent-prereqs-exist?
-        regular-prereqs-changed?
-        not-in-db?)))
+    ;; (or target-does-not-exist?
+    ;;     non-existent-prereqs-exist?
+    ;;     regular-prereqs-changed?
+    ;;     not-in-db?)
+    ;; Return keywords to ease debugging.
+    (cond (target-does-not-exist? :new)
+          (non-existent-prereqs-exist? :prereqs)
+          (regular-prereqs-changed? :changes)
+          (not-in-db? :unknown)
+          (t nil))))
 
 (defun redo-ifchange (&rest targets)
   "Rebuild each target in TARGETS if it is out of date."
