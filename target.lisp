@@ -192,6 +192,7 @@ bound as a generic function."
 (defconst prereqsne-temp :prereqsne-temp)
 (defconst stamp          :stamp)
 (defconst uptodate       :uptodate)
+(defconst build-time     :build-time)
 
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
   "Make a saved prereq object."
@@ -323,6 +324,13 @@ built; otherwise it is the current package."
 (defun (setf target-saved-prereqsne) (value target)
   (setf (prop target prereqsne)
         (assure fset:set value)))
+
+(defmethod target-build-time (target)
+  (prop target build-time 0))
+
+(defmethod (setf target-build-time) (value target)
+  (check-type value (integer 0 *))
+  (setf (prop target build-time) value))
 
 
 ;;; Types.

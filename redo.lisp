@@ -102,7 +102,8 @@
 
 (defun redo-target (target)
   "Unconditionally build TARGET."
-  (let ((target (resolve-target target)))
+  (let ((target (resolve-target target))
+        start end)
     (ensure (cached-stamp target)
       ;; This only needs to be checked if we are actually building.
       ;; E.g. `trivial-prereq'.
@@ -117,10 +118,13 @@
             (nix (target-up-to-date? target))
             (unwind-protect
                  (let ((*parents* (cons target *parents*)))
-                   (run-script build-script))
+                   (setf start (get-internal-real-time))
+                   (run-script build-script)
+                   (setf end (get-internal-real-time)))
               (save-temp-prereqs target)
               (save-temp-prereqsne target))
-            (setf (target-up-to-date? target) t)))
+            (setf (target-build-time  target) (- end start)
+                  (target-up-to-date? target) t)))
         (target-stamp target)))))
 
 (defun walk-targets (fn targets)

@@ -1,5 +1,5 @@
-(uiop:define-package :overlord/target-protocol
-    (:use :cl :alexandria :serapeum)
+(defpackage :overlord/target-protocol
+  (:use :cl :alexandria :serapeum)
   (:import-from :overlord/stamp :target-timestamp :never)
   (:import-from :overlord/types :hash-code :error*)
   (:import-from :fset :compare :define-cross-type-compare-methods)
@@ -25,6 +25,7 @@
    #:record-prereq
    #:record-prereqne
    #:target-in-db?
+   #:target-build-time
    #:target-saved-prereqs
    #:target-saved-prereqsne
    #:saved-prereq-target
@@ -172,3 +173,11 @@ should be copied.")
 (defgeneric clear-temp-prereqs (target))
 
 (defgeneric clear-temp-prereqsne (target))
+
+(defgeneric target-build-time (target)
+  (:documentation "How long (in internal time units) a target took to build.")
+  (:method (target)
+    (declare (ignore target))
+    0))
+
+(defgeneric (setf target-build-time) (value target))
