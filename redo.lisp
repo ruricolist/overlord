@@ -14,6 +14,9 @@
     #:with-meta-kernel
     #:nproc)
   (:import-from #:lparallel
+    #:speculate
+    #:future
+    #:force
     #:invoke-transfer-error
     #:task-handler-bind
     #:psome #:pmap #:*kernel*)
@@ -128,16 +131,44 @@
         (target-stamp target)))))
 
 (defun walk-targets (fn targets)
+  "Call FN on each targets in TARGETS, in some order, and possibly in
+parallel."
+  (check-type fn function)
   (assert (build-env-bound?))
-  (let ((targets (reshuffle targets))
-        ;; We wrap the FN regardless of whether we are using
-        ;; parallelism or not, to prevent reliance on side-effects.
-        (fn (wrap-worker-specials fn)))
-    (if (and (use-threads-p)
-             (>= (length targets) nproc))
-        (task-handler-bind ((error #'invoke-transfer-error))
-          (pmap nil fn :parts nproc targets))
-        (map nil fn targets))))
+  ;; We wrap the FN regardless of whether we are using parallelism or
+  ;; not, to prevent reliance on side-effects.
+  (labels ((walk-targets/parallel (fn targets)
+             (assert (vectorp targets)) ;Targets should have been shuffled.
+             (task-handler-bind ((error #'invoke-transfer-error))
+               (if (<= (length targets) nproc)
+                   (pmap nil fn :parts nproc targets)
+                   (walk-targets/slowest-first fn targets))))
+           (walk-targets/slowest-first (fn targets)
+             ;; We should only end up here if there are enough targets
+             ;; to bother with.
+             (assert (> (length targets) nproc))
+             (mvlet* ((targets
+                       (dsu-sort-new targets #'> :key #'target-build-time))
+                      (slow fast (halves targets))
+                      (fast (reverse fast)))
+               ;; At this point slow is ordered slowest to fastest, and
+               ;; fast is ordered fastest to slowest.
+               (let ((futures
+                       (map 'list (op (future (funcall fn _)))
+                            slow))
+                     (speculations
+                       (map 'list (op (speculate (funcall fn _)))
+                            fast)))
+                 ;; We *want* to steal the "easy" tasks from the kernel.
+                 (mapc #'force speculations)
+                 ;; If we end up stealing slow tasks, we want to work
+                 ;; fastest to slowest.
+                 (mapc #'force (reverse futures))))))
+    (let ((fn (wrap-worker-specials fn))
+          (targets (reshuffle targets)))
+      (if (use-threads-p)
+          (walk-targets/parallel fn targets)
+          (map nil fn targets)))))
 
 (defun redo-all (targets)
   "Unconditionally build each target in TARGETS."
