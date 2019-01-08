@@ -34,7 +34,8 @@
    :unload-db
    :deactivate-db
    :delete-versioned-db
-   :db-loaded?))
+   :db-loaded?
+   :require-db))
 (in-package :overlord/db)
 
 ;;; The database is a single file, an append-only log. If the log is
@@ -380,6 +381,12 @@ If there is no difference, write nothing."
 
 (defun db-loaded? ()
   (not (null *db*)))
+
+(defun require-db ()
+  "Load the DB."
+  (unless (db-loaded?)
+    (db)
+    (assert (db-loaded?))))
 
 (defun unload-db ()
   "Clear the DB out of memory in such a way that it can still be

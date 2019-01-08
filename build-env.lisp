@@ -1,5 +1,5 @@
-(uiop:define-package :overlord/build-env
-    (:documentation "Environment for builds, including (but not limited
+(defpackage :overlord/build-env
+  (:documentation "Environment for builds, including (but not limited
   to) caching already built targets.")
   (:use :cl :alexandria :serapeum
     :overlord/target-table
@@ -12,15 +12,17 @@
     :use-threads-p
     :register-worker-special)
   (:import-from :overlord/message :message)
-  (:import-from :overlord/db :saving-database :db-loaded?)
+  (:import-from :overlord/db
+    :require-db
+    :saving-database)
   (:import-from :lparallel :make-kernel :*kernel*)
   (:export
-   #:with-build-env
-   #:*use-build-cache*
-   #:build-env-bound?
-   #:cached-stamp
-   #:target-exists?/cache
-   #:target-stamp/cache))
+   :with-build-env
+   :*use-build-cache*
+   :build-env-bound?
+   :cached-stamp
+   :target-exists?/cache
+   :target-stamp/cache))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -32,39 +34,45 @@ non-caching behavior is desired.")
 
 (defvar *build-id* 0)
 
+(defun next-build-id ()
+  (synchronized ()
+    (incf *build-id*)))
+
 (defvar-unbound *build-env*
   "Environment for the current build.")
 (register-worker-special '*build-env*)
 
-(defsubst use-build-cache? ()
+(defun use-build-cache? ()
   *use-build-cache*)
 
-(defsubst build-env-bound? ()
+(defun build-env-bound? ()
   (boundp '*build-env*))
 
 (defclass build-env ()
   ((lock :initform (make-recursive-lock)
          :reader monitor)
    (id :type (integer 1 *)
-       :initform (synchronized ()
-                   (incf *build-id*)))
+       :initform (next-build-id))
    (table
     :initform (make-target-table)
-    :reader build-env.table)
-   (kernel :initform nil
-           :reader build-env.kernel))
+    :reader build-env.table))
   (:documentation "Metadata for the build run."))
 
-(defmethod initialize-instance :after ((env build-env) &key)
-  (with-slots (id kernel) env
-    (when (use-threads-p)
-      (message "Initializing threads for build ~a." id)
-      (setf kernel
-            (make-kernel nproc
-                         :name (fmt "Kernel for build ~a." id))))))
+(defclass threaded-build-env (build-env)
+  ((kernel :initform nil
+           :reader build-env.kernel)))
 
-(defsubst make-build-env ()
-  (make 'build-env))
+(defmethod initialize-instance :after ((env threaded-build-env) &key)
+  (with-slots (id kernel) env
+    (message "Initializing threads for build ~a." id)
+    (setf kernel
+          (make-kernel nproc
+                       :name (fmt "Kernel for build ~a." id)))))
+
+(defun make-build-env ()
+  (if (use-threads-p)
+      (make 'threaded-build-env)
+      (make 'build-env)))
 
 (defstruct (target-meta
             (:conc-name target-meta.)
@@ -74,25 +82,33 @@ non-caching behavior is desired.")
   (stamp nil)
   (lock (bt:make-lock)))
 
-(defun call-in-build-env (fn)
+(defun call/build-env (fn)
   (if (build-env-bound?)
       (funcall fn)
-      (let* ((env (make-build-env)))
-        (with-slots (kernel id) env
-          (let ((*build-env* env)
-                (*kernel* kernel))
-            (saving-database
-              ;; The DB cannot be loaded from within worker threads.
-              (assert (db-loaded?))
-              (unwind-protect
-                   (funcall fn)
-                (when kernel
-                  (message "Terminating threads for build ~a." id)
-                  (lparallel:end-kernel :wait t)))))))))
+      (let ((env (make-build-env)))
+        (call-in-build-env env fn))))
+
+(defgeneric call-in-build-env (env fn))
+
+(defmethod call-in-build-env (env fn)
+  (with-slots (id) env
+    (let ((*build-env* env))
+      (saving-database
+        ;; The DB cannot be loaded from within worker threads.
+        (funcall fn)))))
+
+(defmethod call-in-build-env ((env threaded-build-env) fn)
+  (declare (ignore fn))
+  (require-db)
+  (with-slots (kernel id) env
+    (message "Initializing threads for build ~a." id)
+    (let ((kernel-name (fmt "Kernel for build ~a." id)))
+      (lparallel.kernel-util:with-temp-kernel (nproc :name kernel-name)
+        (call-next-method)))))
 
 (defmacro with-build-env ((&key) &body body)
   (with-thunk (body)
-    `(call-in-build-env ,body)))
+    `(call/build-env ,body)))
 
 (defun target-meta (target)
   (let* ((table (build-env.table *build-env*)))
