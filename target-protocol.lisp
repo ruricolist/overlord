@@ -67,6 +67,7 @@ Building this builds all targets defined in this session \(not all targets in th
     (error* "No timestamp method for target ~a.
 
 Need to specialize one of ~s or ~s for class ~s."
+            target
             'target-timestamp
             'target-stamp
             (class-name-of target))))
