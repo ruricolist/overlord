@@ -14,15 +14,10 @@
     #:with-meta-kernel
     #:nproc)
   (:import-from #:lparallel
-    #:make-channel
-    #:submit-task
     #:receive-result
-    #:speculate
-    #:future
-    #:force
-    #:invoke-transfer-error
-    #:task-handler-bind
     #:psome #:pmap
+    #:task-handler-bind
+    #:invoke-transfer-error
     #:*task-priority*)
   (:import-from #:overlord/types
     #:overlord-error
@@ -31,10 +26,6 @@
     #:*db*)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
-  (:import-from #:lparallel.queue
-    #:make-queue
-    #:try-pop-queue
-    #:push-queue)
   (:nicknames :redo)
   (:export
    #:recursive-dependency
@@ -141,38 +132,6 @@
 (defvar *already-sorted* nil)
 (register-worker-special '*already-sorted*)
 
-(deftype token ()
-  '(integer 0 *))
-
-(def jobs nproc)
-
-(defun make-token-pool (n)
-  (make-queue :fixed-capacity n
-              :initial-contents (range n)))
-
-(defvar *token-pool*
-  (make-token-pool (1- nproc)))
-
-(-> ask-for-token () (or token null))
-(defun ask-for-token ()
-  (try-pop-queue *token-pool*))
-
-(-> return-token (token) (values))
-(defun return-token (token)
-  (push-queue token *token-pool*))
-
-(defun run-or-spawn-job (fn)
-  (let ((token (ask-for-token)))
-    (if (no token)
-        (progn (funcall fn)
-               nil)
-        (lret ((ch (make-channel)))
-          (submit-task ch
-                       (lambda ()
-                         (unwind-protect
-                              (funcall fn)
-                           (return-token token))))))))
-
 (defun walk-targets (fn targets)
   "Call FN on each targets in TARGETS, in some order, and possibly in
 parallel."
@@ -182,13 +141,10 @@ parallel."
   ;; not, to prevent reliance on side-effects.
   (labels ((walk-targets/parallel (fn targets)
              (assert (vectorp targets)) ;Targets should have been shuffled.
-             (task-handler-bind ((error #'invoke-transfer-error))
-               (ecase *task-priority*
-                 (:low
-                  (map nil #'receive-result
-                       (target-channels fn targets :low)))
-                 (:default
-                  (walk-targets/slowest-first fn targets)))))
+             (if (eql *task-priority* :low)
+                 (map nil #'receive-result
+                      (target-channels fn targets :low))
+                 (walk-targets/slowest-first fn targets)))
            (where-to-split (seq)
              "Where to split SEQ to isolate the slowest targets at the beginning."
              ;; Assuming the durations are normally distributed, we
@@ -207,14 +163,12 @@ parallel."
                    (nth-best! split targets #'> :key #'car)
                    (map 'vector #'cdr targets))))
            (target-channels (fn targets priority)
-             (remove nil
-                     (let ((*task-priority* priority))
-                       (map 'vector
-                            (lambda (target)
-                              (run-or-spawn-job
-                               (lambda ()
-                                 (funcall fn target))))
-                            targets))))
+             (let ((*task-priority* priority))
+               (run-or-spawn-jobs
+                (map 'list
+                     (lambda (target)
+                       (partial fn target))
+                     targets))))
            (walk-targets/slowest-first (fn targets)
              (mvlet* ((targets (sort-slowest-first targets))
                       (*already-sorted* t)

@@ -15,14 +15,28 @@
   (:import-from :overlord/db
     :require-db
     :saving-database)
-  (:import-from :lparallel :make-kernel :*kernel*)
+  (:import-from :lparallel
+    :task-handler-bind
+    :invoke-transfer-error
+    #:make-channel
+    #:submit-task
+    #:receive-result)
+  (:import-from #:lparallel.queue
+    #:make-queue
+    #:try-pop-queue
+    #:push-queue)
+  (:import-from #:lparallel.kernel-util
+    #:with-temp-kernel)
   (:export
    :with-build-env
    :*use-build-cache*
    :build-env-bound?
    :cached-stamp
    :target-exists?/cache
-   :target-stamp/cache))
+   :target-stamp/cache
+   :ask-for-token
+   :run-or-spawn-job
+   :run-or-spawn-jobs))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -59,15 +73,9 @@ non-caching behavior is desired.")
   (:documentation "Metadata for the build run."))
 
 (defclass threaded-build-env (build-env)
-  ((kernel :initform nil
-           :reader build-env.kernel)))
-
-(defmethod initialize-instance :after ((env threaded-build-env) &key)
-  (with-slots (id kernel) env
-    (message "Initializing threads for build ~a." id)
-    (setf kernel
-          (make-kernel nproc
-                       :name (fmt "Kernel for build ~a." id)))))
+  ((jobs :initform (1- nproc))
+   (tokens :initform (make-token-pool (1- nproc))
+           :reader build-env-tokens)))
 
 (defun make-build-env ()
   (if (use-threads-p)
@@ -100,11 +108,12 @@ non-caching behavior is desired.")
 (defmethod call-in-build-env ((env threaded-build-env) fn)
   (declare (ignore fn))
   (require-db)
-  (with-slots (kernel id) env
+  (with-slots (jobs id tokens) env
     (message "Initializing threads for build ~a." id)
     (let ((kernel-name (fmt "Kernel for build ~a." id)))
-      (lparallel.kernel-util:with-temp-kernel (nproc :name kernel-name)
-        (call-next-method)))))
+      (with-temp-kernel (jobs :name kernel-name)
+        (task-handler-bind ((error #'invoke-transfer-error))
+          (call-next-method))))))
 
 (defmacro with-build-env ((&key) &body body)
   (with-thunk (body)
@@ -168,3 +177,61 @@ built it."
            (use-build-cache?)
            (cached-stamp target))
       (target-stamp target)))
+
+;;; How jobs are parallelized. This is intended to be spiritually (and
+;;; eventually technically) compatible with Make's jobserver protocol.
+;;; We are still using Lparallel, but only as a thread pool; we ignore
+;;; its scheduler. Instead, we use a fixed pool of tokens; when we try
+;;; to run a job, we try to grab a token; if we can grab a token, we
+;;; execute the job in the background (returning a channel) and return
+;;; the token when we are finished; if we can't, we do the job in the
+;;; current thread and return nothing.
+
+(deftype token ()
+  '(integer 0 *))
+
+(defun make-token-pool (n)
+  (make-queue :fixed-capacity n
+              :initial-contents (range n)))
+
+(-> ask-for-token (t) (or token null))
+(defun ask-for-token (env)
+  (try-pop-queue (build-env-tokens env)))
+
+(-> return-token (t token) (values))
+(defun return-token (env token)
+  (push-queue token (build-env-tokens env))
+  (values))
+
+(defun run-or-spawn-job (fn)
+  "Run FN in the background, if possible, otherwise in the foreground.
+
+This is intended to be spiritually (and eventually technically)
+compatible with Make's jobserver protocol. There is a fixed pool of
+tokens; when we try to run a job, we try to grab a token; if we can
+grab a token, we execute the job in the background (returning a
+channel) and return the token when we are finished; if we can't, we do
+the job in the current thread and return nothing.
+
+We still use Lparallel, but only as a thread pool.
+
+Note that you must call receive-result on each channel."
+  (let* ((env *build-env*)
+         (token (ask-for-token env)))
+    (if (no token)
+        (progn (funcall fn)
+               nil)
+        (lret ((ch (make-channel)))
+          (submit-task ch
+                       (lambda ()
+                         (unwind-protect
+                              (funcall fn)
+                           (return-token env token))))))))
+
+(defun run-or-spawn-jobs (fns)
+  "Like `run-or-spawn-jobs'.
+Return a vector of open channels."
+  (remove nil
+          (map 'vector
+               #'run-or-spawn-job
+               fns)))

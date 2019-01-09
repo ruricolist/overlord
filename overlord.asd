@@ -12,3 +12,5 @@
   :depends-on ("overlord/all")
   :in-order-to ((test-op (test-op "overlord/tests")))
   :perform (test-op (o c) (symbol-call :overlord/tests :run-overlord-tests)))
+
+(register-system-packages "lparallel" '(:lparallel.queue :lparallel.kernel-util))
