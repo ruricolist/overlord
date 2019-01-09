@@ -2,6 +2,8 @@
   (:use #:cl :overlord/types :alexandria :serapeum)
   (:import-from :overlord/asdf
     :asdf-system-version)
+  (:import-from #:lparallel
+    #:*task-priority*)
   (:export #:*base*
            #:*cli*
            #:*db-version*
@@ -71,6 +73,8 @@ lexically closes over the current dynamic value of every special that has been r
    ;; Propagating trace output makes debugging much easier.
    *trace-output*
    *error-output*
+
+   *task-priority*
 
    ;; Guard against someone trying to alter the list of worker
    ;; specials from within a worker.

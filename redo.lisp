@@ -19,7 +19,8 @@
     #:force
     #:invoke-transfer-error
     #:task-handler-bind
-    #:psome #:pmap #:*kernel*)
+    #:psome #:pmap
+    #:*task-priority*)
   (:import-from #:overlord/types
     #:overlord-error
     #:overlord-error-target)
@@ -130,6 +131,9 @@
                   (target-up-to-date? target) t)))
         (target-stamp target)))))
 
+(defvar *already-sorted* nil)
+(register-worker-special '*already-sorted*)
+
 (defun walk-targets (fn targets)
   "Call FN on each targets in TARGETS, in some order, and possibly in
 parallel."
@@ -137,33 +141,53 @@ parallel."
   (assert (build-env-bound?))
   ;; We wrap the FN regardless of whether we are using parallelism or
   ;; not, to prevent reliance on side-effects.
-  (labels ((walk-targets/parallel (fn targets)
+  (labels ((pmap* (fn targets)
+             "Call PMAP with the right options."
+             (pmap nil fn :parts nproc targets))
+           (walk-targets/parallel (fn targets)
              (assert (vectorp targets)) ;Targets should have been shuffled.
              (task-handler-bind ((error #'invoke-transfer-error))
-               (if (<= (length targets) nproc)
-                   (pmap nil fn :parts nproc targets)
+               (if (or
+                    ;; If there are few enough tasks, just distribute
+                    ;; them.
+                    (<= (length targets) nproc)
+                    ;; If we are already in a low-priority branch,
+                    ;; just submit the tasks.
+                    (eql *task-priority* :low))
+                   (pmap* fn targets)
                    (walk-targets/slowest-first fn targets))))
+           (where-to-split (seq)
+             "Where to split SEQ to isolate the slowest targets at the beginning."
+             ;; Assuming the durations are normally distributed, we
+             ;; want the left tail.
+             (floor (* (length targets) 0.32)))
+           (sort-slowest-first (targets)
+             "Sort TARGETS (partially) so that the slowest targets are first."
+             (if *already-sorted* targets
+                 (let ((targets
+                         ;; Decorate the seq of targets with build times.
+                         (map 'vector
+                              (op (cons (target-build-time _1) _1))
+                              targets))
+                       (split (where-to-split targets)))
+                   ;; Partially sort the targets.
+                   (nth-best! split targets #'> :key #'car)
+                   (map 'vector #'cdr targets))))
            (walk-targets/slowest-first (fn targets)
              ;; We should only end up here if there are enough targets
              ;; to bother with.
              (assert (> (length targets) nproc))
-             (mvlet* ((targets
-                       (dsu-sort-new targets #'> :key #'target-build-time))
-                      (slow fast (halves targets))
-                      (fast (reverse fast)))
+             (assert (eql *task-priority* :default))
+             (mvlet* ((targets (sort-slowest-first targets))
+                      (*already-sorted* t)
+                      (slow fast (halves targets (where-to-split targets)))
+                      (fast (nreverse fast)))
                ;; At this point slow is ordered slowest to fastest, and
                ;; fast is ordered fastest to slowest.
-               (let ((futures
-                       (map 'list (op (future (funcall fn _)))
-                            slow))
-                     (speculations
-                       (map 'list (op (speculate (funcall fn _)))
-                            fast)))
-                 ;; We *want* to steal the "easy" tasks from the kernel.
-                 (mapc #'force speculations)
-                 ;; If we end up stealing slow tasks, we want to work
-                 ;; fastest to slowest.
-                 (mapc #'force (reverse futures))))))
+               (let ((*task-priority* :default))
+                 (pmap* fn slow))
+               (let ((*task-priority* :low))
+                 (pmap* fn fast)))))
     (let ((fn (wrap-worker-specials fn))
           (targets (reshuffle targets)))
       (if (use-threads-p)
