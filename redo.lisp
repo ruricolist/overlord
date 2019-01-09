@@ -14,6 +14,9 @@
     #:with-meta-kernel
     #:nproc)
   (:import-from #:lparallel
+    #:make-channel
+    #:submit-task
+    #:receive-result
     #:speculate
     #:future
     #:force
@@ -28,6 +31,10 @@
     #:*db*)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
+  (:import-from #:lparallel.queue
+    #:make-queue
+    #:try-pop-queue
+    #:push-queue)
   (:nicknames :redo)
   (:export
    #:recursive-dependency
@@ -89,7 +96,7 @@
    ;; because the database is cleared every time Overlord, or the
    ;; underlying Lisp, is upgraded. Instead, what makes something a
    ;; target is that it has a build script. (This idea comes from
-   ;; Gup). However (see `changed?' below) a target is still
+   ;; Gup). However (see `out-of-date?' below) a target is still
    ;; considered out of date if it has no presence in the DB.
    (target-has-build-script? target)))
 
@@ -134,6 +141,38 @@
 (defvar *already-sorted* nil)
 (register-worker-special '*already-sorted*)
 
+(deftype token ()
+  '(integer 0 *))
+
+(def jobs nproc)
+
+(defun make-token-pool (n)
+  (make-queue :fixed-capacity n
+              :initial-contents (range n)))
+
+(defvar *token-pool*
+  (make-token-pool (1- nproc)))
+
+(-> ask-for-token () (or token null))
+(defun ask-for-token ()
+  (try-pop-queue *token-pool*))
+
+(-> return-token (token) (values))
+(defun return-token (token)
+  (push-queue token *token-pool*))
+
+(defun run-or-spawn-job (fn)
+  (let ((token (ask-for-token)))
+    (if (no token)
+        (progn (funcall fn)
+               nil)
+        (lret ((ch (make-channel)))
+          (submit-task ch
+                       (lambda ()
+                         (unwind-protect
+                              (funcall fn)
+                           (return-token token))))))))
+
 (defun walk-targets (fn targets)
   "Call FN on each targets in TARGETS, in some order, and possibly in
 parallel."
@@ -141,21 +180,15 @@ parallel."
   (assert (build-env-bound?))
   ;; We wrap the FN regardless of whether we are using parallelism or
   ;; not, to prevent reliance on side-effects.
-  (labels ((pmap* (fn targets)
-             "Call PMAP with the right options."
-             (pmap nil fn :parts nproc targets))
-           (walk-targets/parallel (fn targets)
+  (labels ((walk-targets/parallel (fn targets)
              (assert (vectorp targets)) ;Targets should have been shuffled.
              (task-handler-bind ((error #'invoke-transfer-error))
-               (if (or
-                    ;; If there are few enough tasks, just distribute
-                    ;; them.
-                    (<= (length targets) nproc)
-                    ;; If we are already in a low-priority branch,
-                    ;; just submit the tasks.
-                    (eql *task-priority* :low))
-                   (pmap* fn targets)
-                   (walk-targets/slowest-first fn targets))))
+               (ecase *task-priority*
+                 (:low
+                  (map nil #'receive-result
+                       (target-channels fn targets :low)))
+                 (:default
+                  (walk-targets/slowest-first fn targets)))))
            (where-to-split (seq)
              "Where to split SEQ to isolate the slowest targets at the beginning."
              ;; Assuming the durations are normally distributed, we
@@ -173,21 +206,28 @@ parallel."
                    ;; Partially sort the targets.
                    (nth-best! split targets #'> :key #'car)
                    (map 'vector #'cdr targets))))
+           (target-channels (fn targets priority)
+             (remove nil
+                     (let ((*task-priority* priority))
+                       (map 'vector
+                            (lambda (target)
+                              (run-or-spawn-job
+                               (lambda ()
+                                 (funcall fn target))))
+                            targets))))
            (walk-targets/slowest-first (fn targets)
-             ;; We should only end up here if there are enough targets
-             ;; to bother with.
-             (assert (> (length targets) nproc))
-             (assert (eql *task-priority* :default))
              (mvlet* ((targets (sort-slowest-first targets))
                       (*already-sorted* t)
                       (slow fast (halves targets (where-to-split targets)))
-                      (fast (nreverse fast)))
-               ;; At this point slow is ordered slowest to fastest, and
-               ;; fast is ordered fastest to slowest.
-               (let ((*task-priority* :default))
-                 (pmap* fn slow))
-               (let ((*task-priority* :low))
-                 (pmap* fn fast)))))
+                      (fast (nreverse fast))
+                      ;; At this point slow is ordered slowest to
+                      ;; fastest, and fast is ordered fastest to
+                      ;; slowest.
+                      (channels
+                       (concatenate 'vector
+                                    (target-channels fn slow :default)
+                                    (target-channels fn fast :low))))
+               (map nil #'receive-result channels))))
     (let ((fn (wrap-worker-specials fn))
           (targets (reshuffle targets)))
       (if (use-threads-p)
