@@ -160,7 +160,7 @@ parallel."
              "Where to split SEQ to isolate the slowest targets at the beginning."
              ;; Assuming the durations are normally distributed, we
              ;; want the left tail.
-             (floor (* (length targets) 0.32)))
+             (floor (* (length seq) 0.32)))
            (sort-slowest-first (targets)
              "Sort TARGETS (partially) so that the slowest targets are first."
              (if *already-sorted* targets
