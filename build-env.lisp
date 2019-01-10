@@ -72,14 +72,24 @@ non-caching behavior is desired.")
     :reader build-env.table))
   (:documentation "Metadata for the build run."))
 
-(defclass threaded-build-env (build-env)
-  ((jobs :initform (1- nproc))
-   (tokens :initform (make-token-pool (1- nproc))
-           :reader build-env-tokens)))
+(defmethod print-object ((self build-env) stream)
+  (print-unreadable-object (self stream :type t)
+    (with-slots (id) self
+      (format stream "#~a" id))))
 
-(defun make-build-env ()
+(defclass threaded-build-env (build-env)
+  ((jobs :initarg :jobs :type (integer 1 *))
+   (tokens :reader build-env-tokens))
+  (:default-initargs
+   :jobs nproc))
+
+(defmethod initialize-instance :after ((self threaded-build-env) &key)
+  (with-slots (jobs tokens) self
+    (setf tokens (make-token-pool (1- jobs)))))
+
+(defun make-build-env (&key jobs)
   (if (use-threads-p)
-      (make 'threaded-build-env)
+      (make 'threaded-build-env :jobs jobs)
       (make 'build-env)))
 
 (defstruct (target-meta
@@ -90,10 +100,10 @@ non-caching behavior is desired.")
   (stamp nil)
   (lock (bt:make-lock)))
 
-(defun call/build-env (fn)
+(defun call/build-env (fn &key jobs)
   (if (build-env-bound?)
       (funcall fn)
-      (let ((env (make-build-env)))
+      (let ((env (make-build-env :jobs jobs)))
         (call-in-build-env env fn))))
 
 (defgeneric call-in-build-env (env fn))
@@ -109,15 +119,18 @@ non-caching behavior is desired.")
   (declare (ignore fn))
   (require-db)
   (with-slots (jobs id tokens) env
-    (message "Initializing threads for build ~a." id)
-    (let ((kernel-name (fmt "Kernel for build ~a." id)))
-      (with-temp-kernel (jobs :name kernel-name)
-        (task-handler-bind ((error #'invoke-transfer-error))
-          (call-next-method))))))
+    (let ((thread-count (1- jobs)))
+      (message "Initializing ~a thread~:p for build ~a."
+               thread-count
+               id)
+      (let ((kernel-name (fmt "Kernel for build ~a." id)))
+        (with-temp-kernel (thread-count :name kernel-name)
+          (task-handler-bind ((error #'invoke-transfer-error))
+            (call-next-method)))))))
 
-(defmacro with-build-env ((&key) &body body)
+(defmacro with-build-env ((&key (jobs 'nproc)) &body body)
   (with-thunk (body)
-    `(call/build-env ,body)))
+    `(call/build-env ,body :jobs ,jobs)))
 
 (defun target-meta (target)
   (let* ((table (build-env.table *build-env*)))

@@ -60,6 +60,10 @@
     :implementation-identifier
     :with-temporary-file
     :rename-file-overwriting-target)
+  (:import-from :overlord/kernel
+    :nproc)
+  (:import-from :overlord/build-env
+    :build-env-bound?)
   ;; Shadow for style.
   (:shadow
    :if                                  ;Always ternary.
@@ -1328,17 +1332,21 @@ value and NEW do not match under TEST."
       (build (intern (string target) package))
       (values target system-name package))))
 
-(defun build (target/s &key force)
+(defun build (target/s &key force (jobs nproc))
   "Build TARGET/S, a single target or a list of targets."
+  (check-type jobs (integer 1 *))
+  (when (build-env-bound?)
+    (error* "Do not call ~s recursively; use ~s instead."
+            'build
+            'depends-on))
   (let ((*force* force))
-    (redo-all (ensure-list target/s))))
+    (redo-all (ensure-list target/s) :jobs jobs)))
 
 ;;; build-package-tree? That is, build a package and all of its
 ;;; sub-packages \(packages beginning with $package/ or $package).
 
 (defun build-package (package &key force)
-  (let ((*force* force))
-    (build (find-package package))))
+  (build (find-package package) :force force))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))
