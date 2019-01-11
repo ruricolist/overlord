@@ -27,6 +27,8 @@
     #:push-queue)
   (:import-from #:lparallel.kernel-util
     #:with-temp-kernel)
+  (:import-from #:lparallel.queue
+    #:queue-count)
   (:export
    :with-build-env
    :*use-build-cache*
@@ -79,9 +81,22 @@ non-caching behavior is desired.")
 
 (defclass threaded-build-env (build-env)
   ((jobs :initarg :jobs :type (integer 1 *))
-   (tokens :reader build-env-tokens))
+   (tokens :reader build-env-tokens)
+   (jobs-used :initform 1))
   (:default-initargs
    :jobs nproc))
+
+(defmethod track-jobs-used ((env threaded-build-env))
+  "This should be used after a token is obtained to track how many
+threads are being used.
+
+The idea is to be able to tell how many of the allocated threads are
+actually being used, so we know how many to allocate for the next run."
+  (with-slots (jobs-used jobs tokens) env
+    (let* ((length (1- jobs))
+           (count (queue-count tokens))
+           (used (- length count)))
+      (maxf jobs-used (1+ used)))))
 
 (defmethod initialize-instance :after ((self threaded-build-env) &key)
   (with-slots (jobs tokens) self
@@ -118,15 +133,18 @@ non-caching behavior is desired.")
 (defmethod call-in-build-env ((env threaded-build-env) fn)
   (declare (ignore fn))
   (require-db)
-  (with-slots (jobs id tokens) env
-    (let ((thread-count (1- jobs)))
+  (with-slots (jobs id tokens jobs-used) env
+    (let ((thread-count (1- jobs))
+          (kernel-name (fmt "Kernel for build ~a." id)))
       (message "Initializing ~a thread~:p for build ~a."
                thread-count
                id)
-      (let ((kernel-name (fmt "Kernel for build ~a." id)))
-        (with-temp-kernel (thread-count :name kernel-name)
-          (task-handler-bind ((error #'invoke-transfer-error))
-            (call-next-method)))))))
+      (if (zerop thread-count) (call-next-method)
+          (with-temp-kernel (thread-count :name kernel-name)
+            (task-handler-bind ((error #'invoke-transfer-error))
+              (multiple-value-prog1 (call-next-method)
+                (message "A maximum of ~a/~a simultaneous job~:p were used."
+                         jobs-used jobs))))))))
 
 (defmacro with-build-env ((&key (jobs 'nproc)) &body body)
   (with-thunk (body)
@@ -209,7 +227,9 @@ built it."
 
 (-> ask-for-token (t) (or token null))
 (defun ask-for-token (env)
-  (try-pop-queue (build-env-tokens env)))
+  (lret* ((queue (build-env-tokens env))
+          (token (try-pop-queue queue)))
+    (track-jobs-used env)))
 
 (-> return-token (t token) (values))
 (defun return-token (env token)
