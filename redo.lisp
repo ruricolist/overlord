@@ -184,7 +184,10 @@ parallel."
                (map nil #'receive-result channels))))
     (let ((fn (wrap-worker-specials fn))
           (targets (reshuffle targets)))
-      (if (use-threads-p)
+      (if (and (use-threads-p)
+               ;; Don't bother with parallelism if there is only one
+               ;; target to build.
+               (length> targets 1))
           (walk-targets/parallel fn targets)
           (map nil fn targets)))))
 
