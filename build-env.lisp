@@ -82,9 +82,13 @@ non-caching behavior is desired.")
 (defclass threaded-build-env (build-env)
   ((jobs :initarg :jobs :type (integer 1 *))
    (tokens :reader build-env-tokens)
-   (jobs-used :initform 1))
+   (jobs-used :initform 1)
+   (handler
+    :type function
+    :initarg :handler))
   (:default-initargs
-   :jobs nproc))
+   :jobs nproc
+   :handler #'invoke-transfer-error))
 
 (defmethod track-jobs-used ((env threaded-build-env))
   "This should be used after a token is obtained to track how many
@@ -102,9 +106,9 @@ actually being used, so we know how many to allocate for the next run."
   (with-slots (jobs tokens) self
     (setf tokens (make-token-pool (1- jobs)))))
 
-(defun make-build-env (&key jobs)
+(defun make-build-env (&key jobs handler)
   (if (use-threads-p)
-      (make 'threaded-build-env :jobs jobs)
+      (make 'threaded-build-env :jobs jobs :handler handler)
       (make 'build-env)))
 
 (defstruct (target-meta
@@ -115,10 +119,15 @@ actually being used, so we know how many to allocate for the next run."
   (stamp nil)
   (lock (bt:make-lock)))
 
-(defun call/build-env (fn &key jobs)
+(defun call/build-env (fn &key jobs debug)
   (if (build-env-bound?)
       (funcall fn)
-      (let ((env (make-build-env :jobs jobs)))
+      (let* ((handler
+               (if debug
+                   #'invoke-debugger
+                   #'invoke-transfer-error))
+             (env (make-build-env :jobs jobs
+                                  :handler handler)))
         (call-in-build-env env fn))))
 
 (defgeneric call-in-build-env (env fn))
@@ -133,7 +142,7 @@ actually being used, so we know how many to allocate for the next run."
 (defmethod call-in-build-env ((env threaded-build-env) fn)
   (declare (ignore fn))
   (require-db)
-  (with-slots (jobs id tokens jobs-used) env
+  (with-slots (jobs id tokens jobs-used handler) env
     (let ((thread-count (1- jobs))
           (kernel-name (fmt "Kernel for build ~a." id)))
       (message "Initializing ~a thread~:p for build ~a."
@@ -141,14 +150,14 @@ actually being used, so we know how many to allocate for the next run."
                id)
       (if (zerop thread-count) (call-next-method)
           (with-temp-kernel (thread-count :name kernel-name)
-            (task-handler-bind ((error #'invoke-transfer-error))
+            (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
                 (message "A maximum of ~a/~a simultaneous job~:p were used."
                          jobs-used jobs))))))))
 
-(defmacro with-build-env ((&key (jobs 'nproc)) &body body)
+(defmacro with-build-env ((&key (jobs 'nproc) debug) &body body)
   (with-thunk (body)
-    `(call/build-env ,body :jobs ,jobs)))
+    `(call/build-env ,body :jobs ,jobs :debug ,debug)))
 
 (defun target-meta (target)
   (let* ((table (build-env.table *build-env*)))

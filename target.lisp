@@ -1332,7 +1332,8 @@ value and NEW do not match under TEST."
       (build (intern (string target) package))
       (values target system-name package))))
 
-(defun build (target/s &key force (jobs nproc))
+(defun build (target/s &key force (jobs nproc)
+                            debug)
   "Build TARGET/S, a single target or a list of targets."
   (check-type jobs (integer 1 *))
   (when (build-env-bound?)
@@ -1340,7 +1341,9 @@ value and NEW do not match under TEST."
             'build
             'depends-on))
   (let ((*force* force))
-    (redo-all (ensure-list target/s) :jobs jobs)))
+    (redo-all (ensure-list target/s)
+              :jobs jobs
+              :debug debug)))
 
 ;;; build-package-tree? That is, build a package and all of its
 ;;; sub-packages \(packages beginning with $package/ or $package).

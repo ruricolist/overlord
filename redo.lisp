@@ -191,10 +191,11 @@ parallel."
           (walk-targets/parallel fn targets)
           (map nil fn targets)))))
 
-(defun redo-all (targets &key (jobs nproc))
+(defun redo-all (targets &key (jobs nproc)
+                              debug)
   "Unconditionally build each target in TARGETS."
   (unless (emptyp targets)
-    (with-build-env (:jobs jobs)
+    (with-build-env (:jobs jobs :debug debug)
       (walk-targets #'redo-target targets))))
 
 (defun resolve-build-script (target)
@@ -274,21 +275,25 @@ that are themselves out of date."
     (redo target))
   (record-prereq target))
 
-(defun redo-ifchange-all (targets &key (jobs nproc))
+(defun redo-ifchange-all (targets
+                          &key (jobs nproc)
+                               debug)
   "Rebuild each target in TARGETS if it is out of date."
   (unless (emptyp targets)
-    (with-build-env (:jobs jobs)
+    (with-build-env (:jobs jobs :debug debug)
       (walk-targets #'redo-ifchange-target targets))))
 
 (defun redo-ifcreate (&rest targets)
   "Depend on the non-existence of each target in TARGETS."
   (redo-ifcreate-all targets))
 
-(defun redo-ifcreate-all (targets &key (jobs nproc))
+(defun redo-ifcreate-all (targets
+                          &key (jobs nproc)
+                               debug)
   "Depend on the non-existence of each target in TARGETS."
   ;; Probably not worth parallelizing.
   (unless (emptyp targets)
-    (with-build-env (:jobs jobs)
+    (with-build-env (:jobs jobs :debug debug)
       (let ((targets (map 'vector #'resolve-target targets)))
         (do-each (target (reshuffle targets))
           (assert (not (target-exists?/cache target)) ()
