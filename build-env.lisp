@@ -16,6 +16,7 @@
     :require-db
     :saving-database)
   (:import-from :lparallel
+    #:broadcast-task
     :task-handler-bind
     :invoke-transfer-error
     #:make-channel
@@ -150,6 +151,14 @@ actually being used, so we know how many to allocate for the next run."
                id)
       (if (zerop thread-count) (call-next-method)
           (with-temp-kernel (thread-count :name kernel-name)
+            ;; Give each thread its own random state. (Clozure CL, at
+            ;; least, gives every thread the same initial random
+            ;; state. This can cause problems with generating
+            ;; temporary file names.)
+            (broadcast-task
+             (lambda ()
+               (setf *random-state*
+                     (make-random-state t))))
             (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
                 (message "A maximum of ~a/~a simultaneous job~:p were used."
