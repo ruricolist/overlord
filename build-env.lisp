@@ -150,15 +150,16 @@ actually being used, so we know how many to allocate for the next run."
                thread-count
                id)
       (if (zerop thread-count) (call-next-method)
-          (with-temp-kernel (thread-count :name kernel-name)
-            ;; Give each thread its own random state. (Clozure CL, at
-            ;; least, gives every thread the same initial random
-            ;; state. This can cause problems with generating
-            ;; temporary file names.)
-            (broadcast-task
-             (lambda ()
-               (setf *random-state*
-                     (make-random-state t))))
+          (with-temp-kernel (thread-count
+                             :name kernel-name
+                             ;; Give each thread its own random state.
+                             ;; (Clozure CL, at least, gives every
+                             ;; thread the same initial random state.
+                             ;; This can cause race conditions when
+                             ;; generating temporary file names.)
+                             :context (lambda (fn)
+                                        (let ((*random-state* (make-random-state t)))
+                                          (funcall fn))))
             (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
                 (message "A maximum of ~a/~a simultaneous job~:p were used."
@@ -232,9 +233,9 @@ built it."
 ;;; We are still using Lparallel, but only as a thread pool; we ignore
 ;;; its scheduler. Instead, we use a fixed pool of tokens; when we try
 ;;; to run a job, we try to grab a token; if we can grab a token, we
-;;; execute the job in the background (returning a channel) and return
-;;; the token when we are finished; if we can't, we do the job in the
-;;; current thread and return nothing.
+;;; execute the job in the background (returning a channel) and let
+;;; the background job return the token when it is finished; if we
+;;; can't, we do the job in the current thread and return nil.
 
 (deftype token ()
   '(integer 0 *))
