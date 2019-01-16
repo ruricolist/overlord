@@ -1,7 +1,7 @@
 ;;;; overlord.asd
 (in-package :asdf)
 
-(assert (uiop:version< "3.1" (asdf:asdf-version)))
+(assert (uiop:version< "3.2" (asdf:asdf-version)))
 
 (defsystem "overlord"
   :description "Experimental build system."
