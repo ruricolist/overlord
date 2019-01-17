@@ -144,7 +144,7 @@ actually being used, so we know how many to allocate for the next run."
   (declare (ignore fn))
   (require-db)
   (with-slots (jobs id tokens jobs-used handler) env
-    (let ((thread-count (1- jobs))
+    (let ((thread-count (max 1 (1- jobs)))
           (kernel-name (fmt "Kernel for build ~a." id)))
       (message "Initializing ~a thread~:p for build ~a."
                thread-count
@@ -162,7 +162,7 @@ actually being used, so we know how many to allocate for the next run."
                                           (funcall fn))))
             (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
-                (message "A maximum of ~a/~a simultaneous job~:p were used."
+                (message "A maximum of ~a/~a simultaneous jobs were used."
                          jobs-used jobs))))))))
 
 (defmacro with-build-env ((&key (jobs 'nproc) debug) &body body)
@@ -241,8 +241,9 @@ built it."
   '(integer 0 *))
 
 (defun make-token-pool (n)
-  (make-queue :fixed-capacity n
-              :initial-contents (range n)))
+  (let ((n (max 1 n)))
+    (make-queue :fixed-capacity n
+                :initial-contents (range n))))
 
 (-> ask-for-token (t) (or token null))
 (defun ask-for-token (env)
