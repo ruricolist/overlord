@@ -13,18 +13,24 @@
       (mvfold (lambda (tokens plist arg)
                 (typecase arg
                   (string
-                   (nreconc (tokens arg) tokens))
+                   (values (nreconc (tokens arg) tokens)
+                           plist))
                   (pathname
-                   (cons (stringify-pathname arg) tokens))
+                   (values (cons (stringify-pathname arg) tokens)
+                           plist))
                   (plist
-                   (revappend arg plist))
+                   (values tokens
+                           (revappend arg plist)))
                   (sequence
-                   (nreconc (collecting
-                              (do-each (token arg)
-                                (collect (etypecase token
-                                           (string token)
-                                           (pathname (stringify-pathname token))))))
-                            tokens))
+                   (values
+                    (nreconc
+                     (collecting
+                       (do-each (token arg)
+                         (collect (etypecase token
+                                    (string token)
+                                    (pathname (stringify-pathname token))))))
+                     tokens)
+                    plist))
                   (t (error "Can't use ~a as a cmd argument." arg))))
               args '() '())
     (values (nreverse tokens)
