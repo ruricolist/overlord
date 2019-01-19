@@ -1200,15 +1200,18 @@ current package."
          (target-timestamp target))
         (t never)))
 
-(defun rebuild-symbol (symbol thunk &key config)
+(defun rebuild-symbol (symbol value &key config)
+  (let ((stamp
+          (if config
+              (config-stamp value)
+              (now))))
+    (setf (symbol-value symbol) value
+          (target-timestamp symbol) stamp)))
+
+(defun wrap-rebuild-symbol (symbol thunk &key config)
   (lambda ()
-    (let* ((value (funcall thunk))
-           (stamp
-             (if config
-                 (config-stamp value)
-                 (now))))
-      (setf (symbol-value symbol) value
-            (target-timestamp symbol) stamp))))
+    (let* ((value (funcall thunk)))
+      (rebuild-symbol symbol value :config config))))
 
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
@@ -1600,17 +1603,22 @@ exists, and as a non-existent prereq if TARGET does not exist."
   ;; Maybe expand with a code walker?
   (similar? x y))
 
+(defmacro phony-task-target (name &body script)
+  "Like `var-target', but does not actually declare a variable."
+  `(progn
+     (define-script-for ,name
+       ,@script)
+     (save-task ',name (script-thunk ,@script))
+     (record-package-prereq* ',name)
+     ',name))
+
 (defmacro var-target (name expr &body deps)
   "Like `define-target-var', but does not actually evaluate anything."
-  (let ((script (append1 deps expr)))
-    `(progn
-       (define-script-for ,name
-         ,@script)
-       (defvar ,name)
-       (save-task ',name
-                  (rebuild-symbol ',name (script-thunk ,@script)))
-       (record-package-prereq* ',name)
-       ',name)))
+  `(progn
+     (phony-task-target ,name
+       ,@deps
+       (rebuild-symbol ',name ,expr))
+     (defvar ,name)))
 
 (defmacro define-target-var (name expr &body deps)
   "Define a variable with dependencies.
@@ -1666,7 +1674,7 @@ rebuilt."
   (unless (boundp name)
     (let* ((*base* (base))
            (script-thunk (eval* `(script-thunk ,@script)))
-           (script-thunk (rebuild-symbol name script-thunk :config t)))
+           (script-thunk (wrap-rebuild-symbol name script-thunk :config t)))
       (save-task name script-thunk))
     (depends-on name))
   (assert (boundp name))
@@ -1678,8 +1686,8 @@ rebuilt."
              (setf (target-timestamp ',name) ,timestamp)
              ',init))
        (save-task ',name
-                  (rebuild-symbol ',name (script-thunk ,@script)
-                                  :config t))
+                  (wrap-rebuild-symbol ',name (script-thunk ,@script)
+                                       :config t))
        (depends-on ',name)
        (record-package-prereq* ',name)
        ',name)))
@@ -1689,28 +1697,25 @@ rebuilt."
 
 (defmacro deftask (name &body body)
   "Define a task -- a target that only has dependencies.
-This is essentially a convenience to let you use keyword macros to
-specify the dependencies you want on build."
+
+This is essentially a convenience to let you use script syntax to
+specify the dependencies you want to build."
   `(define-target-task ,name
      ;; Phony targets don't *need* to be built.
      (unless *suppress-phonies*
        ,@body)))
 
-(defmacro define-target-task (name &body script)
-  "Lower-level version of `deftask'."
-  (let ((target `(phony-target (delay-symbol ',name))))
-    `(progn
-       (eval-always
-         (assert (not (boundp ',name))))
-       (define-script-for ,name
-         ,@script)
-       (save-task ,target
-                  (lambda ()
-                    (redo-always)
-                    (funcall (script-thunk ,@script)))
-                  (script-for ',name))
-       (record-package-prereq* ,target)
-       ',name)))
+(defmacro define-target-task (name &body body)
+  "Lower-level version of `deftask'.
+
+Unlike tasks defined using `deftask', tasks defined using
+`define-target-task' are built before freezing."
+  `(progn
+     (eval-always
+       (assert (not (boundp ',name))))
+     (phony-task-target ,name
+       (redo-always)                    ;Needless?
+       ,@body)))
 
 
 ;;; File targets.
