@@ -34,7 +34,8 @@
    #:save-temp-prereqs
    #:clear-temp-prereqs
    #:save-temp-prereqsne
-   #:clear-temp-prereqsne))
+   #:clear-temp-prereqsne
+   #:delete-target))
 (in-package :overlord/target-protocol)
 
 ;;; TODO Add touch-target once you have a good implementation for
@@ -75,7 +76,10 @@ Need to specialize one of ~s or ~s for class ~s."
 
 (defgeneric (setf target-timestamp) (timestamp target)
   (:documentation "Set the timestamp of TARGET.
-Not every target type supports this."))
+Not every target type supports this.")
+  (:method (timestamp target)
+    (declare (ignore timestamp))
+    (error* "Cannot set timestamp for ~a" target)))
 
 (-> target-exists? (t) boolean)
 (defgeneric target-exists? (target)
@@ -137,6 +141,12 @@ should be copied.")
 (defmacro with-target-locked ((target &key) &body body)
   (with-thunk (body)
     `(call-with-target-locked ,target ,body)))
+
+(defgeneric delete-target (target)
+  (:documentation "Delete TARGET, if it can be deleted.")
+  (:method (target)
+    (declare (ignore target))
+    (values)))
 
 
 

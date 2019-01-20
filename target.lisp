@@ -789,10 +789,6 @@ treated as out-of-date, regardless of file metadata."))
   (declare (ignore target timestamp))
   (check-not-frozen))
 
-(defmethod (setf target-timestamp) (timestamp target)
-  (declare (ignore timestamp))
-  (error* "Cannot set timestamp for ~a" target))
-
 (defmethod (setf target-timestamp) (timestamp (target delayed-symbol))
   (let ((target (force-symbol target)))
     (setf (target-timestamp target) timestamp)))
@@ -1134,6 +1130,36 @@ current package."
 (defmethod target-node-label ((target pattern-ref))
   (native-namestring
    (pattern-ref-output target)))
+
+(defmethod delete-target ((target cl:pathname))
+  (unless (absolute-pathname-p target)
+    (error* "Will not attempt to delete a relative pathname."))
+  (when (directory-pathname-p target)
+    (error* "To delete a directory, call delete-target on a directory-ref."))
+  ;; If you want to delete a directory, you should call delete-target on directory-ref.
+  (delete-file-if-exists target))
+
+(defmethod delete-target ((target directory-ref))
+  (let ((dir (directory-ref.path target)))
+    (delete-directory-tree dir
+                           :if-does-not-exist :ignore
+                           :validate t)))
+
+(defmethod delete-target ((target package))
+  (delete-package target))
+
+(defmethod delete-target ((target symbol))
+  (makunbound target))
+
+(defmethod delete-target ((target delayed-symbol))
+  (when-let (symbol
+             (ignoring overlord-error
+               (force-symbol target)))
+    (delete-target symbol)))
+
+(defmethod delete-target ((target pattern-ref))
+  (let ((output (pattern-ref-output target)))
+    (delete-target output)))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
