@@ -35,7 +35,8 @@
    #:clear-temp-prereqs
    #:save-temp-prereqsne
    #:clear-temp-prereqsne
-   #:delete-target))
+   #:delete-target
+   #:delete-targets))
 (in-package :overlord/target-protocol)
 
 ;;; TODO Add touch-target once you have a good implementation for
@@ -147,6 +148,12 @@ should be copied.")
   (:method (target)
     (declare (ignore target))
     (values)))
+
+(defun delete-targets (&rest targets)
+  "Delete all targets in TARGETS, in no particular order.
+Lists of targets in TARGETS are flattened."
+  (map nil #'delete-target
+       (reshuffle (flatten targets))))
 
 
 
