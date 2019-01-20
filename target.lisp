@@ -130,7 +130,8 @@
    :pattern-ref-output
    :clear-package-prereqs
    :list-package-prereqs
-   :directory-ref))
+   :directory-ref
+   :path))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -1265,9 +1266,12 @@ value and NEW do not match under TEST."
 ;;; API and keyword macros
 
 (defun path (path)
-  (~> path
-      (ensure-pathname :want-pathname t)
-      (merge-pathnames (base))))
+  (let ((path
+          (~> path
+              (ensure-pathname :want-pathname t)
+              (merge-pathnames (base)))))
+    (if (not (wild-pathname-p path)) path
+        (directory* path))))
 
 (defun file (file)
   (assure file-pathname (path file)))
