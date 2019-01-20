@@ -615,20 +615,6 @@ inherit a method on `make-load-form', and need only specialize
         :pattern pattern
         :output (path output)))
 
-(defconstructor phony-target
-  (name (or symbol delayed-symbol)))
-
-(defmethod fset:compare ((x phony-target) (y phony-target))
-  (fset:compare (phony-target-name x)
-                (phony-target-name y)))
-
-(defmethod call-with-target-locked ((target phony-target) fn)
-  (let* ((name (phony-target-name target))
-         (target (force-symbol name)))
-    (call-with-target-locked target fn)))
-
-(fset:define-cross-type-compare-methods phony-target)
-
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
 ;;; not all possible use cases.)
@@ -752,9 +738,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-exists? ((target impossible-prereq))
   nil)
 
-(defmethod target-exists? ((target phony-target))
-  nil)
-
 (defmethod target-exists? ((target symbol))
   (boundp target))
 
@@ -776,9 +759,6 @@ treated as out-of-date, regardless of file metadata."))
   never)
 
 (defmethod target-timestamp ((target impossible-prereq))
-  never)
-
-(defmethod target-timestamp ((target phony-target))
   never)
 
 (defmethod target-timestamp ((target trivial-prereq))
@@ -856,10 +836,6 @@ treated as out-of-date, regardless of file metadata."))
                                               (or base (base))))
                           inputs)))))
 
-(defmethod target= ((x phony-target) (y phony-target))
-  (target= (phony-target-name x)
-           (phony-target-name y)))
-
 (defmethod target= ((x delayed-symbol) y)
   (target= (force-symbol x)
            (force-symbol y)))
@@ -896,10 +872,6 @@ treated as out-of-date, regardless of file metadata."))
   (dx-sxhash
    (list 'pattern-ref
          (ref.name target))))
-
-(defmethod hash-target ((target phony-target))
-  (let ((name (force-symbol (phony-target-name target))))
-    (dx-sxhash `(phony ,name))))
 
 (defun deduplicate-targets (targets &key (key #'identity))
   ;; (test-chamber:with-experiment
@@ -1049,17 +1021,7 @@ current package."
         (impossible-task target))))
 
 (defmethod target-build-script ((target symbol))
-  (or (gethash target *tasks*)
-      ;; If there is no real target by that name, look for a
-      ;; phony target.
-      (target-build-script
-       (phony-target target))))
-
-(defmethod target-build-script ((target phony-target))
-  (let* ((name (force-symbol (phony-target-name target)))
-         (key `(phony ,name)))
-    (or (gethash key *tasks*)
-        (impossible-task target))))
+  (gethash target *tasks*))
 
 (defmethod target-build-script ((target root-target))
   (task target
@@ -1120,12 +1082,7 @@ current package."
     (setf (gethash target *tasks*)
           (task target thunk script)))
   (:method ((target delayed-symbol) thunk script)
-    (save-task (force-symbol target) thunk script))
-  (:method ((target phony-target) thunk script)
-    (let* ((name (force-symbol (phony-target-name target)))
-           (task (task target thunk script))
-           (key `(phony ,name)))
-      (setf (gethash key *tasks*) task))))
+    (save-task (force-symbol target) thunk script)))
 
 (defun save-task (target thunk &optional (script (script-for target)))
   (check-not-frozen)
@@ -1173,10 +1130,6 @@ current package."
 ;;; Shouldn't happen either.
 (defmethod target-node-label ((target impossible-prereq))
   (progn "IMPOSSIBLE TARGET"))
-
-(defmethod target-node-label ((target phony-target))
-  (let ((name (force-symbol (phony-target-name target))))
-    (fmt "phony target ~a" name)))
 
 (defmethod target-node-label ((target pattern-ref))
   (native-namestring
