@@ -14,11 +14,12 @@
     #:with-meta-kernel
     #:nproc)
   (:import-from #:lparallel
+    #:make-channel
     #:receive-result
-    #:psome #:pmap
+    #:psome
     #:task-handler-bind
     #:invoke-transfer-error
-    #:*task-priority*)
+    #:submit-task)
   (:import-from #:overlord/types
     #:overlord-error
     #:overlord-error-target)
@@ -26,6 +27,9 @@
     #:*db*)
   (:import-from #:overlord/stamp
     #:stamp-satisfies-p)
+  (:import-from #:overlord/makespan
+    #:minimize-makespan
+    #:optimal-machine-count)
   (:nicknames :redo)
   (:export
    #:recursive-dependency
@@ -132,56 +136,58 @@
 (defvar *already-sorted* nil)
 (register-worker-special '*already-sorted*)
 
-(defun walk-targets (fn targets)
+(defun walk-targets (fn targets &key (jobs nproc))
   "Call FN on each targets in TARGETS, in some order, and possibly in
 parallel."
   (check-type fn function)
+  (check-type jobs (integer 1 *))
   (assert (build-env-bound?))
   ;; We wrap the FN regardless of whether we are using parallelism or
   ;; not, to prevent reliance on side-effects.
-  (labels ((walk-targets/parallel (fn targets)
-             (assert (vectorp targets)) ;Targets should have been shuffled.
-             (if (eql *task-priority* :low)
-                 (map nil #'receive-result
-                      (target-channels fn targets :low))
-                 (walk-targets/slowest-first fn targets)))
-           (where-to-split (seq)
-             "Where to split SEQ to isolate the slowest targets at the beginning."
-             ;; Assuming the durations are normally distributed, we
-             ;; want the left tail.
-             (floor (* (length seq) 0.32)))
-           (sort-slowest-first (targets)
-             "Sort TARGETS (partially) so that the slowest targets are first."
-             (if *already-sorted* targets
-                 (let ((targets
-                         ;; Decorate the seq of targets with build times.
-                         (map 'vector
-                              (op (cons (target-build-time _1) _1))
-                              targets))
-                       (split (where-to-split targets)))
-                   ;; Partially sort the targets.
-                   (nth-best! split targets #'> :key #'car)
-                   (map 'vector #'cdr targets))))
-           (target-channels (fn targets priority)
-             (let ((*task-priority* priority))
-               (run-or-spawn-jobs
-                (map 'list
-                     (lambda (target)
-                       (partial fn target))
-                     targets))))
-           (walk-targets/slowest-first (fn targets)
-             (mvlet* ((targets (sort-slowest-first targets))
-                      (*already-sorted* t)
-                      (slow fast (halves targets (where-to-split targets)))
-                      (fast (nreverse fast))
-                      ;; At this point slow is ordered slowest to
-                      ;; fastest, and fast is ordered fastest to
-                      ;; slowest.
-                      (channels
-                       (concatenate 'vector
-                                    (target-channels fn slow :default)
-                                    (target-channels fn fast :low))))
-               (map nil #'receive-result channels))))
+  (labels ((walk-targets/serial (fn targets)
+             (map nil fn targets))
+           (walk-targets/parallel (fn targets)
+             (let* ((build-times
+                      (map 'list #'target-build-time targets))
+                    (ideal (optimal-machine-count build-times))
+                    (tokens
+                      (loop for n below (min jobs
+                                             ideal
+                                             (length targets))
+                            for token = (ask-for-token*)
+                            while token
+                            collect token)))
+               (if (null tokens)
+                   (walk-targets/serial fn targets)
+                   (let* ((batches
+                            (minimize-makespan
+                             ;; Remember we are also using the current
+                             ;; thread.
+                             (1+ (length tokens))
+                             targets
+                             build-times))
+                          (channels
+                            (loop repeat (length tokens)
+                                  collect (make-channel))))
+                     (assert (= (1- (length batches))
+                                (length tokens)
+                                (length channels)))
+                     (loop for batch in batches
+                           for token in tokens
+                           for ch in channels
+                           do (submit-task ch
+                                           ;; loop can mutate its
+                                           ;; variables.
+                                           (let ((batch batch)
+                                                 (token token))
+                                             (lambda ()
+                                               (unwind-protect
+                                                    (walk-targets/serial fn batch)
+                                                 (return-token* token))))))
+                     ;; The last batch is handled by the current
+                     ;; thread.
+                     (walk-targets/serial fn (lastcar batches))
+                     (map nil #'receive-result channels))))))
     (let ((fn (wrap-worker-specials fn))
           (targets (reshuffle targets)))
       (if (and (use-threads-p)
@@ -189,14 +195,14 @@ parallel."
                ;; target to build.
                (length> targets 1))
           (walk-targets/parallel fn targets)
-          (map nil fn targets)))))
+          (walk-targets/serial fn targets)))))
 
 (defun redo-all (targets &key (jobs nproc)
                               debug)
   "Unconditionally build each target in TARGETS."
   (unless (emptyp targets)
     (with-build-env (:jobs jobs :debug debug)
-      (walk-targets #'redo-target targets))))
+      (walk-targets #'redo-target targets :jobs jobs))))
 
 (defun resolve-build-script (target)
   "Find a build script for TARGET, and depend on it.
@@ -281,7 +287,7 @@ that are themselves out of date."
   "Rebuild each target in TARGETS if it is out of date."
   (unless (emptyp targets)
     (with-build-env (:jobs jobs :debug debug)
-      (walk-targets #'redo-ifchange-target targets))))
+      (walk-targets #'redo-ifchange-target targets :jobs jobs))))
 
 (defun redo-ifcreate (&rest targets)
   "Depend on the non-existence of each target in TARGETS."

@@ -37,9 +37,8 @@
    :cached-stamp
    :target-exists?/cache
    :target-stamp/cache
-   :ask-for-token
-   :run-or-spawn-job
-   :run-or-spawn-jobs))
+   :ask-for-token*
+   :return-token*))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -162,7 +161,7 @@ actually being used, so we know how many to allocate for the next run."
                                           (funcall fn))))
             (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
-                (message "A maximum of ~a/~a simultaneous jobs were used."
+                (message "A maximum of ~a/~a jobs were used."
                          jobs-used jobs))))))))
 
 (defmacro with-build-env ((&key (jobs 'nproc) debug) &body body)
@@ -231,11 +230,7 @@ built it."
 ;;; How jobs are parallelized. This is intended to be spiritually (and
 ;;; eventually technically) compatible with Make's jobserver protocol.
 ;;; We are still using Lparallel, but only as a thread pool; we ignore
-;;; its scheduler. Instead, we use a fixed pool of tokens; when we try
-;;; to run a job, we try to grab a token; if we can grab a token, we
-;;; execute the job in the background (returning a channel) and let
-;;; the background job return the token when it is finished; if we
-;;; can't, we do the job in the current thread and return nil.
+;;; its scheduler. Instead, we use a fixed pool of tokens.
 
 (deftype token ()
   '(integer 0 *))
@@ -251,40 +246,16 @@ built it."
           (token (try-pop-queue queue)))
     (track-jobs-used env)))
 
+(defun ask-for-token* ()
+  "Get a token from the current build environment."
+  (ask-for-token *build-env*))
+
 (-> return-token (t token) (values))
 (defun return-token (env token)
   (push-queue token (build-env-tokens env))
   (values))
 
-(defun run-or-spawn-job (fn)
-  "Run FN in the background, if possible, otherwise in the foreground.
+(defun return-token* (token)
+  "Return TOKEN to the current build environment."
+  (return-token token *build-env*))
 
-This is intended to be spiritually (and eventually technically)
-compatible with Make's jobserver protocol. There is a fixed pool of
-tokens; when we try to run a job, we try to grab a token; if we can
-grab a token, we execute the job in the background (returning a
-channel) and return the token when we are finished; if we can't, we do
-the job in the current thread and return nothing.
-
-We still use Lparallel, but only as a thread pool.
-
-Note that you must call receive-result on each channel."
-  (let* ((env *build-env*)
-         (token (ask-for-token env)))
-    (if (no token)
-        (progn (funcall fn)
-               nil)
-        (lret ((ch (make-channel)))
-          (submit-task ch
-                       (lambda ()
-                         (unwind-protect
-                              (funcall fn)
-                           (return-token env token))))))))
-
-(defun run-or-spawn-jobs (fns)
-  "Like `run-or-spawn-jobs'.
-Return a vector of open channels."
-  (remove nil
-          (map 'vector
-               #'run-or-spawn-job
-               fns)))
