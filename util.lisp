@@ -16,6 +16,9 @@
   (:import-from :babel :string-to-octets)
   (:import-from :quri :url-encode)
   (:import-from :bit-smasher :octets->hex)
+  (:import-from #:local-time
+    #:nsec-of
+    #:timestamp-to-universal)
   (:export
    #:compare
    #:locate-dominating-file
@@ -38,7 +41,8 @@
    #:propagate-side-effect
    #:url-encode
    #:byte-array-to-hex-string
-   #:version-major-version))
+   #:version-major-version
+   #:timestamp-diff))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with)
@@ -270,3 +274,12 @@ once."
          (parse-integer version
                         :junk-allowed t
                         :radix 10))))))
+
+(defun timestamp-diff (end start)
+  (let* ((s1 (timestamp-to-universal start))
+         (s2 (timestamp-to-universal end))
+         (ns1 (nsec-of start))
+         (ns2 (nsec-of end))
+         (ns1 (+ ns1 (* s1 (expt 10 9))))
+         (ns2 (+ ns2 (* s2 (expt 10 9)))))
+    (- ns2 ns1)))

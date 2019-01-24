@@ -30,6 +30,10 @@
   (:import-from #:overlord/makespan
     #:minimize-makespan
     #:optimal-machine-count)
+  (:import-from #:local-time
+    #:now)
+  (:import-from #:overlord/util
+    #:timestamp-diff)
   (:nicknames :redo)
   (:export
    #:recursive-dependency
@@ -124,12 +128,12 @@
             (nix (target-up-to-date? target))
             (unwind-protect
                  (let ((*parents* (cons target *parents*)))
-                   (setf start (get-internal-real-time))
+                   (setf start (now))
                    (run-script build-script)
-                   (setf end (get-internal-real-time)))
+                   (setf end (now)))
               (save-temp-prereqs target)
               (save-temp-prereqsne target))
-            (setf (target-build-time  target) (- end start)
+            (setf (target-build-time  target) (timestamp-diff end start)
                   (target-up-to-date? target) t)))
         (target-stamp target)))))
 
