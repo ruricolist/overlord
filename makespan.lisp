@@ -39,7 +39,13 @@ one batch per machine (but possibly less), in such a way as to
 minimize their makespan -- the time until the last machine is done
 with the last task."
   (assert (length= targets build-times))
-  (let ((tasks (map 'vector #'task targets build-times)))
+  (let* ((build-times
+           ;; Add 1 to every build time so we get reasonable results
+           ;; for targets with a build time of 0, which can happen
+           ;; either because the target is too cheap to meter, or
+           ;; because it hasn't been run yet.
+           (map 'vector #'1+ build-times))
+         (tasks (map 'vector #'task targets build-times)))
     (lpt-schedule machine-count tasks)))
 
 (defun optimal-machine-count (build-times)
