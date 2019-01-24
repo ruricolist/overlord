@@ -180,10 +180,11 @@ parallel."
                                            ;; variables.
                                            (let ((batch batch)
                                                  (token token))
-                                             (lambda ()
-                                               (unwind-protect
-                                                    (walk-targets/serial fn batch)
-                                                 (return-token* token))))))
+                                             (wrap-worker-specials ;We just need the environment.
+                                              (lambda ()
+                                                (unwind-protect
+                                                     (walk-targets/serial fn batch)
+                                                  (return-token* token)))))))
                      ;; The last batch is handled by the current
                      ;; thread.
                      (walk-targets/serial fn (lastcar batches))

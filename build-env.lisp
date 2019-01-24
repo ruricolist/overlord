@@ -257,5 +257,4 @@ built it."
 
 (defun return-token* (token)
   "Return TOKEN to the current build environment."
-  (return-token token *build-env*))
-
+  (return-token *build-env* token))

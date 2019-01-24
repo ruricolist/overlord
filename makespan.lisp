@@ -68,5 +68,4 @@ Times should be given as integers."
     (let* ((machines (reverse (heap-extract-all heap)))
            (batches (map 'list #'machine-tasks machines)))
       (loop for batch in batches
-            when batch
-              collect (map 'list #'task-task batch)))))
+            collect (map 'list #'task-task batch)))))
