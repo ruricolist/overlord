@@ -276,6 +276,8 @@ once."
                         :radix 10))))))
 
 (defun timestamp-diff (end start)
+  "Return the difference between END and START, two timestamps, in
+nanoseconds."
   (let* ((s1 (timestamp-to-universal start))
          (s2 (timestamp-to-universal end))
          (ns1 (nsec-of start))
