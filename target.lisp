@@ -1502,7 +1502,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
 
 ;;; In-Lisp targets.
 
-(defun save-base (form)
+(defun wrap-save-base (form)
   `(let ((*base* ,(base)))
      (with-current-dir (*base*)
        ,form)))
@@ -1525,13 +1525,13 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (defmacro defconfig (name &body (init &body body))
   (check-type name symbol)
   (mvlet* ((test documentation
-             (ematch body
-               ((list (and docstring (type string)))
-                (values '#'equal docstring))
-               ((trivia:lambda-list &key (test '#'equal) documentation)
-                (values test documentation))))
+            (ematch body
+              ((list (and docstring (type string)))
+               (values '#'equal docstring))
+              ((trivia:lambda-list &key (test '#'equal) documentation)
+               (values test documentation))))
            (init
-            (save-base
+            (wrap-save-base
              `(with-script ()
                 ,init))))
     `(progn
@@ -1547,7 +1547,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
 
 (defmacro script-thunk (&body body)
   `(lambda ()
-     ,(save-base
+     ,(wrap-save-base
        `(with-script ()
           ,@body))))
 
@@ -1862,7 +1862,7 @@ depends on that."
             :script ',(script-for class-name)
             ;; Save the base around initforms.
             ,@(loop for (initarg initform) in (batches options 2)
-                    append `(,initarg ,(save-base initform))))
+                    append `(,initarg ,(wrap-save-base initform))))
            ,@class-options))
        (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
