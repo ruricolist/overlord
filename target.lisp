@@ -1584,7 +1584,7 @@ Unlike tasks defined using `deftask', tasks defined using
 ;;; scripts.
 
 (defmacro file-target (name pathname (&key (dest nil dest-supplied?)
-                                           (temp nil temp-supplied?))
+                                           (out nil out-supplied?))
                        &body body)
   "Define PATHNAME as a target.
 
@@ -1602,18 +1602,18 @@ after it has been resolved. If only DEST is supplied, or if no
 bindings are requested, then you must write directly to the
 destination file.
 
-If a binding for TEMP is supplied, however, the behavior of
-`file-target' changes: TEMP is bound to a temporary file, and after
+If a binding for OUT is supplied, however, the behavior of
+`file-target' changes: OUT is bound to a temporary file, and after
 BODY has finished the destination file is atomically overwritten
-with TEMP.
+with OUT.
 
-You should generally prefer TEMP to DEST. DEST is most useful when you
+You should generally prefer OUT to DEST. DEST is most useful when you
 are using an external program that lets you specify the input file but
 not the output file (a bad design, but unfortunately a common one)."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (check-type dest symbol)
-  (check-type temp symbol)
+  (check-type out symbol)
   (let* ((base (base))
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
@@ -1627,10 +1627,10 @@ not the output file (a bad design, but unfortunately a common one)."
                   ,script)
                script))
          (script
-           (if temp-supplied?
+           (if out-supplied?
                `(call/temp-file-pathname
                  ,pathname
-                 (lambda (,temp)
+                 (lambda (,out)
                    ,script))
                script)))
     `(progn
@@ -1714,7 +1714,7 @@ not the output file (a bad design, but unfortunately a common one)."
 
 (defmacro defpattern (class-name
                       (&key (in nil in-supplied?)
-                            (temp nil temp-supplied?)
+                            (out nil out-supplied?)
                             (dest nil dest-supplied?))
                       (&rest initargs &key &allow-other-keys)
                       &body script)
@@ -1728,10 +1728,10 @@ It has to have a name.
 The behavior of `defpattern' changes based on the bindings you
 request. IN is bound to the name of the input file or files.
 
-For the meaning of TEMP and DEST, compare the documentation for
+For the meaning of OUT and DEST, compare the documentation for
 `file-target'."
   (check-type in symbol)
-  (check-type temp symbol)
+  (check-type out symbol)
   (check-type dest symbol)
   (mvlet ((class-options script
            (loop for form in script
@@ -1743,12 +1743,12 @@ For the meaning of TEMP and DEST, compare the documentation for
           ;; You could do this in the lambda list, but it would make
           ;; it ugly and hard to read.
           (in   (or in   (string-gensym 'in)))
-          (temp (or temp (string-gensym 'temp)))
+          (out  (or out  (string-gensym 'out)))
           (dest (or dest (string-gensym 'dest))))
     `(progn
        (define-script-for ,class-name
          ,(and in-supplied? in)
-         ,(and temp-supplied? temp)
+         ,(and out-supplied? out)
          ,(and dest-supplied? dest)
          ,@initargs
          ,@script)
@@ -1765,9 +1765,9 @@ For the meaning of TEMP and DEST, compare the documentation for
           (ignorable
            ,@(unsplice (unless in-supplied? in))
            ,@(unsplice (unless dest-supplied? dest))))
-         ,(if temp-supplied?
+         ,(if out-supplied?
               `(call/temp-file-pathname
                 ,dest
-                (lambda (,temp)
+                (lambda (,out)
                   ,@script))
               `(progn ,@script))))))
