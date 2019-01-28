@@ -2,7 +2,8 @@
     (:use :fiveam)
   (:mix :cl :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as
-    :with-import-default :require-default)
+    :with-import-default :require-default
+    :depends-on)
   (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :overlord/asdf
@@ -129,13 +130,13 @@
 
 (overlord:define-target-config +literal-string+
     (read-file-into-string +literal-string-file+)
-  (:depends-on '+literal-string-file+)
-  (:depends-on +literal-string-file+))
+  (depends-on '+literal-string-file+)
+  (depends-on +literal-string-file+))
 
 (overlord:define-target-var *literal-string*
     (read-file-into-string +literal-string-file+)
-  (:depends-on '+literal-string-file+)
-  (:depends-on +literal-string-file+))
+  (depends-on '+literal-string-file+)
+  (depends-on +literal-string-file+))
 
 (test config/deps
   (nap 1)
