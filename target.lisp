@@ -612,6 +612,9 @@ inherit a method on `make-load-form', and need only specialize
         :pattern pattern
         :output (resolve-file output)))
 
+(defun pattern (name input)
+  (pattern-ref name input))
+
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
 ;;; not all possible use cases.)
