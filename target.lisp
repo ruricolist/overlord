@@ -1653,6 +1653,9 @@ not the output file (a bad design, but unfortunately a common one)."
   (:method ((pattern symbol))
     pattern))
 
+(defgeneric pattern-build (pattern input output)
+  (:documentation "Build OUTPUT from INPUT according to PATTERN."))
+
 (defclass pattern (externalizable)
   ((input-defaults
     :initarg :input-defaults
