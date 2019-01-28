@@ -111,9 +111,6 @@
 
    :ensure-target-recorded
 
-   :with-script
-   :define-script-keyword-macro
-
    :task
    :pattern
    :merge-input-defaults
@@ -1531,9 +1528,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
               ((trivia:lambda-list &key (test '#'equal) documentation)
                (values test documentation))))
            (init
-            (wrap-save-base
-             `(with-script ()
-                ,init))))
+            (wrap-save-base init)))
     `(progn
        (eval-always
          (define-global-var ,name
@@ -1548,8 +1543,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (defmacro script-thunk (&body body)
   `(lambda ()
      ,(wrap-save-base
-       `(with-script ()
-          ,@body))))
+       `(progn ,@body))))
 
 (defvar *scripts* (make-hash-table)
   "Set of registered scripts.")
@@ -1855,24 +1849,18 @@ depends on that."
          ,out
          ,@options
          ,@script)
-       (with-script ()
-         (defclass ,class-name (pattern)
-           ()
-           (:default-initargs
-            :script ',(script-for class-name)
-            ;; Save the base around initforms.
-            ,@(loop for (initarg initform) in (batches options 2)
-                    append `(,initarg ,(wrap-save-base initform))))
-           ,@class-options))
+       (defclass ,class-name (pattern)
+         ()
+         (:default-initargs
+          :script ',(script-for class-name)
+          ;; Save the base around initforms.
+          ,@(loop for (initarg initform) in (batches options 2)
+                  append `(,initarg ,(wrap-save-base initform))))
+         ,@class-options)
        (defmethod pattern-build ((self ,class-name) ,in ,out)
          (declare (ignorable ,in))
          (let ((,dest ,out))
            (declare ,@(unsplice (unless dest-supplied? `(ignorable ,dest))))
            (call/temp-file-pathname ,out
-                                    ,(receive (script decls docs)
-                                         (parse-body script)
-                                       (declare (ignore docs))
-                                       `(lambda (,out)
-                                          ,@decls
-                                          (with-script ()
-                                            ,@script)))))))))
+                                    (lambda (,out)
+                                      ,@script)))))))
