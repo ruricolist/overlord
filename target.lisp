@@ -1583,50 +1583,63 @@ Unlike tasks defined using `deftask', tasks defined using
 ;;; the same file should not be a target under two names, with two
 ;;; scripts.
 
-(defun file-target-form (pathname script-form args)
-  (ematch args
-    ((list)
-     script-form)
-    ((list $1)
-     `(let ((,$1 ,pathname))
-        ,script-form))
-    ((list $1 $3)
-     `(call/temp-file-pathname
-       ,pathname
-       (lambda (,$3)
-         (let ((,$1 ,pathname))
-           (declare (ignorable ,$1))
-           ,script-form))))))
-
-(defmacro file-target (name pathname (&optional (in nil in?) (temp nil temp?)) &body script)
+(defmacro file-target (name pathname (&key (dest nil dest-supplied?)
+                                           (temp nil temp-supplied?))
+                       &body body)
   "Define PATHNAME as a target.
+
+PATHNAME may be a literal pathname or a string (in which case it is
+parsed with `uiop:parse-unix-namestring'). Using a string is preferred
+for programs that care about portability.
 
 NAME is not a target; it is a lexical binding that serves as a
 convenient handle for the name of the target. (It is also necessary to
-be able to recognize that the file is out of date when the definition
-changes.)
+be able to recognize that the file is out of date when BODY changes.)
 
-If TMP is not provided, no temp file is used."
+The behavior of `file-target' depends on which, if any, bindings are
+requested. If DEST is supplied, then it is simply bound to PATHNAME,
+after it has been resolved. If only DEST is supplied, or if no
+bindings are requested, then you must write directly to the
+destination file.
+
+If a binding for TEMP is supplied, however, the behavior of
+`file-target' changes: TEMP is bound to a temporary file, and after
+BODY has finished the destination file is atomically overwritten
+with TEMP.
+
+You should generally prefer TEMP to DEST. DEST is most useful when you
+are using an external program that lets you specify the input file but
+not the output file (a bad design, but unfortunately a common one)."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
-  (let* ((args (cond (temp? (list in temp))
-                     (in? (list in))
-                     (t nil)))
-         (base (base))
+  (check-type dest symbol)
+  (check-type temp symbol)
+  (let* ((base (base))
          (pathname (resolve-target pathname base))
          (dir (pathname-directory-pathname pathname))
-         (script-form
+         (script
            `(with-current-dir (,dir)
               ,pathname
-              ,@script)))
+              ,@body))
+         (script
+           (if dest-supplied?
+               `(let ((,dest ,pathname))
+                  ,script)
+               script))
+         (script
+           (if temp-supplied?
+               `(call/temp-file-pathname
+                 ,pathname
+                 (lambda (,temp)
+                   ,script))
+               script)))
     `(progn
        ;; Make the task accessible by name.
        (def ,name ,pathname)
        (define-script-for ,name
-         ,script-form)
+         ,script)
        (save-file-task ,pathname
-                       (script-thunk
-                         ,(file-target-form pathname script-form args))
+                       (script-thunk ,script)
                        (script-for ',name))
        (record-package-prereq* ,pathname)
        ',pathname)))
