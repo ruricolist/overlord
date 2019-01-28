@@ -77,15 +77,17 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
   (with-thunk (body)
     `(call/current-dir ,body ,dir)))
 
-(defun ensure-absolute (pathname)
+(defun ensure-absolute (pathname &key (base (base)))
   (assure absolute-pathname
     (etypecase pathname
       (absolute-pathname pathname)
       (relative-pathname
-       (merge-pathnames* pathname (base))))))
+       (merge-pathnames* pathname base)))))
 
-(defun resolve-file (file)
-  (ensure-absolute (ensure-pathname* file)))
+(defun resolve-file (file &key (base (base)))
+  (~> file
+      ensure-pathname*
+      (ensure-absolute :base base)))
 
 (define-global-state *package-bases*
     (dict* (make-hash-table)

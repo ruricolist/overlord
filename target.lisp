@@ -59,7 +59,8 @@
   (:import-from :uiop
     :implementation-identifier
     :with-temporary-file
-    :rename-file-overwriting-target)
+    :rename-file-overwriting-target
+    :parse-unix-namestring)
   (:import-from :overlord/kernel
     :nproc)
   (:import-from :overlord/build-env
@@ -421,9 +422,7 @@ inherit a method on `make-load-form', and need only specialize
         target
         (directory-ref
          (assure tame-pathname
-           (~> target
-               path
-               (merge-pathnames* (or base (base))))))))
+           (resolve-file target :base (or base (base)))))))
   (:method target= (target (y directory-ref))
     (pathname-equal path (directory-ref.path y)))
   (:method target-build-script (target)
@@ -520,7 +519,7 @@ inherit a method on `make-load-form', and need only specialize
 
 (defgeneric merge-input-defaults (pattern input/s)
   (:method (pattern (input string))
-    (merge-input-defaults pattern (path input)))
+    (merge-input-defaults pattern (resolve-file input)))
   (:method (pattern (input cl:pathname))
     (merge-pathnames* (pattern.input-defaults pattern)
                       input))
@@ -600,7 +599,7 @@ inherit a method on `make-load-form', and need only specialize
          (pattern-ref pattern (directory* input/s))
          (pattern-ref pattern (vector input/s))))
     (string
-     (pattern-ref pattern (path input/s)))
+     (pattern-ref pattern (resolve-file input/s)))
     (sequence
      (if (length>= input/s 1)
          (make 'pattern-ref
@@ -611,7 +610,7 @@ inherit a method on `make-load-form', and need only specialize
 (defun pattern-into (pattern output)
   (make 'pattern-ref
         :pattern pattern
-        :output (path output)))
+        :output (resolve-file output)))
 
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
@@ -1262,16 +1261,15 @@ value and NEW do not match under TEST."
 
 ;;; API and keyword macros
 
-(defun path (path)
-  (let ((path
-          (~> path
-              (ensure-pathname :want-pathname t)
-              (merge-pathnames (base)))))
-    (if (not (wild-pathname-p path)) path
-        (directory* path))))
+(defmacro path (string)
+  "At compile time, parse STRING using `uiop:parse-unix-namestring'.
 
-(defun file (file)
-  (assure file-pathname (path file)))
+The result is a relative pathname object.
+
+This is an alternative to literal pathname syntax for greater
+portability."
+  (check-type string string)
+  (parse-unix-namestring string :want-relative t))
 
 (defun basename (file)
   (enough-pathname file (pathname-directory-pathname file)))
