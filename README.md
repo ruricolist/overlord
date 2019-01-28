@@ -58,9 +58,11 @@ Here are some examples of how to make direct use of Overlord:
 One thing that might not be obvious about Redo-style build systems is
 that they afford unusually good opportunities for parallelism.
 
-Overlord does not currently support parallelism, but even without
-parallelism, it tries to discourage reliance on side effects by,
-whenever possible, randomizing the order in which targets are built.
+Overlord supports parallelism, but it is not on by default. For an explanation of how to turn it on, and how it works, see the [Parallelism in Overlord][parallelism] article in the wiki.
+
+Even without parallelism, it tries to discourage reliance on side
+effects by, whenever possible, randomizing the order in which targets
+are built.
 
 # Freezing the Lisp image
 
@@ -159,6 +161,7 @@ You might want them again later. -->
 [dev]: https://github.com/ruricolist/overlord/tree/dev
 [Quicklisp]: https://www.quicklisp.org/beta/
 [wiki]: https://github.com/ruricolist/overlord/wiki
+[parallelism]: https://github.com/ruricolist/overlord/wiki/Parallelism-in-Overlord
 [Proctor]: https://github.com/ruricolist/proctor
 [Vernacular]: https://github.com/ruricolist/vernacular
 
