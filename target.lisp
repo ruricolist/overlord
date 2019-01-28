@@ -1712,10 +1712,11 @@ not the output file (a bad design, but unfortunately a common one)."
              (errorp (error* "No such pattern: ~s" pattern))
              (t nil))))))
 
-(defmacro defpattern (class-name (in out
-                                  &optional (dest (string-gensym 'dest)
-                                                  dest-supplied?))
-                      (&rest options &key &allow-other-keys)
+(defmacro defpattern (class-name
+                      (&key (in nil in-supplied?)
+                            (temp nil temp-supplied?)
+                            (dest nil dest-supplied?))
+                      (&rest initargs &key &allow-other-keys)
                       &body script)
   "Define a file pattern named NAME.
 
@@ -1724,41 +1725,49 @@ regular expressions. That won't work for Overlord, because there is no
 special namespace for targets, so such a rule would apply everywhere.
 It has to have a name.
 
-A file pattern in Overlord must have a name. You use it like this:
+The behavior of `defpattern' changes based on the bindings you
+request. IN is bound to the name of the input file or files.
 
-    (:depends-on (:pattern 'my-pattern \"file\"))
-
-If you set the input pathname defaults, you don't have to give an
-extension to the file.
-
-Based on the pattern, the output file is calculated, and the result
-depends on that."
-  (receive (class-options script)
-      (loop for form in script
-            if (and (consp form)
-                    (keywordp (car form))
-                    (not (script-keyword? (car form))))
-              collect form into class-options
-            else collect form into script
-            finally (return (values class-options script)))
+For the meaning of TEMP and DEST, compare the documentation for
+`file-target'."
+  (check-type in symbol)
+  (check-type temp symbol)
+  (check-type dest symbol)
+  (mvlet ((class-options script
+           (loop for form in script
+                 if (and (consp form)
+                         (keywordp (car form)))
+                   collect form into class-options
+                 else collect form into script
+                 finally (return (values class-options script))))
+          ;; You could do this in the lambda list, but it would make
+          ;; it ugly and hard to read.
+          (in   (or in   (string-gensym 'in)))
+          (temp (or temp (string-gensym 'temp)))
+          (dest (or dest (string-gensym 'dest))))
     `(progn
        (define-script-for ,class-name
-         ,in
-         ,out
-         ,@options
+         ,(and in-supplied? in)
+         ,(and temp-supplied? temp)
+         ,(and dest-supplied? dest)
+         ,@initargs
          ,@script)
        (defclass ,class-name (pattern)
          ()
          (:default-initargs
           :script ',(script-for class-name)
           ;; Save the base around initforms.
-          ,@(loop for (initarg initform) in (batches options 2)
+          ,@(loop for (initarg initform) in (batches initargs 2)
                   append `(,initarg ,(wrap-save-base initform))))
          ,@class-options)
-       (defmethod pattern-build ((self ,class-name) ,in ,out)
-         (declare (ignorable ,in))
-         (let ((,dest ,out))
-           (declare ,@(unsplice (unless dest-supplied? `(ignorable ,dest))))
-           (call/temp-file-pathname ,out
-                                    (lambda (,out)
-                                      ,@script)))))))
+       (defmethod pattern-build ((self ,class-name) ,in ,dest)
+         (declare
+          (ignorable
+           ,@(unsplice (unless in-supplied? in))
+           ,@(unsplice (unless dest-supplied? dest))))
+         ,(if temp-supplied?
+              `(call/temp-file-pathname
+                ,dest
+                (lambda (,temp)
+                  ,@script))
+              `(progn ,@script))))))
