@@ -239,8 +239,7 @@ and return T if the stamp has changed."
   (let ((fn (wrap-worker-specials fn)))
     (if (use-threads-p)
         (with-meta-kernel ()
-          (task-handler-bind ((error #'invoke-transfer-error))
-            (psome fn seq)))
+          (psome fn seq))
         (some fn seq))))
 
 (defun out-of-date? (target)

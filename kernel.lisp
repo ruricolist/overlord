@@ -6,7 +6,9 @@
     #:*kernel*
     #:make-kernel
     #:end-kernel
-    #:pmap)
+    #:pmap
+    #:task-handler-bind
+    #:invoke-transfer-error)
   (:import-from #:uiop
     #:register-image-dump-hook)
   (:export
@@ -52,7 +54,8 @@
 (defun call/meta-kernel (thunk)
   (if (use-threads-p)
       (let ((*kernel* (ensure-meta-kernel)))
-        (funcall thunk))
+        (task-handler-bind ((error #'invoke-transfer-error))
+          (funcall thunk)))
       (funcall thunk)))
 
 (defmacro with-meta-kernel ((&key) &body body)
