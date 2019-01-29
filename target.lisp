@@ -1017,7 +1017,10 @@ current package."
         (impossible-task target))))
 
 (defmethod target-build-script ((target symbol))
-  (gethash target *tasks*))
+  (let ((task (gethash target *tasks*)))
+    (if (typep task 'task)
+        task
+        (error* "Not a target: ~a" target))))
 
 (defmethod target-build-script ((target root-target))
   (task target
