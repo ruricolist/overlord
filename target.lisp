@@ -1750,6 +1750,7 @@ For the meaning of OUT and DEST, compare the documentation for
           (dest (or dest (string-gensym 'dest))))
     `(progn
        (define-script-for ,class-name
+         ;; Be careful not to splice in the gensyms.
          ,(and in-supplied? in)
          ,(and out-supplied? out)
          ,(and dest-supplied? dest)
