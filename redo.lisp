@@ -16,7 +16,7 @@
   (:import-from #:lparallel
     #:make-channel
     #:receive-result
-    #:psome
+    #:psome #:pmap
     #:task-handler-bind
     #:invoke-transfer-error
     #:submit-task)
@@ -150,17 +150,18 @@ parallel."
   ;; not, to prevent reliance on side-effects.
   (labels ((walk-targets/serial (fn targets)
              (map nil fn targets))
+           (try-get-tokens (build-times)
+             (let ((ideal (optimal-machine-count build-times)))
+               (loop for n below (min jobs
+                                      ideal
+                                      (length build-times))
+                     for token = (ask-for-token*)
+                     while token
+                     collect token)))
            (walk-targets/parallel (fn targets)
              (let* ((build-times
-                      (map 'list #'target-build-time targets))
-                    (ideal (optimal-machine-count build-times))
-                    (tokens
-                      (loop for n below (min jobs
-                                             ideal
-                                             (length targets))
-                            for token = (ask-for-token*)
-                            while token
-                            collect token)))
+                      (pmap* 'list #'target-build-time targets))
+                    (tokens (try-get-tokens build-times)))
                (if (null tokens)
                    (walk-targets/serial fn targets)
                    (let* ((batches
@@ -180,8 +181,8 @@ parallel."
                            for token in tokens
                            for ch in channels
                            do (submit-task ch
-                                           ;; loop can mutate its
-                                           ;; variables.
+                                           ;; Watch out, loop can
+                                           ;; mutate its variables.
                                            (let ((batch batch)
                                                  (token token))
                                              (wrap-worker-specials ;We just need the environment.
@@ -234,13 +235,21 @@ and return T if the stamp has changed."
          (new-stamp (target-stamp/cache req)))
     (not (stamp-satisfies-p new-stamp old-stamp))))
 
-(defun some* (fn seq)
+(defun psome* (fn seq)
   "Like `some', but possibly parallel."
   (let ((fn (wrap-worker-specials fn)))
     (if (use-threads-p)
         (with-meta-kernel ()
           (psome fn seq))
         (some fn seq))))
+
+(defun pmap* (type fn seq)
+  "Like `map', but possibly parallel."
+  (let ((fn (wrap-worker-specials fn)))
+    (if (use-threads-p)
+        (with-meta-kernel ()
+          (pmap type fn seq))
+        (map type fn seq))))
 
 (defun out-of-date? (target)
   "Return T if TARGET needs rebuilding.
@@ -250,7 +259,7 @@ that are themselves out of date."
            (prereqs (target-saved-prereqs target))
            (target-does-not-exist? (not (target-exists?/cache target)))
            (non-existent-prereqs-exist?
-            (some* #'target-exists?/cache prereqsne))
+            (psome* #'target-exists?/cache prereqsne))
            (regular-prereqs-changed?
             ;; If we were ever to adopt parallelism as the default, we
             ;; could store information about which targets take
@@ -259,7 +268,7 @@ that are themselves out of date."
             (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
                    (outdated (filter #'out-of-date? reqs)))
               (redo-all outdated)
-              (some* #'prereq-changed? prereqs)))
+              (psome* #'prereq-changed? prereqs)))
            (not-in-db?
             (and (target? target)
                  (not (target-in-db? target)))))
