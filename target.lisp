@@ -124,7 +124,7 @@
    :pattern-from
    :pattern-into
    :define-script
-   :pattern-ref-inputs
+   :pattern-ref-static-inputs
    :pattern-ref-output
    :clear-package-prereqs
    :list-package-prereqs
@@ -524,7 +524,7 @@ inherit a method on `make-load-form', and need only specialize
    (name
     :initarg :inputs
     :type vector
-    :reader pattern-ref-inputs)
+    :reader pattern-ref-static-inputs)
    (output
     :type pathname
     :initarg :output
@@ -562,7 +562,7 @@ inherit a method on `make-load-form', and need only specialize
                      output)))
 
 (defun print-pattern-ref (pattern ref stream)
-  (let* ((inputs (pattern-ref-inputs ref))
+  (let* ((inputs (pattern-ref-static-inputs ref))
          (output (pattern-ref-output ref))
          (pattern (find-pattern pattern))
          (pattern-name (pattern-name pattern)))
@@ -606,7 +606,7 @@ inherit a method on `make-load-form', and need only specialize
 
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
-                        #'pattern-ref-inputs
+                        #'pattern-ref-static-inputs
                         #'pattern-ref-output
                         #'pattern-ref-pattern))
 
@@ -622,7 +622,7 @@ inherit a method on `make-load-form', and need only specialize
           never)))
 
   (:method resolve-target (self &optional base)
-    (let ((inputs (pattern-ref-inputs self)))
+    (let ((inputs (pattern-ref-static-inputs self)))
       (if (every #'absolute-pathname-p inputs) self
           (pattern-ref (pattern-ref-pattern self)
                        (map 'vector
@@ -632,8 +632,8 @@ inherit a method on `make-load-form', and need only specialize
                             inputs)))))
 
   (:method target= (self (other pattern-ref))
-    (and (vector= (pattern-ref-inputs self)
-                  (pattern-ref-inputs other)
+    (and (vector= (pattern-ref-static-inputs self)
+                  (pattern-ref-static-inputs other)
                   :test #'target=)
          (eql (pattern-ref-pattern self)
               (pattern-ref-pattern other))))
@@ -644,7 +644,7 @@ inherit a method on `make-load-form', and need only specialize
            (ref.name self))))
 
   (:method target-build-script (self)
-    (let* ((inputs (pattern-ref-inputs self))
+    (let* ((inputs (pattern-ref-static-inputs self))
            (output (pattern-ref-output self))
            (pattern (find-pattern (pattern-ref-pattern self))))
       (task output
