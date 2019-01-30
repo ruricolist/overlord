@@ -445,7 +445,11 @@ inherit a method on `make-load-form', and need only specialize
                 `(directory-ref ,path))))
   (:method call-with-target-locked (target fn)
     "Lock the directory (file), not target."
-    (call-with-target-locked path fn)))
+    (call-with-target-locked path fn))
+  ;; The time it takes to create directory -- not worth measuring.
+  (:method target-build-time (target) 0)
+  (:method (setf target-build-time) (value target)
+    (declare (ignore value))))
 
 (defclass file-digest-ref (ref)
   ((name :type pathname
@@ -886,6 +890,7 @@ treated as out-of-date, regardless of file metadata."))
             (when (= count 1)
               (collect target))))))))
 
+;;; Locking targets.
 
 (defmethod call-with-target-locked ((target root-target) fn)
   (funcall fn))
@@ -905,6 +910,28 @@ treated as out-of-date, regardless of file metadata."))
     (if (equal target resolved)
         (call-next-method)
         (call-with-target-locked target fn))))
+
+;;; Targets not worth metering.
+
+(defmethod target-build-time ((target trivial-prereq))
+  0)
+(defmethod (setf target-build-time) (value (target trivial-prereq))
+  (declare (ignore value))
+  (values))
+
+(defmethod target-build-time ((target impossible-prereq))
+  0)
+(defmethod (setf target-build-time) (value (target impossible-prereq))
+  (declare (ignore value)))
+
+(defmethod target-build-time ((target delayed-symbol))
+  (target-build-time (force-symbol target)))
+
+(defmethod (setf target-build-time) (value (target delayed-symbol))
+  (setf (target-build-time (force-symbol target)) value))
+
+(defmethod target-build-time ((target cl:pathname))
+  (build-time-from-file target target))
 
 
 ;;; Building targets (scripts).
