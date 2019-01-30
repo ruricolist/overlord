@@ -1199,13 +1199,16 @@ current package."
     (error* "To delete a directory, call delete-target on a directory-ref."))
   (when (wild-pathname-p target)
     (error* "Will not attempt to delete a wild pathname."))
+  (unless (subpathp target (base))
+    (error* "File ~a is not relative to current base." target))
   (delete-file-if-exists target))
 
 (defmethod delete-target ((target directory-ref))
-  (let ((dir (directory-ref.path target)))
+  (let ((dir (directory-ref.path target))
+        (base (base)))
     (delete-directory-tree dir
                            :if-does-not-exist :ignore
-                           :validate t)))
+                           :validate (op (subpathp _ base)))))
 
 (defmethod delete-target ((target package))
   (delete-package target))
