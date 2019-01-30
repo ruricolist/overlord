@@ -129,7 +129,8 @@
    :clear-package-prereqs
    :list-package-prereqs
    :directory-ref
-   :path))
+   :path
+   :file))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -1196,7 +1197,8 @@ current package."
     (error* "Will not attempt to delete a relative pathname."))
   (when (directory-pathname-p target)
     (error* "To delete a directory, call delete-target on a directory-ref."))
-  ;; If you want to delete a directory, you should call delete-target on directory-ref.
+  (when (wild-pathname-p target)
+    (error* "Will not attempt to delete a wild pathname."))
   (delete-file-if-exists target))
 
 (defmethod delete-target ((target directory-ref))
@@ -1329,6 +1331,20 @@ This is an alternative to literal pathname syntax for greater
 portability."
   (check-type string string)
   (parse-unix-namestring string :want-relative t))
+
+(defun file (path)
+  "Parse PATH as a Unix namestring and resolve it.
+If PATH is wild, expand it."
+  (etypecase-of (or string pathname) path
+    (string (file (parse-unix-namestring path :want-relative t)))
+    (relative-pathname (file (resolve-file path)))
+    (wild-pathname (directory path))
+    (pathname path)))
+
+(define-compiler-macro file (&whole call path)
+  (if (stringp path)
+      `(file (path ,path))
+      call))
 
 (defun basename (file)
   (enough-pathname file (pathname-directory-pathname file)))
