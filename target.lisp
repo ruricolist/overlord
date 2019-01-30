@@ -335,6 +335,24 @@ built; otherwise it is the current package."
   (check-type value (integer 0 *))
   (setf (prop target build-time) value))
 
+(defun build-time-from-file (target file)
+  "Get the build time for TARGET from the database, but if there is no
+recorded build time, fall back to using the size of FILE.
+
+This heuristic ensures that, in the absence of other information,
+larger files will be built before smaller files."
+  (check-type file cl:pathname)
+  (assert (file-pathname-p file))
+  (build-time-from-files target (list file)))
+
+(defun build-time-from-files (target files)
+  "Like `build-time-from-file', but the size is a sum over FILES."
+  (let* ((unknown :unknown)
+         (build-time (prop target build-time unknown)))
+    (if (eql build-time unknown)
+        (reduce #'+ files :key #'file-size-in-octets)
+        build-time)))
+
 
 ;;; Types.
 
@@ -489,7 +507,9 @@ inherit a method on `make-load-form', and need only specialize
                 (read-eval-prefix target stream)
                 `(file-digest-ref ,file))))
   (:method call-with-target-locked (target fn)
-    (call-with-target-locked file fn)))
+    (call-with-target-locked file fn))
+  (:method target-build-time (target)
+    (build-time-from-file target file)))
 
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
@@ -590,7 +610,10 @@ inherit a method on `make-load-form', and need only specialize
                         #'pattern-ref-pattern))
 
   (:method call-with-target-locked (self fn)
-    (call-with-target-locked output fn)))
+    (call-with-target-locked output fn))
+
+  (:method target-build-time (self)
+    (build-time-from-files self inputs)))
 
 (defun pattern-ref (pattern input/s)
   "Make a pattern reference."
@@ -648,7 +671,10 @@ inherit a method on `make-load-form', and need only specialize
     (target-build-script (relative-file-truename self)))
   (:method call-with-locked-target (self fn)
     (let ((file (relative-file-truename self)))
-      (call-with-locked-target file fn))))
+      (call-with-locked-target file fn)))
+  (:method target-build-time (self)
+    (let ((file (relative-file-truename self)))
+      (build-time-from-file self file))))
 
 (defclass system-resource (relative-file-target)
   ((system
