@@ -686,7 +686,7 @@ inherit a method on `make-load-form', and need only specialize
          (make 'pattern-ref
                :pattern pattern
                :inputs (coerce input/s 'vector))
-         (error "A pattern without an output must have at least one input.")))))
+         (error* "A pattern without an output must have at least one input.")))))
 
 (defun pattern-into (pattern output)
   (make 'pattern-ref
