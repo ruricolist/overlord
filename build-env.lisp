@@ -149,16 +149,20 @@ actually being used, so we know how many to allocate for the next run."
                thread-count
                id)
       (if (zerop thread-count) (call-next-method)
-          (with-temp-kernel (thread-count
-                             :name kernel-name
-                             ;; Give each thread its own random state.
-                             ;; (Clozure CL, at least, gives every
-                             ;; thread the same initial random state.
-                             ;; This can cause race conditions when
-                             ;; generating temporary file names.)
-                             :context (lambda (fn)
-                                        (let ((*random-state* (make-random-state t)))
-                                          (funcall fn))))
+          (with-temp-kernel
+              (thread-count
+               :name kernel-name
+               :context (lambda (fn)
+                          (nest
+                           ;; Propagate the build env here.
+                           (let ((*build-env* env)))
+                           ;; Give each thread its own random state.
+                           ;; (Clozure CL, at least, gives every
+                           ;; thread the same initial random state.
+                           ;; This can cause race conditions when
+                           ;; generating temporary file names.)
+                           (let ((*random-state* (make-random-state t))))
+                           (funcall fn))))
             (task-handler-bind ((error handler))
               (multiple-value-prog1 (call-next-method)
                 (message "A maximum of ~a/~a jobs were used."
