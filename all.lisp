@@ -21,8 +21,8 @@
   (:import-from :overlord/build-env :*use-build-cache*)
   (:export :*use-build-cache*)
 
-  (:import-from :overlord/cmd :cmd)
-  (:export :cmd)
+  (:import-from :overlord/cmd :cmd :$cmd)
+  (:export :cmd :$cmd)
   (:export
    :recursive-dependency :missing-script
    :module-ref :module-ref* :module-exports :module-static-exports

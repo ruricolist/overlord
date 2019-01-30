@@ -5,7 +5,7 @@
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream*)
   (:import-from :uiop :os-windows-p)
-  (:export :cmd))
+  (:export :cmd :$cmd))
 (cl:in-package :overlord/cmd)
 
 (defun parse-cmd-args (args)
@@ -110,3 +110,13 @@ A property list is treated as a list of arguments to `uiop:run-program'."
       (values-list plist)
       :output t
       :error-output *message-stream*)))
+
+(defun $cmd (cmd &rest args)
+  "Return the results of CMD as a string, stripping any trailing
+newlines, like $(cmd) would in a shell."
+  (let ((string
+          (apply #'cmd
+                 cmd
+                 '(:output :string)
+                 args)))
+    (chomp string)))
