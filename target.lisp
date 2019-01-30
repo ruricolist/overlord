@@ -609,8 +609,61 @@ inherit a method on `make-load-form', and need only specialize
                         #'pattern-ref-output
                         #'pattern-ref-pattern))
 
+  (:method target-exists? (self)
+    (~> self
+        pattern-ref-output
+        pathname-exists?))
+
+  (:method target-stamp (self)
+    (with-accessors ((output pattern-ref-output)) self
+      (if (pathname-exists? output)
+          (target-stamp output)
+          never)))
+
+  (:method resolve-target (self &optional base)
+    (let ((inputs (pattern-ref-inputs self)))
+      (if (every #'absolute-pathname-p inputs) self
+          (pattern-ref (pattern-ref-pattern self)
+                       (map 'vector
+                            (lambda (input)
+                              (merge-pathnames* input
+                                                (or base (base))))
+                            inputs)))))
+
+  (:method target= (self (other pattern-ref))
+    (and (vector= (pattern-ref-inputs self)
+                  (pattern-ref-inputs other)
+                  :test #'target=)
+         (eql (pattern-ref-pattern self)
+              (pattern-ref-pattern other))))
+
+  (:method hash-target (self)
+    (dx-sxhash
+     (list 'pattern-ref
+           (ref.name self))))
+
+  (:method target-build-script (self)
+    (let* ((inputs (pattern-ref-inputs self))
+           (output (pattern-ref-output self))
+           (pattern (find-pattern (pattern-ref-pattern self))))
+      (task output
+            (lambda ()
+              (depends-on-all inputs)
+              (if (single inputs)
+                  (pattern-build pattern (first-elt inputs) output)
+                  (pattern-build pattern inputs output)))
+            (pattern.script pattern))))
+
   (:method call-with-target-locked (self fn)
     (call-with-target-locked output fn))
+
+  (:method target-node-label (self)
+    (native-namestring
+     (pattern-ref-output self)))
+
+  (:method delete-target (self)
+    (let ((output (pattern-ref-output self)))
+      (delete-target output)))
 
   (:method target-build-time (self)
     (build-time-from-files self inputs)))
@@ -777,11 +830,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-exists? ((target cl:pathname))
   (pathname-exists? (resolve-target target)))
 
-(defmethod target-exists? ((target pattern-ref))
-  (~> target
-      pattern-ref-output
-      pathname-exists?))
-
 (defmethod target-timestamp ((target root-target))
   never)
 
@@ -808,12 +856,6 @@ treated as out-of-date, regardless of file metadata."))
   (if (pathname-exists? target)
       (file-mtime target)
       never))
-
-(defmethod target-stamp ((target pattern-ref))
-  (with-accessors ((output pattern-ref-output)) target
-    (if (pathname-exists? output)
-        (target-stamp output)
-        never)))
 
 (defmethod (setf target-timestamp) :before (timestamp target)
   (declare (ignore target timestamp))
@@ -852,29 +894,12 @@ treated as out-of-date, regardless of file metadata."))
             (directory* path)
             path))))
 
-(defmethod resolve-target ((target pattern-ref) &optional base)
-  (let ((inputs (pattern-ref-inputs target)))
-    (if (every #'absolute-pathname-p inputs) target
-        (pattern-ref (pattern-ref-pattern target)
-                     (map 'vector
-                          (lambda (input)
-                            (merge-pathnames* input
-                                              (or base (base))))
-                          inputs)))))
-
 (defmethod target= ((x delayed-symbol) y)
   (target= (force-symbol x)
            (force-symbol y)))
 
 (defmethod target= ((x cl:pathname) (y cl:pathname))
   (pathname-equal x y))
-
-(defmethod target= ((x pattern-ref) (y pattern-ref))
-  (and (vector= (pattern-ref-inputs x)
-                (pattern-ref-inputs y)
-                :test #'target=)
-       (eql (pattern-ref-pattern x)
-            (pattern-ref-pattern y))))
 
 (defmethod hash-target ((target root-target))
   (load-time-value (sxhash root-target)))
@@ -893,11 +918,6 @@ treated as out-of-date, regardless of file metadata."))
 
 (defmethod hash-friendly? ((target impossible-prereq))
   t)
-
-(defmethod hash-target ((target pattern-ref))
-  (dx-sxhash
-   (list 'pattern-ref
-         (ref.name target))))
 
 (defun deduplicate-targets (targets &key (key #'identity))
   ;; (test-chamber:with-experiment
@@ -1092,18 +1112,6 @@ current package."
             (depends-on-all (list-package-prereqs target))))
         trivial-prereq))
 
-(defmethod target-build-script ((target pattern-ref))
-  (let* ((inputs (pattern-ref-inputs target))
-         (output (pattern-ref-output target))
-         (pattern (find-pattern (pattern-ref-pattern target))))
-    (task output
-          (lambda ()
-            (depends-on-all inputs)
-            (if (single inputs)
-                (pattern-build pattern (first-elt inputs) output)
-                (pattern-build pattern inputs output)))
-          (pattern.script pattern))))
-
 (defmethod build-script-target ((script task))
   (task-script script))
 
@@ -1183,10 +1191,6 @@ current package."
 (defmethod target-node-label ((target impossible-prereq))
   (progn "IMPOSSIBLE TARGET"))
 
-(defmethod target-node-label ((target pattern-ref))
-  (native-namestring
-   (pattern-ref-output target)))
-
 (defmethod delete-target ((target cl:pathname))
   (unless (absolute-pathname-p target)
     (error* "Will not attempt to delete a relative pathname."))
@@ -1212,10 +1216,6 @@ current package."
              (ignoring overlord-error
                (force-symbol target)))
     (delete-target symbol)))
-
-(defmethod delete-target ((target pattern-ref))
-  (let ((output (pattern-ref-output target)))
-    (delete-target output)))
 
 (defun file-stamp (file)
   (let ((size (file-size-in-octets file))
