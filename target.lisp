@@ -664,7 +664,6 @@ A pattern ref needs either an output OR at least one input (or both)."))
            (pattern (find-pattern (pattern-ref-pattern self))))
       (task output
             (lambda ()
-              (assert (not (emptyp inputs)))
               (depends-on-all inputs)
               (if (single inputs)
                   (pattern-build pattern (first-elt inputs) output)
