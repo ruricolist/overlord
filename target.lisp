@@ -584,11 +584,21 @@ inherit a method on `make-load-form', and need only specialize
                   inputs
                   output)))))
 
+(defun sort-pathnames (files)
+  (dsu-sort-new files #'string<
+                :stable t
+                :key #'uiop:native-namestring))
+
 (defmethods pattern-ref (self (inputs name) output pattern)
   (:method initialize-instance :after (self &key)
+    (unless (or (not (emptyp inputs))
+                (slot-boundp self 'output))
+      (error* "~
+A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
            (abs-input (merge-input-defaults pattern inputs)))
-      (setf inputs abs-input)))
+      ;; Keeping the inputs sorted is important for valid comparisons.
+      (setf inputs (sort-pathnames abs-input))))
 
   (:method print-object (self stream)
     (print-pattern-ref pattern self stream))
@@ -596,6 +606,7 @@ inherit a method on `make-load-form', and need only specialize
   (:method slot-unbound (class self (slot-name (eql 'output)))
     (declare (ignore class))
     ;; Since this is idempotent I see no reason to lock.
+    (assert (not (emptyp inputs)))
     (let* ((pattern (find-pattern pattern))
            (input (first-elt inputs))
            (abs-output (merge-output-defaults pattern input)))
@@ -632,16 +643,20 @@ inherit a method on `make-load-form', and need only specialize
                             inputs)))))
 
   (:method target= (self (other pattern-ref))
+    ;; Remember the static inputs are always sorted.
     (and (vector= (pattern-ref-static-inputs self)
                   (pattern-ref-static-inputs other)
                   :test #'target=)
+         (target= (pattern-ref-output self)
+                  (pattern-ref-output other))
          (eql (pattern-ref-pattern self)
               (pattern-ref-pattern other))))
 
   (:method hash-target (self)
     (dx-sxhash
      (list 'pattern-ref
-           (ref.name self))))
+           inputs
+           output)))
 
   (:method target-build-script (self)
     (let* ((inputs (pattern-ref-static-inputs self))
@@ -649,6 +664,7 @@ inherit a method on `make-load-form', and need only specialize
            (pattern (find-pattern (pattern-ref-pattern self))))
       (task output
             (lambda ()
+              (assert (not (emptyp inputs)))
               (depends-on-all inputs)
               (if (single inputs)
                   (pattern-build pattern (first-elt inputs) output)
@@ -675,18 +691,20 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun pattern-from (pattern input/s)
   (etypecase-of (or pathname string sequence) input/s
-    (pathname
-     (if (wild-pathname-p input/s)
-         (pattern-ref pattern (directory* input/s))
-         (pattern-ref pattern (vector input/s))))
     (string
-     (pattern-ref pattern (resolve-file input/s)))
+     (pattern-from pattern (file input/s)))
+    (pathname
+     (let ((resolved (file input/s)))
+       (if (equal resolved input/s)
+           (pattern-ref pattern (vector input/s))
+           (pattern-from pattern resolved))))
     (sequence
      (if (length>= input/s 1)
          (make 'pattern-ref
                :pattern pattern
                :inputs (coerce input/s 'vector))
-         (error* "A pattern without an output must have at least one input.")))))
+         (error* "~
+A pattern without an output must have at least one input.")))))
 
 (defun pattern-into (pattern output)
   (make 'pattern-ref
