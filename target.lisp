@@ -336,6 +336,7 @@ built; otherwise it is the current package."
   (check-type value (integer 0 *))
   (setf (prop target build-time) value))
 
+(-> build-time-from-file (t pathname) (integer 0 *))
 (defun build-time-from-file (target file)
   "Get the build time for TARGET from the database, but if there is no
 recorded build time, fall back to using the size of FILE.
@@ -351,7 +352,7 @@ larger files will be built before smaller files."
   (let* ((unknown :unknown)
          (build-time (prop target build-time unknown)))
     (if (eql build-time unknown)
-        (reduce #'+ files :key #'file-size-in-octets)
+        (reduce #'+ files :key (op (or (file-size-in-octets _) 0)))
         build-time)))
 
 
