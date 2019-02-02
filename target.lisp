@@ -64,7 +64,8 @@
   (:import-from :overlord/kernel
     :nproc)
   (:import-from :overlord/build-env
-    :build-env-bound?)
+    :build-env-bound?
+    :claim-file*)
   ;; Shadow for style.
   (:shadow
    :if                                  ;Always ternary.
@@ -465,6 +466,7 @@ inherit a method on `make-load-form', and need only specialize
                 `(directory-ref ,path))))
   (:method call-with-target-locked (target fn)
     "Lock the directory (file), not target."
+    (claim-file* target path)
     (call-with-target-locked path fn))
   ;; The time it takes to create directory -- not worth measuring.
   (:method target-build-time (target) 0)
@@ -509,6 +511,7 @@ inherit a method on `make-load-form', and need only specialize
                 (read-eval-prefix target stream)
                 `(file-digest-ref ,file))))
   (:method call-with-target-locked (target fn)
+    (claim-file* target file)
     (call-with-target-locked file fn))
   (:method target-build-time (target)
     (build-time-from-file target file)))
@@ -650,8 +653,8 @@ A pattern ref needs either an output OR at least one input (or both)."))
                   :test #'target=)
          (target= (pattern-ref-output self)
                   (pattern-ref-output other))
-         (eql (pattern-ref-pattern self)
-              (pattern-ref-pattern other))))
+         (target= (pattern-ref-pattern self)
+                  (pattern-ref-pattern other))))
 
   (:method hash-target (self)
     (dx-sxhash
@@ -672,6 +675,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
             (pattern.script pattern))))
 
   (:method call-with-target-locked (self fn)
+    (claim-file* self output)
     (call-with-target-locked output fn))
 
   (:method target-node-label (self)

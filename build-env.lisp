@@ -30,6 +30,10 @@
     #:with-temp-kernel)
   (:import-from #:lparallel.queue
     #:queue-count)
+  (:import-from #:overlord/types
+    #:error*)
+  (:import-from #:uiop
+    #:absolute-pathname-p)
   (:export
    :with-build-env
    :*use-build-cache*
@@ -38,7 +42,8 @@
    :target-exists?/cache
    :target-stamp/cache
    :ask-for-token*
-   :return-token*))
+   :return-token*
+   :claim-file*))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -71,13 +76,32 @@ non-caching behavior is desired.")
        :initform (next-build-id))
    (table
     :initform (make-target-table)
-    :reader build-env.table))
+    :reader build-env.table)
+   (file-owners
+    :initform (dict)
+    :reader build-env.file-owners))
   (:documentation "Metadata for the build run."))
 
 (defmethod print-object ((self build-env) stream)
   (print-unreadable-object (self stream :type t)
     (with-slots (id) self
       (format stream "#~a" id))))
+
+(defmethod claim-file ((self build-env) target (file pathname))
+  (assert (absolute-pathname-p file))
+  (with-slots (file-owners) self
+    (let ((owner
+            #+ccl (ensure-gethash file file-owners target)
+            #-ccl
+            (synchronized (self)
+              (ensure-gethash file file-owners target))))
+      (unless (target= owner target)
+        (error* "~
+Target ~a wants to build ~a, but it has already been built by ~a."
+                target file owner)))))
+
+(defun claim-file* (target file)
+  (claim-file *build-env* target file))
 
 (defclass threaded-build-env (build-env)
   ((jobs :initarg :jobs :type (integer 1 *))
