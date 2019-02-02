@@ -45,8 +45,11 @@
    #:timestamp-diff))
 (cl:in-package #:overlord/util)
 
-(define-modify-macro withf (&rest item-or-tuple) with)
-(define-modify-macro lessf (&rest item-or-tuple) less)
+(define-modify-macro withf (&rest item-or-tuple) with
+  "Modify macro for augmenting an Fset map or set.")
+
+(define-modify-macro lessf (&rest item-or-tuple) less
+  "Modify macro for removing from an Fset map or set.")
 
 ;;; TODO This cries out for a compiler macro.
 (-> compare (function function &rest t) t)

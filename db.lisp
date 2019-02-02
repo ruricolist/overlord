@@ -27,6 +27,8 @@
   (:import-from :local-time)
   (:import-from :lparallel
     :kernel-worker-index)
+  (:import-from :overlord/util
+    :withf :lessf)
   (:export
    :prop :has-prop? :delete-prop
    :save-database
@@ -72,12 +74,6 @@
 (deftype db-value ()
   "Type for database values."
   't)
-
-(define-modify-macro withf (&rest item-or-tuple) fset:with
-  "Modify macro for augmenting an Fset map or set.")
-
-(define-modify-macro lessf (&rest item-or-tuple) fset:less
-  "Modify macro for removing from an Fset map or set.")
 
 (defgeneric db.ref (db key)
   (:documentation "Lookup KEY in DB."))
