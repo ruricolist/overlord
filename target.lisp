@@ -549,11 +549,11 @@ inherit a method on `make-load-form', and need only specialize
 (defgeneric merge-input-defaults (input/s default)
   (:method ((input string) default)
     (merge-input-defaults (resolve-file input) default))
-  (:method ((input cl:pathname) default)
+  (:method ((input cl:pathname) (default cl:pathname))
     ;; Here we want to preserve the host of the provided input, so we
     ;; use uiop:merge-pathnames*.
     (merge-pathnames* default input))
-  (:method ((inputs sequence) default)
+  (:method ((inputs sequence) (default cl:pathname))
     (map 'vector
          (lambda (input)
            (merge-input-defaults input default))
@@ -564,11 +564,11 @@ inherit a method on `make-load-form', and need only specialize
     (merge-output-defaults output defaults)))
 
 (defgeneric merge-output-defaults (output default)
-  (:method ((output string) default)
+  (:method ((output string) (default cl:pathname))
     ;; Not resolve-file; if the output is relative we want it to get
     ;; its path from `default'.
     (merge-output-defaults (parse-unix-namestring output) default))
-  (:method ((output cl:pathname) default)
+  (:method ((output cl:pathname) (default cl:pathname))
     ;; We want to be able to redirect to the output to a different
     ;; host, so we use good old cl:merge-pathnames.
     (merge-pathnames default output)))
