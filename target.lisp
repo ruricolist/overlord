@@ -602,29 +602,6 @@ inherit a method on `make-load-form', and need only specialize
                         (merge-output-defaults output defaults))
                 outputs))))
 
-(defun print-pattern-ref (pattern ref stream)
-  (let* ((inputs (pattern-ref-static-inputs ref))
-         (output (pattern-ref-output ref))
-         (pattern (find-pattern pattern))
-         (pattern-name (pattern-name pattern)))
-    (if *print-escape*
-        (let* ((name (maybe-delay-symbol pattern-name))
-               (name-form
-                 (if (symbolp name)
-                     `(quote ,name)
-                     name)))
-          (format stream "~a~s"
-                  (read-eval-prefix ref stream)
-                  `(make 'pattern-ref
-                         :pattern ,name-form
-                         :inputs ,inputs
-                         :output ,output)))
-        (print-unreadable-object (ref stream :type t)
-          (format stream "~a ~a -> ~a"
-                  pattern-name
-                  inputs
-                  output)))))
-
 (defun sort-pathnames (files)
   (dsu-sort-new files #'string<
                 :stable t
@@ -642,7 +619,24 @@ A pattern ref needs either an output OR at least one input (or both)."))
       (setf inputs (sort-pathnames abs-input))))
 
   (:method print-object (self stream)
-    (print-pattern-ref pattern self stream))
+    (let ((pattern-name (pattern-name pattern)))
+      (if *print-escape*
+          (let* ((name (maybe-delay-symbol pattern-name))
+                 (name-form
+                   (if (symbolp name)
+                       `(quote ,name)
+                       name)))
+            (format stream "~a~s"
+                    (read-eval-prefix self stream)
+                    `(make 'pattern-ref
+                           :pattern ,name-form
+                           :inputs ,inputs
+                           :output ,output)))
+          (print-unreadable-object (self stream :type t)
+            (format stream "~a ~a -> ~a"
+                    pattern-name
+                    inputs
+                    output)))))
 
   (:method slot-unbound (class self (slot-name (eql 'output)))
     (declare (ignore class))
