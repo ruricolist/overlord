@@ -554,6 +554,7 @@ inherit a method on `make-load-form', and need only specialize
     ;; use uiop:merge-pathnames*.
     (merge-pathnames* default input))
   (:method ((input cl:pathname) (defaults list))
+    (assert (not (null defaults)))
     (map 'vector
          (lambda (default)
            (merge-input-defaults input default))
@@ -564,6 +565,7 @@ inherit a method on `make-load-form', and need only specialize
            (merge-input-defaults input default))
          inputs))
   (:method ((inputs sequence) (defaults list))
+    (assert (not (null defaults)))
     (apply #'concatenate 'vector
            (map 'list (lambda (input)
                         (merge-input-defaults input defaults))
@@ -583,6 +585,7 @@ inherit a method on `make-load-form', and need only specialize
     ;; host, so we use good old cl:merge-pathnames.
     (merge-pathnames default output))
   (:method ((output cl:pathname) (defaults list))
+    (assert (not (null defaults)))
     (map 'vector
          (lambda (default)
            (merge-output-defaults output default))
@@ -593,6 +596,7 @@ inherit a method on `make-load-form', and need only specialize
            (merge-output-defaults output default))
          outputs))
   (:method ((outputs sequence) (defaults list))
+    (assert (not (null defaults)))
     (apply #'concatenate 'vector
            (map 'list (lambda (output)
                         (merge-output-defaults output defaults))
