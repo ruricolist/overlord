@@ -115,8 +115,8 @@
 
    :task
    :pattern
-   :merge-input-defaults
-   :merge-output-defaults
+   :merge-pattern-input-defaults
+   :merge-pattern-output-defaults
    :pattern.input-defaults
    :pattern.output-defaults
    :pattern-name
@@ -541,26 +541,26 @@ inherit a method on `make-load-form', and need only specialize
 ;;; merge them. The order is important. We merge the *provided* inputs
 ;;; and outputs into the *defaults*, rather than vice-versa. The
 ;;; choice of merging algorithm is also important. For
-;;; merge-input-defaults, we want to preserve the host of the provided
+;;; merge-pattern-input-defaults, we want to preserve the host of the provided
 ;;; input, so we use uiop:merge-pathnames*. But for
-;;; merge-output-defaults, we want to be able to redirect to the
+;;; merge-pattern-output-defaults, we want to be able to redirect to the
 ;;; output to a different host, so we use good old cl:merge-pathnames.
 
-(defgeneric merge-input-defaults (pattern input/s)
+(defgeneric merge-pattern-input-defaults (pattern input/s)
   (:method (pattern (input string))
-    (merge-input-defaults pattern (resolve-file input)))
+    (merge-pattern-input-defaults pattern (resolve-file input)))
   (:method (pattern (input cl:pathname))
     (merge-pathnames* (pattern.input-defaults pattern)
                       input))
   (:method (pattern (inputs sequence))
     (map 'vector
          (lambda (input)
-           (merge-input-defaults pattern input))
+           (merge-pattern-input-defaults pattern input))
          inputs)))
 
-(defgeneric merge-output-defaults (pattern output)
+(defgeneric merge-pattern-output-defaults (pattern output)
   (:method (pattern (output string))
-    (merge-output-defaults pattern (cl:pathname output)))
+    (merge-pattern-output-defaults pattern (cl:pathname output)))
   (:method (pattern (output cl:pathname))
     (merge-pathnames (pattern.output-defaults pattern)
                      output)))
@@ -600,7 +600,7 @@ inherit a method on `make-load-form', and need only specialize
       (error* "~
 A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
-           (abs-input (merge-input-defaults pattern inputs)))
+           (abs-input (merge-pattern-input-defaults pattern inputs)))
       ;; Keeping the inputs sorted is important for valid comparisons.
       (setf inputs (sort-pathnames abs-input))))
 
@@ -613,7 +613,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
     (assert (not (emptyp inputs)))
     (let* ((pattern (find-pattern pattern))
            (input (first-elt inputs))
-           (abs-output (merge-output-defaults pattern input)))
+           (abs-output (merge-pattern-output-defaults pattern input)))
       (setf output abs-output)))
 
   (:method load-form-slot-names append (self)
