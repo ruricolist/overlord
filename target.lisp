@@ -564,14 +564,12 @@ inherit a method on `make-load-form', and need only specialize
            (merge-input-defaults input default))
          inputs))
   (:method ((inputs sequence) (defaults list))
-    (let* ((inputs (coerce inputs 'list))
-           (merged
-             (mappend (lambda (input)
+    (apply #'concatenate 'vector
+           (map 'list (lambda (input)
                         (mapcar (lambda (default)
                                   (merge-input-defaults input default))
                                 defaults))
-                      inputs)))
-      (coerce merged 'vector))))
+                inputs))))
 
 (defun merge-pattern-output-defaults (pattern output)
   (let ((defaults (pattern.output-defaults pattern)))
@@ -1773,7 +1771,7 @@ not the output file (a bad design, but unfortunately a common one)."
 (defclass pattern (externalizable)
   ((input-defaults
     :initarg :input-defaults
-    :type pathname
+    :type (or pathname (list-of pathname))
     :reader pattern.input-defaults)
    (output-defaults
     :initarg :output-defaults
@@ -1788,6 +1786,21 @@ not the output file (a bad design, but unfortunately a common one)."
    :output-defaults *nil-pathname*
    :script trivial-prereq)
   (:documentation "A file-to-file build pattern."))
+
+(defmethod initialize-instance :after ((self pattern) &key)
+  (with-slots (input-defaults) self
+    (when (listp input-defaults)
+      (cond
+        ;; Providing an empty list of input defaults is equivalent to
+        ;; providing no input defaults.
+        ((null input-defaults)
+         (setf input-defaults *nil-pathname*))
+        ;; Instantiating a pattern with a list of one input default should
+        ;; be equivalent to instantiating the pattern with a single input
+        ;; default.
+        ((single input-defaults)
+         (setf input-defaults (first input-defaults)))
+        (t (assert (every #'pathnamep input-defaults)))))))
 
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
