@@ -546,18 +546,32 @@ inherit a method on `make-load-form', and need only specialize
   (let ((defaults (pattern.input-defaults pattern)))
     (merge-input-defaults input/s defaults)))
 
-(defgeneric merge-input-defaults (input/s default)
+(defgeneric merge-input-defaults (input/s default/s)
   (:method ((input string) default)
     (merge-input-defaults (resolve-file input) default))
   (:method ((input cl:pathname) (default cl:pathname))
     ;; Here we want to preserve the host of the provided input, so we
     ;; use uiop:merge-pathnames*.
     (merge-pathnames* default input))
+  (:method ((input cl:pathname) (defaults list))
+    (map 'vector
+         (lambda (default)
+           (merge-input-defaults input default))
+         defaults))
   (:method ((inputs sequence) (default cl:pathname))
     (map 'vector
          (lambda (input)
            (merge-input-defaults input default))
-         inputs)))
+         inputs))
+  (:method ((inputs sequence) (defaults list))
+    (let* ((inputs (coerce inputs 'list))
+           (merged
+             (mappend (lambda (input)
+                        (mapcar (lambda (default)
+                                  (merge-input-defaults input default))
+                                defaults))
+                      inputs)))
+      (coerce merged 'vector))))
 
 (defun merge-pattern-output-defaults (pattern output)
   (let ((defaults (pattern.output-defaults pattern)))
