@@ -566,24 +566,37 @@ inherit a method on `make-load-form', and need only specialize
   (:method ((inputs sequence) (defaults list))
     (apply #'concatenate 'vector
            (map 'list (lambda (input)
-                        (mapcar (lambda (default)
-                                  (merge-input-defaults input default))
-                                defaults))
+                        (merge-input-defaults input defaults))
                 inputs))))
 
 (defun merge-pattern-output-defaults (pattern output)
   (let ((defaults (pattern.output-defaults pattern)))
     (merge-output-defaults output defaults)))
 
-(defgeneric merge-output-defaults (output default)
-  (:method ((output string) (default cl:pathname))
+(defgeneric merge-output-defaults (output/s default/s)
+  (:method ((output string) default)
     ;; Not resolve-file; if the output is relative we want it to get
     ;; its path from `default'.
     (merge-output-defaults (parse-unix-namestring output) default))
   (:method ((output cl:pathname) (default cl:pathname))
     ;; We want to be able to redirect to the output to a different
     ;; host, so we use good old cl:merge-pathnames.
-    (merge-pathnames default output)))
+    (merge-pathnames default output))
+  (:method ((output cl:pathname) (defaults list))
+    (map 'vector
+         (lambda (default)
+           (merge-output-defaults output default))
+         defaults))
+  (:method ((outputs sequence) (default cl:pathname))
+    (map 'vector
+         (lambda (output)
+           (merge-output-defaults output default))
+         outputs))
+  (:method ((outputs sequence) (defaults list))
+    (apply #'concatenate 'vector
+           (map 'list (lambda (output)
+                        (merge-output-defaults output defaults))
+                outputs))))
 
 (defun print-pattern-ref (pattern ref stream)
   (let* ((inputs (pattern-ref-static-inputs ref))
