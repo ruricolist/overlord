@@ -539,32 +539,39 @@ inherit a method on `make-load-form', and need only specialize
 
 ;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
 ;;; pathnames seems to work, as long as we're careful about how we
-;;; merge them. The order is important. We merge the *provided* inputs
-;;; and outputs into the *defaults*, rather than vice-versa. The
-;;; choice of merging algorithm is also important. For
-;;; merge-pattern-input-defaults, we want to preserve the host of the provided
-;;; input, so we use uiop:merge-pathnames*. But for
-;;; merge-pattern-output-defaults, we want to be able to redirect to the
-;;; output to a different host, so we use good old cl:merge-pathnames.
+;;; merge them. The order is important: we merge the *provided* inputs
+;;; and outputs into the *defaults*, rather than vice-versa.
 
-(defgeneric merge-pattern-input-defaults (pattern input/s)
-  (:method (pattern (input string))
-    (merge-pattern-input-defaults pattern (resolve-file input)))
-  (:method (pattern (input cl:pathname))
-    (merge-pathnames* (pattern.input-defaults pattern)
-                      input))
-  (:method (pattern (inputs sequence))
+(defun merge-pattern-input-defaults (pattern input/s)
+  (let ((defaults (pattern.input-defaults pattern)))
+    (merge-input-defaults defaults input/s)))
+
+(defgeneric merge-input-defaults (default input/s)
+  (:method (default (input string))
+    (merge-input-defaults default (resolve-file input)))
+  (:method (default (input cl:pathname))
+    ;; Here we want to preserve the host of the provided input, so we
+    ;; use uiop:merge-pathnames*.
+    (merge-pathnames* default input))
+  (:method (default (inputs sequence))
     (map 'vector
          (lambda (input)
-           (merge-pattern-input-defaults pattern input))
+           (merge-input-defaults default input))
          inputs)))
 
-(defgeneric merge-pattern-output-defaults (pattern output)
-  (:method (pattern (output string))
-    (merge-pattern-output-defaults pattern (cl:pathname output)))
-  (:method (pattern (output cl:pathname))
-    (merge-pathnames (pattern.output-defaults pattern)
-                     output)))
+(defun merge-pattern-output-defaults (pattern output)
+  (let ((defaults (pattern.output-defaults pattern)))
+    (merge-output-defaults defaults output)))
+
+(defgeneric merge-output-defaults (default output)
+  (:method (default (output string))
+    ;; Not resolve-file; if the output is relative we want it to get
+    ;; its path from `default'.
+    (merge-output-defaults default (parse-unix-namestring output)))
+  (:method (default (output cl:pathname))
+    ;; We want to be able to redirect to the output to a different
+    ;; host, so we use good old cl:merge-pathnames.
+    (merge-pathnames default output)))
 
 (defun print-pattern-ref (pattern ref stream)
   (let* ((inputs (pattern-ref-static-inputs ref))
