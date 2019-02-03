@@ -527,6 +527,7 @@ inherit a method on `make-load-form', and need only specialize
     :reader pattern-ref-pattern)
    (name
     :initarg :inputs
+    ;; Stored as a vector because it must be sorted.
     :type vector
     :reader pattern-ref-static-inputs)
    (output
