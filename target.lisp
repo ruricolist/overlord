@@ -663,15 +663,12 @@ A pattern ref needs either an output OR at least one input (or both)."))
                         #'pattern-ref-pattern))
 
   (:method target-exists? (self)
-    (~> self
-        pattern-ref-output
-        pathname-exists?))
+    (pathname-exists? output))
 
   (:method target-stamp (self)
-    (with-accessors ((output pattern-ref-output)) self
-      (if (pathname-exists? output)
-          (target-stamp output)
-          never)))
+    (if (pathname-exists? output)
+        (target-stamp output)
+        never))
 
   (:method resolve-target (self &optional base)
     (let ((inputs (pattern-ref-static-inputs self)))
@@ -685,12 +682,12 @@ A pattern ref needs either an output OR at least one input (or both)."))
 
   (:method target= (self (other pattern-ref))
     ;; Remember the static inputs are always sorted.
-    (and (vector= (pattern-ref-static-inputs self)
+    (and (vector= inputs
                   (pattern-ref-static-inputs other)
                   :test #'target=)
-         (target= (pattern-ref-output self)
+         (target= output
                   (pattern-ref-output other))
-         (target= (pattern-ref-pattern self)
+         (target= pattern
                   (pattern-ref-pattern other))))
 
   (:method hash-target (self)
@@ -700,28 +697,23 @@ A pattern ref needs either an output OR at least one input (or both)."))
            output)))
 
   (:method target-build-script (self)
-    (let* ((inputs (pattern-ref-static-inputs self))
-           (output (pattern-ref-output self))
-           (pattern (find-pattern (pattern-ref-pattern self))))
-      (task output
-            (lambda ()
-              (depends-on-all inputs)
-              (if (single inputs)
-                  (pattern-build pattern (first-elt inputs) output)
-                  (pattern-build pattern inputs output)))
-            (pattern.script pattern))))
+    (task output
+          (lambda ()
+            (depends-on-all inputs)
+            (if (single inputs)
+                (pattern-build pattern (first-elt inputs) output)
+                (pattern-build pattern inputs output)))
+          (pattern.script pattern)))
 
   (:method call-with-target-locked (self fn)
     (claim-file* self output)
     (call-with-target-locked output fn))
 
   (:method target-node-label (self)
-    (native-namestring
-     (pattern-ref-output self)))
+    (native-namestring output))
 
   (:method delete-target (self)
-    (let ((output (pattern-ref-output self)))
-      (delete-target output)))
+    (delete-target output))
 
   (:method target-build-time (self)
     (build-time-from-files self inputs)))
