@@ -1803,7 +1803,10 @@ not the output file (a bad design, but unfortunately a common one)."
         ;; default.
         ((single input-defaults)
          (setf input-defaults (first input-defaults)))
-        (t (assert (every #'pathnamep input-defaults)))))))
+        ;; The list of patterns should be sorted (so two refs with the
+        ;; same defaults compare as equal).
+        (t (dsu-sort input-defaults #'string<
+                     :key #'namestring))))))
 
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
