@@ -605,7 +605,7 @@ inherit a method on `make-load-form', and need only specialize
 (defun sort-pathnames (files)
   (dsu-sort-new files #'string<
                 :stable t
-                :key #'uiop:native-namestring))
+                :key #'namestring))
 
 (defmethods pattern-ref (self (inputs name) output pattern)
   (:method initialize-instance :after (self &key)
