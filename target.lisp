@@ -544,7 +544,8 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun merge-pattern-input-defaults (pattern input/s)
   (let ((defaults (pattern.input-defaults pattern)))
-    (merge-input-defaults input/s defaults)))
+    (assure sequence
+      (merge-input-defaults input/s defaults))))
 
 (defgeneric merge-input-defaults (input/s default/s)
   (:method ((input string) default)
@@ -552,9 +553,12 @@ inherit a method on `make-load-form', and need only specialize
   (:method ((input cl:pathname) (default cl:pathname))
     ;; Here we want to preserve the host of the provided input, so we
     ;; use uiop:merge-pathnames*.
-    (merge-pathnames* default input))
-  (:method ((input cl:pathname) (defaults list))
-    (assert (not (null defaults)))
+    (list (merge-pathnames* default input)))
+  (:method ((input cl:pathname) (defaults null))
+    (list input))
+  (:method ((inputs sequence) (defaults null))
+    inputs)
+  (:method ((input cl:pathname) (defaults cons))
     (map 'vector
          (lambda (default)
            (merge-input-defaults input default))
@@ -564,8 +568,7 @@ inherit a method on `make-load-form', and need only specialize
          (lambda (input)
            (merge-input-defaults input default))
          inputs))
-  (:method ((inputs sequence) (defaults list))
-    (assert (not (null defaults)))
+  (:method ((inputs sequence) (defaults cons))
     (apply #'concatenate 'vector
            (map 'list (lambda (input)
                         (merge-input-defaults input defaults))
@@ -584,8 +587,9 @@ inherit a method on `make-load-form', and need only specialize
     ;; We want to be able to redirect to the output to a different
     ;; host, so we use good old cl:merge-pathnames.
     (merge-pathnames default output))
-  (:method ((output cl:pathname) (defaults list))
-    (assert (not (null defaults)))
+  (:method ((output cl:pathname) (defaults null))
+    output)
+  (:method ((output cl:pathname) (defaults cons))
     (map 'vector
          (lambda (default)
            (merge-output-defaults output default))
@@ -595,8 +599,9 @@ inherit a method on `make-load-form', and need only specialize
          (lambda (output)
            (merge-output-defaults output default))
          outputs))
-  (:method ((outputs sequence) (defaults list))
-    (assert (not (null defaults)))
+  (:method ((outputs sequence) (defaults null))
+    outputs)
+  (:method ((outputs sequence) (defaults cons))
     (apply #'concatenate 'vector
            (map 'list (lambda (output)
                         (merge-output-defaults output defaults))
