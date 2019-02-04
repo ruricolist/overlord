@@ -576,7 +576,10 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun merge-pattern-output-defaults (pattern output)
   (let ((defaults (pattern.output-defaults pattern)))
-    (merge-output-defaults output defaults)))
+    (assure absolute-pathname
+      (first-elt
+       (assure vector
+         (merge-output-defaults output defaults))))))
 
 (defgeneric merge-output-defaults (output/s default/s)
   (:method ((output string) default)
@@ -586,9 +589,9 @@ inherit a method on `make-load-form', and need only specialize
   (:method ((output cl:pathname) (default cl:pathname))
     ;; We want to be able to redirect to the output to a different
     ;; host, so we use good old cl:merge-pathnames.
-    (merge-pathnames default output))
+    (vector (merge-pathnames default output)))
   (:method ((output cl:pathname) (defaults null))
-    output)
+    (vector output))
   (:method ((output cl:pathname) (defaults cons))
     (map 'vector
          (lambda (default)
@@ -600,7 +603,7 @@ inherit a method on `make-load-form', and need only specialize
            (merge-output-defaults output default))
          outputs))
   (:method ((outputs sequence) (defaults null))
-    outputs)
+    (coerce outputs 'vector))
   (:method ((outputs sequence) (defaults cons))
     (apply #'concatenate 'vector
            (map 'list (lambda (output)
