@@ -1787,7 +1787,7 @@ not the output file (a bad design, but unfortunately a common one)."
     :reader pattern.input-defaults)
    (output-defaults
     :initarg :output-defaults
-    :type pathname
+    :type (or pathname (list-of pathname))
     :reader pattern.output-defaults)
    (script
     :initarg :script
@@ -1800,22 +1800,25 @@ not the output file (a bad design, but unfortunately a common one)."
   (:documentation "A file-to-file build pattern."))
 
 (defmethod initialize-instance :after ((self pattern) &key)
-  (with-slots (input-defaults) self
-    (when (listp input-defaults)
-      (cond
-        ;; Providing an empty list of input defaults is equivalent to
-        ;; providing no input defaults.
-        ((null input-defaults)
-         (setf input-defaults *nil-pathname*))
-        ;; Instantiating a pattern with a list of one input default should
-        ;; be equivalent to instantiating the pattern with a single input
-        ;; default.
-        ((single input-defaults)
-         (setf input-defaults (first input-defaults)))
-        ;; The list of patterns should be sorted (so two refs with the
-        ;; same defaults compare as equal).
-        (t (dsu-sort input-defaults #'string<
-                     :key #'namestring))))))
+  (flet ((canonicalize-defaults (defaults)
+           (if (not (listp defaults)) defaults
+               (cond
+                 ;; Providing an empty list of defaults is equivalent to
+                 ;; providing no default.
+                 ((null defaults)
+                  *nil-pathname*)
+                 ;; Instantiating a pattern with a list of one default
+                 ;; should be equivalent to instantiating the pattern
+                 ;; with a default.
+                 ((single defaults)
+                  (first defaults))
+                 ;; The list of defaults should be sorted (so two refs
+                 ;; with the same defaults compare as equal).
+                 (t (dsu-sort defaults #'string<
+                              :key #'namestring))))))
+    (with-slots (input-defaults output-defaults) self
+      (callf #'canonicalize-defaults input-defaults)
+      (callf #'canonicalize-defaults output-defaults))))
 
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
