@@ -616,6 +616,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
            (abs-input (merge-pattern-input-defaults pattern inputs)))
       ;; Keeping the inputs sorted is important for valid comparisons.
+      (assert (every #'absolute-pathname-p abs-input))
       (setf inputs (sort-pathnames abs-input))))
 
   (:method print-object (self stream)
