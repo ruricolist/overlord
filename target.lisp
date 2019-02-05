@@ -725,7 +725,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
                         #'pattern-ref-pattern))
 
   (:method target-stamp (self)
-    (combined-stamps outputs))
+    (combined-stamp outputs))
 
   (:method resolve-target (self &optional base)
     (let ((inputs (pattern-ref-static-inputs self)))
@@ -1331,20 +1331,20 @@ current package."
     (delete-target symbol)))
 
 (defun combined-stamp (files)
-  (let ((stamps
-          (reduce (lambda (file stamps)
-                    (cond ((not (file-exists-p file))
-                           (cons -1 stamps))
-                          ((directory-pathname-p file)
-                           (cons (file-mtime file) stamps))
-                          (t (list* (file-mtime file)
-                                    (file-size-in-octets file)
-                                    stamps))))
-                  (sort-pathnames files)
-                  :from-end t
-                  :initial-value nil)))
-    (assert (every #'integerp stamps))
-    (fmt "sxhash:~x" (sxhash stamps))))
+  (if (null files)
+      ;; Is this right? If there are no files there is nothing to
+      ;; build and the constraint may be considered to be satisfied.
+      far-future
+      (loop for file in files
+            if (file-exists-p file)
+              nconc (list (file-mtime file)
+                          (file-size-in-octets file))
+                into stamps
+            else
+              if (directory-exists-p file)
+                collect (file-mtime file)
+            else do (return never)
+            finally (return (fmt "sxhash:~x" (sxhash stamps))))))
 
 (defun file-stamp (file)
   (assert (file-exists-p file))
