@@ -1252,7 +1252,7 @@ current package."
 (defun file-stamp/hash (file)
   (let* ((file (ensure-pathname file))
          (size (file-size-in-octets file))
-         (hash (byte-array-to-hex-string (digest-file file))))
+         (hash (file-digest-string file)))
     (file-hash size hash)))
 
 (defmethod target-stamp ((target cl:pathname))
@@ -1299,14 +1299,9 @@ If VALUE is simple enough to hash, return a hash.
 
 Otherwise nil."
   (flet ((digest-as-printed (x)
-           (let* ((string
-                    (with-standard-io-syntax
-                      (prin1-to-string x)))
-                  (digest-bytes
-                    (digest-string string))
-                  (digest-string
-                    (byte-array-to-hex-string digest-bytes)))
-             digest-string)))
+           (string-digest-string
+            (with-standard-io-syntax
+              (prin1-to-string x)))))
     (cl:typecase value
       ((or string cl:pathname number character keyword)
        (digest-as-printed value))

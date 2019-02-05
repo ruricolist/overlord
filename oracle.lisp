@@ -17,7 +17,7 @@
     :delay-symbol
     :overlord-error)
   (:import-from :overlord/digest
-    :digest-string)
+    :string-digest-string)
   (:import-from :overlord/asdf
     :asdf-system-version)
   (:import-from :overlord/util
@@ -90,7 +90,7 @@ depend on the oracle are considered out of date."))
   (:method target-stamp (self)
     (let ((answer (oracle-answer self)))
       (if (stringp answer)
-          (byte-array-to-hex-string (digest-string answer))
+          (string-digest-string answer)
           (prin1-to-string answer))))
   (:method target-node-label (self)
     (fmt "oracle for ~a" question)))
@@ -212,10 +212,7 @@ A name is extracted using `named-readtable:readtable-name'."))
   (:method oracle-answer (self)
     (uiop:getenv name))
   (:method target-stamp (self)
-    (~> self
-        oracle-answer
-        digest-string
-        byte-array-to-hex-string))
+    (string-digest-string (oracle-answer self)))
   (:method target-exists? (self)
     (uiop:getenvp name))
   (:method target= (self (other env-oracle))
