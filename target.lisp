@@ -525,19 +525,21 @@ inherit a method on `make-load-form', and need only specialize
 (defstruct-read-only (fileset (:constructor %make-fileset))
   (files :type list))
 
+(def empty-fileset
+  (%make-fileset :files nil))
+
 (defun make-fileset (files)
-  (when (emptyp files)
-    (error "Empty fileset."))
-  (let* ((files
-           (if (typep files 'sequence)
-               files
-               (ensure-list files)))
-         (files (map 'vector #'resolve-file files))
-         (files (remove-duplicates files :test #'equal))
-         (files (sort-pathnames files)))
-    (unless (every #'file-pathname-p files)
-      (error* "Cannot use directory pathnames in filesets."))
-    (%make-fileset :files (coerce files 'list))))
+  (if (null files) empty-fileset
+      (let* ((files
+               (if (typep files 'sequence)
+                   files
+                   (ensure-list files)))
+             (files (map 'vector #'resolve-file files))
+             (files (remove-duplicates files :test #'equal))
+             (files (sort-pathnames files)))
+        (unless (every #'file-pathname-p files)
+          (error* "Cannot use directory pathnames in filesets."))
+        (%make-fileset :files (coerce files 'list)))))
 
 (defmethods fileset (self (files #'fileset-files))
   (:method fset:compare (self (other fileset))
