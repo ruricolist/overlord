@@ -528,7 +528,7 @@ inherit a method on `make-load-form', and need only specialize
 (def empty-fileset
   (%make-fileset :files nil))
 
-(defun make-fileset (files)
+(defun fileset (files)
   (if (null files) empty-fileset
       (let* ((files
                (if (typep files 'sequence)
