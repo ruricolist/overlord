@@ -229,7 +229,7 @@ built; otherwise it is the current package."
   (declare (ignore target)))
 
 (defmethod record-prereq ((target null))
-  (error* "Not a target: ~a" target))
+  (error 'not-a-target :designator target))
 
 (defmethod record-prereq ((target symbol))
   (let ((target (maybe-delay-symbol target)))
@@ -358,6 +358,12 @@ larger files will be built before smaller files."
 
 
 ;;; Types.
+
+(defcondition not-a-target (overlord-error)
+  ((designator :initarg :designator))
+  (:report (lambda (c s)
+             (with-slots (designator) c
+               (format s "Not a target: ~a" designator)))))
 
 (defgeneric load-form-slot-names (self)
   (:method-combination append))
@@ -554,7 +560,7 @@ inherit a method on `make-load-form', and need only specialize
       (if (typep task 'task)
           task
           ;; TODO not-a-target error type.
-          (error* "Not a target: ~a" self))))
+          (error 'not-a-target :designator self))))
   (:method target-node-label (self)
     (fmt "~{~a~^, ~}" (mapcar #'native-namestring files)))
   (:method call-with-target-locked (self fn)
@@ -1196,7 +1202,7 @@ current package."
   (let ((task (gethash target *tasks*)))
     (if (typep task 'task)
         task
-        (error* "Not a target: ~a" target))))
+        (error 'not-a-target :designator target))))
 
 (defmethod target-build-script ((target root-target))
   (task target
