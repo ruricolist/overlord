@@ -554,6 +554,8 @@ inherit a method on `make-load-form', and need only specialize
     (dx-sxhash (cons 'fileset files)))
   (:method resolve-target (self &optional base)
     (declare (ignore base))
+    (assert (every #'absolute-pathname-p files))
+    (assert (notany #'wild-pathname-p files))
     self)
   (:method target-build-script (self)
     ;; TODO Does this mean we should store the files as a list? Or a
