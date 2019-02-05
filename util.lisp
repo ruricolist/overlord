@@ -150,26 +150,33 @@
                                      :start2 offset
                                      :end1 end1))))))))
 
-(defun call/temp-file-pathname (dest fn)
-  "Call FN on a freshly allocated temporary pathname; if it completes
-safely, overwrite DEST with the contents of the temporary file."
-  (let* ((ok nil)
-         (tmp (with-temporary-file (:pathname p :keep t)
-                (funcall fn p)
-                (setq ok t)
-                p)))
+(defun call/temp-file-pathname (dests fn)
+  (let* ((dests
+           (if (typep dests 'sequence)
+               (coerce dests 'list)
+               (list dests)))
+         (ok nil)
+         (tmps
+           (loop for nil in dests
+                 collect (with-temporary-file (:pathname p :keep t)
+                           (funcall fn p)
+                           (setq ok t)
+                           p))))
     (if ok
         ;; Cross-device?
-        (flet ((rename-by-copying ()
+        (flet ((rename-by-copying (tmp dest)
                  (copy-file tmp dest :if-to-exists :rename-and-delete)))
-          (if (equal (pathname-device tmp)
-                     (pathname-device dest))
+          (if (every (lambda (tmp dest)
+                       (equal (pathname-device tmp)
+                              (pathname-device dest)))
+                     tmps
+                     dests)
               (handler-case
-                  (rename-file-overwriting-target tmp dest)
+                  (mapc #'rename-file-overwriting-target tmps dests)
                 (error ()
-                  (rename-by-copying)))
-              (rename-by-copying)))
-        (delete-file-if-exists tmp))))
+                  (mapc #'rename-by-copying tmps dests)))
+              (mapc #'rename-by-copying tmps dests)))
+        (mapc #'delete-file-if-exists tmps))))
 
 (defun replace-file-atomically (data dest)
   "Write DATA into DEST"
