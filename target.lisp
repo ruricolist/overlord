@@ -516,6 +516,60 @@ inherit a method on `make-load-form', and need only specialize
   (:method target-build-time (target)
     (build-time-from-file target file)))
 
+(defstruct-read-only (fileset (:constructor %make-fileset))
+  (files :type list))
+
+(defun make-fileset (files)
+  (when (emptyp files)
+    (error "Empty fileset."))
+  (let* ((files
+           (if (typep files 'sequence)
+               files
+               (ensure-list files)))
+         (files (map 'vector #'resolve-file files))
+         (files (remove-duplicates files :test #'equal))
+         (files (sort-pathnames files)))
+    (unless (every #'file-pathname-p files)
+      (error* "Cannot use directory pathnames in filesets."))
+    (%make-fileset :files (coerce files 'list))))
+
+(defmethods fileset (self (files #'fileset-files))
+  (:method fset:compare (self (other fileset))
+    (fset:compare-slots self other #'fileset-files #'fileset-files))
+  (:method target-timestamp (self)
+    (combined-stamp files))
+  (:method target-exists? (self)
+    (every #'file-exists-p files))
+  (:method target= (self (other fileset))
+    (equal files (fileset-files other)))
+  (:method hash-target (self)
+    (dx-sxhash (cons 'fileset files)))
+  (:method resolve-target (self &optional base)
+    (declare (ignore base))
+    self)
+  (:method target-build-script (self)
+    ;; TODO Does this mean we should store the files as a list? Or a
+    ;; separate hash table?
+    (let* ((task (gethash files *tasks*)))
+      (if (typep task 'task)
+          task
+          ;; TODO not-a-target error type.
+          (error* "Not a target: ~a" self))))
+  (:method target-node-label (self)
+    (fmt "~{~a~^, ~}" (mapcar #'native-namestring files)))
+  (:method call-with-target-locked (self fn)
+    (do-each (file files)
+      (claim-file* self file))
+    (funcall
+     (reduce (lambda (self fn)
+               (lambda ()
+                 (call-with-target-locked self fn)))
+             files
+             :from-end t
+             :initial-value fn)))
+  (:method delete-target (self)
+    (apply #'delete-targets files)))
+
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
   ;; either a symbol or an instance of `pattern', which is not yet
@@ -1271,21 +1325,20 @@ current package."
     (delete-target symbol)))
 
 (defun combined-stamp (files)
-  (let ((files (sort-pathnames files))
-        (stamps (queue)))
-    (do-each (file files)
-      (cond ((not (file-exists-p file))
-             (enq -1 stamps))
-            ((directory-pathname-p file)
-             (enq (file-mtime file) stamps))
-            (t
-             (qappend
-              stamps
-              (list (file-mtime file)
-                    (file-size-in-octets file))))))
-    (let ((stamps (qlist stamps)))
-      (assert (every #'integerp stamps))
-      (fmt "sxhash:~x" (sxhash stamps)))))
+  (let ((stamps
+          (reduce (lambda (file stamps)
+                    (cond ((not (file-exists-p file))
+                           (cons -1 stamps))
+                          ((directory-pathname-p file)
+                           (cons (file-mtime file) stamps))
+                          (t (list* (file-mtime file)
+                                    (file-size-in-octets file)
+                                    stamps))))
+                  (sort-pathnames files)
+                  :from-end t
+                  :initial-value nil)))
+    (assert (every #'integerp stamps))
+    (fmt "sxhash:~x" (sxhash stamps))))
 
 (defun file-stamp (file)
   (assert (file-exists-p file))
