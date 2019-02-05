@@ -1277,6 +1277,7 @@ current package."
     (delete-target symbol)))
 
 (defun file-stamp (file)
+  (assert (file-exists-p file))
   (let ((size (file-size-in-octets file))
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
