@@ -530,10 +530,10 @@ inherit a method on `make-load-form', and need only specialize
     ;; Stored as a vector because it must be sorted.
     :type vector
     :reader pattern-ref-static-inputs)
-   (output
+   (outputs
     :type pathname
-    :initarg :output
-    :reader pattern-ref-output))
+    :initarg :outputs
+    :reader pattern-ref-outputs))
   (:default-initargs
    :inputs #()))
 
@@ -576,10 +576,8 @@ inherit a method on `make-load-form', and need only specialize
 
 (defun merge-pattern-output-defaults (pattern output)
   (let ((defaults (pattern.output-defaults pattern)))
-    (assure absolute-pathname
-      (first-elt
-       (assure vector
-         (merge-output-defaults output defaults))))))
+    (assure vector
+      (merge-output-defaults output defaults))))
 
 (defgeneric merge-output-defaults (output/s default/s)
   (:method ((output string) default)
@@ -615,10 +613,11 @@ inherit a method on `make-load-form', and need only specialize
                 :stable t
                 :key #'namestring))
 
-(defmethods pattern-ref (self (inputs name) output pattern)
+(defmethods pattern-ref (self (inputs name) outputs pattern)
   (:method initialize-instance :after (self &key)
     (unless (or (not (emptyp inputs))
-                (slot-boundp self 'output))
+                (and (slot-boundp self 'outputs)
+                     (not (emptyp outputs))))
       (error* "~
 A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
@@ -640,38 +639,33 @@ A pattern ref needs either an output OR at least one input (or both)."))
                     `(make 'pattern-ref
                            :pattern ,name-form
                            :inputs ,inputs
-                           :output ,output)))
+                           :outputs ,outputs)))
           (print-unreadable-object (self stream :type t)
             (format stream "~a ~a -> ~a"
                     pattern-name
                     inputs
-                    output)))))
+                    outputs)))))
 
-  (:method slot-unbound (class self (slot-name (eql 'output)))
+  (:method slot-unbound (class self (slot-name (eql 'outputs)))
     (declare (ignore class))
     ;; Since this is idempotent I see no reason to lock.
     (assert (not (emptyp inputs)))
     (let* ((pattern (find-pattern pattern))
            (input (first-elt inputs))
-           (abs-output (merge-pattern-output-defaults pattern input)))
-      (setf output abs-output)))
+           (abs-outputs (merge-pattern-output-defaults pattern input)))
+      (setf outputs (sort-pathnames abs-outputs))))
 
   (:method load-form-slot-names append (self)
-    '(pattern output))
+    '(pattern outputs))
 
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
                         #'pattern-ref-static-inputs
-                        #'pattern-ref-output
+                        #'pattern-ref-outputs
                         #'pattern-ref-pattern))
 
-  (:method target-exists? (self)
-    (pathname-exists? output))
-
   (:method target-stamp (self)
-    (if (pathname-exists? output)
-        (target-stamp output)
-        never))
+    (combined-stamps outputs))
 
   (:method resolve-target (self &optional base)
     (let ((inputs (pattern-ref-static-inputs self)))
