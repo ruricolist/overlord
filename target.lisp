@@ -1276,6 +1276,23 @@ current package."
                (force-symbol target)))
     (delete-target symbol)))
 
+(defun combined-stamp (files)
+  (let ((files (sort-pathnames files))
+        (stamps (queue)))
+    (do-each (file files)
+      (cond ((not (file-exists-p file))
+             (enq -1 stamps))
+            ((directory-pathname-p file)
+             (enq (file-mtime file) stamps))
+            (t
+             (qappend
+              stamps
+              (list (file-mtime file)
+                    (file-size-in-octets file))))))
+    (let ((stamps (qlist stamps)))
+      (assert (every #'integerp stamps))
+      (fmt "sxhash:~x" (sxhash stamps)))))
+
 (defun file-stamp (file)
   (assert (file-exists-p file))
   (let ((size (file-size-in-octets file))
