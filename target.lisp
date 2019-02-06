@@ -522,64 +522,6 @@ inherit a method on `make-load-form', and need only specialize
   (:method target-build-time (target)
     (build-time-from-file target file)))
 
-(defstruct-read-only (fileset (:constructor %make-fileset))
-  (files :type list))
-
-(def empty-fileset
-  (%make-fileset :files nil))
-
-(defun fileset (files)
-  (if (null files) empty-fileset
-      (let* ((files
-               (if (typep files 'sequence)
-                   files
-                   (ensure-list files)))
-             (files (map 'vector #'resolve-file files))
-             (files (remove-duplicates files :test #'equal))
-             (files (sort-pathnames files)))
-        (when-let (dirs (filter #'directory-pathname-p files))
-          (error* "Cannot use directory pathnames in filesets: ~a" dirs))
-        (%make-fileset :files (coerce files 'list)))))
-
-(defmethods fileset (self (files #'fileset-files))
-  (:method fset:compare (self (other fileset))
-    (fset:compare-slots self other #'fileset-files #'fileset-files))
-  (:method target-timestamp (self)
-    (combined-stamp files))
-  (:method target-exists? (self)
-    (every #'file-exists-p files))
-  (:method target= (self (other fileset))
-    (equal files (fileset-files other)))
-  (:method hash-target (self)
-    (dx-sxhash (cons 'fileset files)))
-  (:method resolve-target (self &optional base)
-    (declare (ignore base))
-    (assert (every #'absolute-pathname-p files))
-    (assert (notany #'wild-pathname-p files))
-    self)
-  (:method target-build-script (self)
-    ;; TODO Does this mean we should store the files as a list? Or a
-    ;; separate hash table?
-    (let* ((task (gethash files *tasks*)))
-      (if (typep task 'task)
-          task
-          ;; TODO not-a-target error type.
-          (error 'not-a-target :designator self))))
-  (:method target-node-label (self)
-    (fmt "~{~a~^, ~}" (mapcar #'native-namestring files)))
-  (:method call-with-target-locked (self fn)
-    (do-each (file files)
-      (claim-file* self file))
-    (funcall
-     (reduce (lambda (self fn)
-               (lambda ()
-                 (call-with-target-locked self fn)))
-             files
-             :from-end t
-             :initial-value fn)))
-  (:method delete-target (self)
-    (apply #'delete-targets files)))
-
 (defclass pattern-ref (ref)
   ;; Note that the pattern slot has a silly type: a pattern ref can be
   ;; either a symbol or an instance of `pattern', which is not yet
