@@ -552,19 +552,28 @@ inherit a method on `make-load-form', and need only specialize
     (collecting
       (dolist (default defaults)
         (dolist (input inputs)
-          ;; Here we want to preserve the host of the
-          ;; provided input, so we use
-          ;; uiop:merge-pathnames*.
-          (collect (merge-pathnames* default input)))))))
+          (let ((input
+                  (if (stringp input)
+                      (resolve-file input)
+                      input)))
+            ;; Here we want to preserve the host of the provided
+            ;; input, so we use uiop:merge-pathnames*.
+            (collect (merge-pathnames* default input))))))))
 
 (defun merge-output-defaults (pattern outputs)
   (let ((defaults (pattern.output-defaults pattern)))
     (collecting
       (dolist (default defaults)
         (dolist (output outputs)
-          ;; We want to be able to redirect to the output to a different
-          ;; host, so we use good old cl:merge-pathnames.
-          (merge-pathnames default output))))))
+          (let ((output
+                  (if (stringp output)
+                      ;; Not resolve-file; default should be able to
+                      ;; override path.
+                      (parse-unix-namestring output)
+                      output)))
+            ;; We want to be able to redirect to the output to a
+            ;; different host, so we use good old cl:merge-pathnames.
+            (merge-pathnames default output)))))))
 
 (defun sort-pathnames (files)
   (coerce (dsu-sort-new files #'string<
@@ -578,7 +587,7 @@ inherit a method on `make-load-form', and need only specialize
                 (and (slot-boundp self 'outputs)
                      outputs))
       (error* "~
-A pattern ref needs either an output OR at least one input (or both)."))
+A pattern ref needs either outputs OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
            (merged-input (merge-input-defaults pattern inputs)))
       (setf inputs (sort-pathnames merged-input))))
@@ -653,7 +662,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
            outputs)))
 
   (:method target-build-script (self)
-    (task outputs
+    (task self
           (lambda ()
             (depends-on inputs)
             (pattern-build pattern inputs outputs))
