@@ -126,7 +126,7 @@
    :pattern-into
    :define-script
    :pattern-ref-static-inputs
-   :pattern-ref-output
+   :pattern-ref-outputs
    :clear-package-prereqs
    :list-package-prereqs
    :directory-ref
@@ -591,104 +591,55 @@ inherit a method on `make-load-form', and need only specialize
     :reader pattern-ref-pattern)
    (name
     :initarg :inputs
-    ;; Stored as a vector because it must be sorted.
-    :type vector
+    :type (list-of pathname)
     :reader pattern-ref-static-inputs)
    (outputs
-    :type pathname
+    :type (list-of pathname)
     :initarg :outputs
     :reader pattern-ref-outputs))
   (:default-initargs
-   :inputs #()))
+   :inputs '()))
 
 ;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
 ;;; pathnames seems to work, as long as we're careful about how we
 ;;; merge them. The order is important: we merge the *provided* inputs
 ;;; and outputs into the *defaults*, rather than vice-versa.
 
-(defun merge-pattern-input-defaults (pattern input/s)
+(defun merge-pattern-input-defaults (pattern inputs)
   (let ((defaults (pattern.input-defaults pattern)))
-    (assure vector
-      (merge-input-defaults input/s defaults))))
+    (collecting
+      (dolist (default defaults)
+        (dolist (input inputs)
+          ;; Here we want to preserve the host of the
+          ;; provided input, so we use
+          ;; uiop:merge-pathnames*.
+          (collect (merge-pathnames* default input)))))))
 
-(defgeneric merge-input-defaults (input/s default/s)
-  (:method ((input string) default)
-    (merge-input-defaults (resolve-file input) default))
-  (:method ((input cl:pathname) (default cl:pathname))
-    ;; Here we want to preserve the host of the provided input, so we
-    ;; use uiop:merge-pathnames*.
-    (vector (merge-pathnames* default input)))
-  (:method ((input cl:pathname) (defaults null))
-    (vector input))
-  (:method ((inputs sequence) (defaults null))
-    (coerce inputs 'vector))
-  (:method ((input cl:pathname) (defaults cons))
-    (map 'vector
-         (lambda (default)
-           (merge-input-defaults input default))
-         defaults))
-  (:method ((inputs sequence) (default cl:pathname))
-    (map 'vector
-         (lambda (input)
-           (merge-input-defaults input default))
-         inputs))
-  (:method ((inputs sequence) (defaults cons))
-    (apply #'concatenate 'vector
-           (map 'list (lambda (input)
-                        (merge-input-defaults input defaults))
-                inputs))))
-
-(defun merge-pattern-output-defaults (pattern output)
+(defun merge-pattern-output-defaults (pattern outputs)
   (let ((defaults (pattern.output-defaults pattern)))
-    (assure vector
-      (merge-output-defaults output defaults))))
-
-(defgeneric merge-output-defaults (output/s default/s)
-  (:method ((output string) default)
-    ;; Not resolve-file; if the output is relative we want it to get
-    ;; its path from `default'.
-    (merge-output-defaults (parse-unix-namestring output) default))
-  (:method ((output cl:pathname) (default cl:pathname))
-    ;; We want to be able to redirect to the output to a different
-    ;; host, so we use good old cl:merge-pathnames.
-    (vector (merge-pathnames default output)))
-  (:method ((output cl:pathname) (defaults null))
-    (vector output))
-  (:method ((output cl:pathname) (defaults cons))
-    (map 'vector
-         (lambda (default)
-           (merge-output-defaults output default))
-         defaults))
-  (:method ((outputs sequence) (default cl:pathname))
-    (map 'vector
-         (lambda (output)
-           (merge-output-defaults output default))
-         outputs))
-  (:method ((outputs sequence) (defaults null))
-    (coerce outputs 'vector))
-  (:method ((outputs sequence) (defaults cons))
-    (apply #'concatenate 'vector
-           (map 'list (lambda (output)
-                        (merge-output-defaults output defaults))
-                outputs))))
+    (collecting
+      (dolist (default defaults)
+        (dolist (output outputs)
+          ;; We want to be able to redirect to the output to a different
+          ;; host, so we use good old cl:merge-pathnames.
+          (merge-pathnames default output))))))
 
 (defun sort-pathnames (files)
-  (dsu-sort-new files #'string<
-                :stable t
-                :key #'namestring))
+  (coerce (dsu-sort-new files #'string<
+                        :stable t
+                        :key #'namestring)
+          'list))
 
 (defmethods pattern-ref (self (inputs name) outputs pattern)
   (:method initialize-instance :after (self &key)
-    (unless (or (not (emptyp inputs))
+    (unless (or inputs
                 (and (slot-boundp self 'outputs)
-                     (not (emptyp outputs))))
+                     outputs))
       (error* "~
 A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
-           (abs-input (merge-pattern-input-defaults pattern inputs)))
-      ;; Keeping the inputs sorted is important for valid comparisons.
-      (assert (every #'absolute-pathname-p abs-input))
-      (setf inputs (sort-pathnames abs-input))))
+           (merged-input (merge-pattern-input-defaults pattern inputs)))
+      (setf inputs (sort-pathnames merged-input))))
 
   (:method print-object (self stream)
     (let ((pattern-name (pattern-name pattern)))
@@ -713,14 +664,14 @@ A pattern ref needs either an output OR at least one input (or both)."))
   (:method slot-unbound (class self (slot-name (eql 'outputs)))
     (declare (ignore class))
     ;; Since this is idempotent I see no reason to lock.
-    (assert (not (emptyp inputs)))
+    (unless inputs
+      (error* "Cannot default outputs without inputs."))
     (let* ((pattern (find-pattern pattern))
-           (input (first-elt inputs))
-           (abs-outputs (merge-pattern-output-defaults pattern input)))
-      (setf outputs (sort-pathnames abs-outputs))))
+           (merged-outputs (merge-pattern-output-defaults pattern inputs)))
+      (setf outputs (sort-pathnames merged-outputs))))
 
   (:method load-form-slot-names append (self)
-    '(pattern outputs))
+    '(pattern inputs outputs))
 
   (:method fset:compare (self (other pattern-ref))
     (fset:compare-slots self other
@@ -732,81 +683,76 @@ A pattern ref needs either an output OR at least one input (or both)."))
     (combined-stamp outputs))
 
   (:method resolve-target (self &optional base)
-    (let ((inputs (pattern-ref-static-inputs self)))
-      (if (every #'absolute-pathname-p inputs) self
-          (pattern-ref (pattern-ref-pattern self)
-                       (map 'vector
-                            (lambda (input)
-                              (merge-pathnames* input
-                                                (or base (base))))
-                            inputs)))))
+    (if (and (every #'absolute-pathname-p inputs)
+             (every #'absolute-pathname-p outputs))
+        self
+        (make 'pattern-ref
+              :pattern (pattern-ref-pattern self)
+              ;; Cf. merge-input-defaults, merge-output-defaults.
+              :inputs (sort-pathnames
+                       (mapcar
+                        (op (merge-pathnames* (or base (base)) _))
+                        inputs))
+              :outputs (sort-pathnames
+                        (mapcar
+                         (op (merge-pathnames (or base (base)) _))
+                         outputs)))))
 
   (:method target= (self (other pattern-ref))
-    ;; Remember the static inputs are always sorted.
-    (and (vector= inputs
-                  (pattern-ref-static-inputs other)
-                  :test #'target=)
-         (target= output
-                  (pattern-ref-output other))
-         (target= pattern
-                  (pattern-ref-pattern other))))
+    ;; Remember the inputs and outputs are always sorted.
+    (and (equal inputs (pattern-ref-static-inputs other))
+         (equal outputs (pattern-ref-outputs other))
+         (target= pattern (pattern-ref-pattern other))))
 
   (:method hash-target (self)
     (dx-sxhash
      (list 'pattern-ref
            inputs
-           output)))
+           outputs)))
 
   (:method target-build-script (self)
-    (task output
+    (task outputs
           (lambda ()
-            (depends-on-all inputs)
-            (if (single inputs)
-                (pattern-build pattern (first-elt inputs) output)
-                (pattern-build pattern inputs output)))
+            (depends-on inputs)
+            (pattern-build pattern inputs outputs))
           (pattern.script pattern)))
 
   (:method call-with-target-locked (self fn)
-    (claim-file* self output)
-    (call-with-target-locked output fn))
+    (dolist (output outputs)
+      (claim-file* self output))
+    (funcall
+     (reduce (lambda (output fn)
+               (lambda ()
+                 (call-with-target-locked output fn)))
+             outputs
+             :initial-value fn
+             :from-end t)))
 
   (:method target-node-label (self)
-    (native-namestring output))
+    (mapcar #'native-namestring outputs))
 
   (:method delete-target (self)
-    (delete-target output))
+    (apply #'delete-targets outputs))
 
   (:method target-build-time (self)
     (build-time-from-files self inputs)))
 
-(defun pattern-ref (pattern input/s)
+(defun pattern-ref (pattern inputs)
   "Make a pattern reference."
-  (pattern-from pattern input/s))
+  (pattern-from pattern inputs))
 
-(defun pattern-from (pattern input/s)
-  (etypecase-of (or pathname string sequence) input/s
-    (string
-     (pattern-from pattern (file input/s)))
-    (pathname
-     (let ((resolved (file input/s)))
-       (if (equal resolved input/s)
-           (pattern-ref pattern (vector input/s))
-           (pattern-from pattern resolved))))
-    (sequence
-     (if (length>= input/s 1)
-         (make 'pattern-ref
-               :pattern pattern
-               :inputs (coerce input/s 'vector))
-         (error* "~
-A pattern without an output must have at least one input.")))))
-
-(defun pattern-into (pattern output)
+(defun pattern-from (pattern inputs)
   (make 'pattern-ref
         :pattern pattern
-        :output (resolve-file output)))
+        :inputs (ensure-list inputs)))
 
-(defun pattern (name input)
-  (pattern-ref name input))
+(defun pattern-into (pattern outputs)
+  (make 'pattern-ref
+        :pattern pattern
+        :output (ensure-list outputs)))
+
+(defun pattern (name inputs)
+  (pattern-ref name inputs))
 
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
@@ -1235,11 +1181,6 @@ current package."
                  '(or impossible-prereq trivial-prereq))
     (print-target-being-built parent))
   (funcall (task-thunk task)))
-
-(defun run-save-task (target thunk &optional (script (script-for target)))
-  (check-not-frozen)
-  (save-task target thunk script)
-  (depends-on target))
 
 (defgeneric save-task* (target thunk script)
   (:method :before (target thunk script)
@@ -1858,39 +1799,27 @@ not the output file (a bad design, but unfortunately a common one)."
 (defclass pattern (externalizable)
   ((input-defaults
     :initarg :input-defaults
-    :type (or pathname (list-of pathname))
+    :type (list-of pathname)
     :reader pattern.input-defaults)
    (output-defaults
     :initarg :output-defaults
-    :type (or pathname (list-of pathname))
+    :type (list-of pathname)
     :reader pattern.output-defaults)
    (script
     :initarg :script
     :type target
     :reader pattern.script))
   (:default-initargs
-   :input-defaults *nil-pathname*
-   :output-defaults *nil-pathname*
+   :input-defaults ()
+   :output-defaults ()
    :script trivial-prereq)
   (:documentation "A file-to-file build pattern."))
 
 (defmethod initialize-instance :after ((self pattern) &key)
   (flet ((canonicalize-defaults (defaults)
-           (if (not (listp defaults)) defaults
-               (cond
-                 ;; Providing an empty list of defaults is equivalent to
-                 ;; providing no default.
-                 ((null defaults)
-                  *nil-pathname*)
-                 ;; Instantiating a pattern with a list of one default
-                 ;; should be equivalent to instantiating the pattern
-                 ;; with a default.
-                 ((single defaults)
-                  (first defaults))
-                 ;; The list of defaults should be sorted (so two refs
-                 ;; with the same defaults compare as equal).
-                 (t (dsu-sort defaults #'string<
-                              :key #'namestring))))))
+           ;; The list of defaults should be sorted (so two refs with
+           ;; the same defaults compare as equal).
+           (sort-pathnames (or defaults (list *nil-pathname*)))))
     (with-slots (input-defaults output-defaults) self
       (callf #'canonicalize-defaults input-defaults)
       (callf #'canonicalize-defaults output-defaults))))
