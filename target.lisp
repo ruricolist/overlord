@@ -540,7 +540,8 @@ inherit a method on `make-load-form', and need only specialize
     :initarg :outputs
     :reader pattern-ref-outputs))
   (:default-initargs
-   :inputs '()))
+   :inputs  '()
+   :outputs '()))
 
 ;;; Re. merge-*-defaults. Originally I was planning on a DSL, but
 ;;; pathnames seems to work, as long as we're careful about how we
@@ -550,47 +551,44 @@ inherit a method on `make-load-form', and need only specialize
 (defun merge-input-defaults (pattern inputs)
   (let ((defaults (pattern.input-defaults pattern)))
     (collecting
-      (dolist (default defaults)
-        (dolist (input inputs)
-          (let ((input
-                  (if (stringp input)
-                      (resolve-file input)
-                      input)))
+      (dolist (input inputs)
+        (let ((input
+                (if (stringp input)
+                    (resolve-file input)
+                    input)))
+          (dolist (default defaults)
             ;; Here we want to preserve the host of the provided
             ;; input, so we use uiop:merge-pathnames*.
             (collect (merge-pathnames* default input))))))))
 
-(defun merge-output-defaults (pattern outputs)
+(defun merge-output-defaults (pattern inputs)
   (let ((defaults (pattern.output-defaults pattern)))
     (collecting
-      (dolist (default defaults)
-        (dolist (output outputs)
-          (let ((output
-                  (if (stringp output)
-                      ;; Not resolve-file; default should be able to
-                      ;; override path.
-                      (parse-unix-namestring output)
-                      output)))
+      (dolist (input inputs)
+        (let ((input
+                (if (stringp input)
+                    ;; Not resolve-file; default should be able to
+                    ;; override path.
+                    (parse-unix-namestring input)
+                    input)))
+          (dolist (default defaults)
             ;; We want to be able to redirect to the output to a
             ;; different host, so we use good old cl:merge-pathnames.
-            (merge-pathnames default output)))))))
-
-(defun sort-pathnames (files)
-  (coerce (dsu-sort-new files #'string<
-                        :stable t
-                        :key #'namestring)
-          'list))
+            (collect (merge-pathnames default input))))))))
 
 (defmethods pattern-ref (self (inputs name) outputs pattern)
-  (:method initialize-instance :after (self &key)
-    (unless (or inputs
-                (and (slot-boundp self 'outputs)
-                     outputs))
+  (:method initialize-instance :after (self &key (merge t))
+    (unless (or inputs outputs)
       (error* "~
 A pattern ref needs either outputs OR at least one input (or both)."))
-    (let* ((pattern (find-pattern pattern))
-           (merged-input (merge-input-defaults pattern inputs)))
-      (setf inputs (sort-pathnames merged-input))))
+    (when merge
+      (let ((pattern (find-pattern pattern)))
+        (setf inputs
+              (merge-input-defaults pattern inputs))
+        (setf outputs
+              (merge-output-defaults pattern
+                                     (or outputs inputs)))))
+    (assert outputs))
 
   (:method print-object (self stream)
     (let ((pattern-name (pattern-name pattern)))
@@ -604,22 +602,13 @@ A pattern ref needs either outputs OR at least one input (or both)."))
                     (read-eval-prefix self stream)
                     `(make 'pattern-ref
                            :pattern ,name-form
-                           :inputs ,inputs
-                           :outputs ,outputs)))
+                           :inputs ',inputs
+                           :outputs ',outputs)))
           (print-unreadable-object (self stream :type t)
             (format stream "~a ~a -> ~a"
                     pattern-name
                     inputs
                     outputs)))))
-
-  (:method slot-unbound (class self (slot-name (eql 'outputs)))
-    (declare (ignore class))
-    ;; Since this is idempotent I see no reason to lock.
-    (unless inputs
-      (error* "Cannot default outputs without inputs."))
-    (let* ((pattern (find-pattern pattern))
-           (merged-outputs (merge-output-defaults pattern inputs)))
-      (setf outputs (sort-pathnames merged-outputs))))
 
   (:method load-form-slot-names append (self)
     '(pattern inputs outputs))
@@ -637,17 +626,13 @@ A pattern ref needs either outputs OR at least one input (or both)."))
     (if (and (every #'absolute-pathname-p inputs)
              (every #'absolute-pathname-p outputs))
         self
-        (make 'pattern-ref
-              :pattern (pattern-ref-pattern self)
-              ;; Cf. merge-input-defaults, merge-output-defaults.
-              :inputs (sort-pathnames
-                       (mapcar
-                        (op (merge-pathnames* (or base (base)) _))
-                        inputs))
-              :outputs (sort-pathnames
-                        (mapcar
-                         (op (merge-pathnames (or base (base)) _))
-                         outputs)))))
+        (let ((base (or base (base))))
+          (make 'pattern-ref
+                :merge nil
+                :pattern (pattern-ref-pattern self)
+                ;; Cf. merge-input-defaults, merge-output-defaults.
+                :inputs (mapcar (op (ensure-absolute _ :base base)) inputs)
+                :outputs (mapcar (op (ensure-absolute _ :base base)) outputs)))))
 
   (:method target= (self (other pattern-ref))
     ;; Remember the inputs and outputs are always sorted.
@@ -662,11 +647,12 @@ A pattern ref needs either outputs OR at least one input (or both)."))
            outputs)))
 
   (:method target-build-script (self)
-    (task self
-          (lambda ()
-            (depends-on inputs)
-            (pattern-build pattern inputs outputs))
-          (pattern.script pattern)))
+    (let ((pattern (find-pattern pattern)))
+      (task self
+            (lambda ()
+              (depends-on inputs)
+              (pattern-build pattern inputs outputs))
+            (pattern.script pattern))))
 
   (:method call-with-target-locked (self fn)
     (dolist (output outputs)
@@ -680,7 +666,8 @@ A pattern ref needs either outputs OR at least one input (or both)."))
              :from-end t)))
 
   (:method target-node-label (self)
-    (mapcar #'native-namestring outputs))
+    (fmt "~{~a~^, ~}"
+         (mapcar #'native-namestring outputs)))
 
   (:method delete-target (self)
     (apply #'delete-targets outputs))
@@ -700,7 +687,7 @@ A pattern ref needs either outputs OR at least one input (or both)."))
 (defun pattern-into (pattern outputs)
   (make 'pattern-ref
         :pattern pattern
-        :output (ensure-list outputs)))
+        :outputs (ensure-list outputs)))
 
 (defun pattern (name inputs)
   (pattern-ref name inputs))
@@ -1719,10 +1706,11 @@ not the output file (a bad design, but unfortunately a common one)."
                script))
          (script
            (if out-supplied?
-               `(call/temp-file-pathname
+               `(call/temp-file-pathnames
                  ,pathname
                  (lambda (,out)
-                   ,script))
+                   (let ((,out (first ,out)))
+                     ,script)))
                script)))
     `(progn
        ;; Make the task accessible by name.
@@ -1742,7 +1730,9 @@ not the output file (a bad design, but unfortunately a common one)."
 
 (defgeneric pattern-name (pattern)
   (:method ((pattern symbol))
-    pattern))
+    pattern)
+  (:method ((pattern delayed-symbol))
+    (force-symbol pattern)))
 
 (defgeneric pattern-build (pattern input output)
   (:documentation "Build OUTPUT from INPUT according to PATTERN."))
@@ -1768,9 +1758,7 @@ not the output file (a bad design, but unfortunately a common one)."
 
 (defmethod initialize-instance :after ((self pattern) &key)
   (flet ((canonicalize-defaults (defaults)
-           ;; The list of defaults should be sorted (so two refs with
-           ;; the same defaults compare as equal).
-           (sort-pathnames (or defaults (list *nil-pathname*)))))
+           (or defaults (list *nil-pathname*))))
     (with-slots (input-defaults output-defaults) self
       (callf #'canonicalize-defaults input-defaults)
       (callf #'canonicalize-defaults output-defaults))))
@@ -1830,9 +1818,6 @@ request. IN is bound to the name of the input file or files.
 
 For the meaning of OUT and DEST, compare the documentation for
 `file-target'."
-  (check-type in symbol)
-  (check-type out symbol)
-  (check-type dest symbol)
   (mvlet ((class-options script
            (loop for form in script
                  if (and (consp form)
@@ -1842,9 +1827,12 @@ For the meaning of OUT and DEST, compare the documentation for
                  finally (return (values class-options script))))
           ;; You could do this in the lambda list, but it would make
           ;; it ugly and hard to read.
-          (in   (or in   (string-gensym 'in)))
-          (out  (or out  (string-gensym 'out)))
-          (dest (or dest (string-gensym 'dest))))
+          (in   (ensure-list (or in   (string-gensym 'in))))
+          (out  (ensure-list (or out  (string-gensym 'out))))
+          (dest (ensure-list (or dest (string-gensym 'dest))))
+          (in-temp (string-gensym 'in))
+          (dest-temp (string-gensym 'dest))
+          (out-temp (string-gensym 'out)))
     `(progn
        (define-script-for ,class-name
          ;; Be careful not to splice in the gensyms.
@@ -1861,14 +1849,27 @@ For the meaning of OUT and DEST, compare the documentation for
           ,@(loop for (initarg initform) in (batches initargs 2)
                   append `(,initarg ,(wrap-save-base initform))))
          ,@class-options)
-       (defmethod pattern-build ((self ,class-name) ,in ,dest)
+       (defmethod pattern-build ((self ,class-name) ,in-temp ,dest-temp)
          (declare
           (ignorable
-           ,@(unsplice (unless in-supplied? in))
-           ,@(unsplice (unless dest-supplied? dest))))
-         ,(if out-supplied?
-              `(call/temp-file-pathname
-                ,dest
-                (lambda (,out)
-                  ,@script))
-              `(progn ,@script))))))
+           ,@(unsplice (unless in-supplied? in-temp))
+           ,@(unsplice (unless dest-supplied? dest-temp))))
+         ,(let* ((form `(progn ,@script))
+                 (form (wrap-save-base form))
+                 (form
+                   (if (not in-supplied?) form
+                       `(cl:multiple-value-bind ,in
+                            (values-list ,in-temp)
+                          ,form)))
+                 (form
+                   (if (not dest-supplied?) form
+                       `(cl:multiple-value-bind ,dest
+                            (values-list ,dest-temp)
+                          ,form))))
+            (if out-supplied?
+                `(call/temp-file-pathnames
+                  ,dest-temp
+                  (lambda (,out-temp)
+                    (cl:multiple-value-bind ,out (values-list ,out-temp)
+                      ,form)))
+                form))))))

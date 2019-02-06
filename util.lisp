@@ -32,7 +32,7 @@
    #:write-form-as-file
    #:write-file-if-changed
    #:copy-file-if-changed
-   #:call/temp-file-pathname
+   #:call/temp-file-pathnames
    #:withf
    #:lessf
    #:with-absolute-package-names
@@ -150,7 +150,10 @@
                                      :start2 offset
                                      :end1 end1))))))))
 
-(defun call/temp-file-pathname (dests fn)
+(defun rename-by-copying (tmp dest)
+  (copy-file tmp dest :if-to-exists :rename-and-delete))
+
+(defun call/temp-file-pathnames (dests fn)
   (let* ((dests
            (if (typep dests 'sequence)
                (coerce dests 'list)
@@ -159,24 +162,22 @@
          (tmps
            (loop for nil in dests
                  collect (with-temporary-file (:pathname p :keep t)
-                           (funcall fn p)
-                           (setq ok t)
                            p))))
-    (if ok
-        ;; Cross-device?
-        (flet ((rename-by-copying (tmp dest)
-                 (copy-file tmp dest :if-to-exists :rename-and-delete)))
-          (if (every (lambda (tmp dest)
-                       (equal (pathname-device tmp)
-                              (pathname-device dest)))
-                     tmps
-                     dests)
-              (handler-case
-                  (mapc #'rename-file-overwriting-target tmps dests)
-                (error ()
-                  (mapc #'rename-by-copying tmps dests)))
-              (mapc #'rename-by-copying tmps dests)))
-        (mapc #'delete-file-if-exists tmps))))
+    (unwind-protect
+         (progn
+           (funcall fn tmps)
+           (loop for tmp in tmps
+                 for dest in dests
+                 if (equal (pathname-device tmp)
+                           (pathname-device dest))
+                   do (handler-case
+                          (rename-file-overwriting-target tmp dest)
+                        (error ()
+                          (rename-by-copying tmp dest)))
+                 else do (rename-by-copying tmp dest))
+           (setq ok t))
+      (unless ok
+        (mapc #'delete-file-if-exists tmps)))))
 
 (defun replace-file-atomically (data dest)
   "Write DATA into DEST"

@@ -89,7 +89,7 @@ Not every target type supports this.")
     (declare (ignore target))
     (true (call-next-method)))
   (:method (target)
-    (not (eql never (target-timestamp target)))))
+    (not (eql never (target-stamp target)))))
 
 (-> target= (t t) boolean)
 (defgeneric target= (target1 target2)
