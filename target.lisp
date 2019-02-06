@@ -115,8 +115,8 @@
 
    :task
    :pattern
-   :merge-pattern-input-defaults
-   :merge-pattern-output-defaults
+   :merge-input-defaults
+   :merge-output-defaults
    :pattern.input-defaults
    :pattern.output-defaults
    :pattern-name
@@ -547,7 +547,7 @@ inherit a method on `make-load-form', and need only specialize
 ;;; merge them. The order is important: we merge the *provided* inputs
 ;;; and outputs into the *defaults*, rather than vice-versa.
 
-(defun merge-pattern-input-defaults (pattern inputs)
+(defun merge-input-defaults (pattern inputs)
   (let ((defaults (pattern.input-defaults pattern)))
     (collecting
       (dolist (default defaults)
@@ -557,7 +557,7 @@ inherit a method on `make-load-form', and need only specialize
           ;; uiop:merge-pathnames*.
           (collect (merge-pathnames* default input)))))))
 
-(defun merge-pattern-output-defaults (pattern outputs)
+(defun merge-output-defaults (pattern outputs)
   (let ((defaults (pattern.output-defaults pattern)))
     (collecting
       (dolist (default defaults)
@@ -580,7 +580,7 @@ inherit a method on `make-load-form', and need only specialize
       (error* "~
 A pattern ref needs either an output OR at least one input (or both)."))
     (let* ((pattern (find-pattern pattern))
-           (merged-input (merge-pattern-input-defaults pattern inputs)))
+           (merged-input (merge-input-defaults pattern inputs)))
       (setf inputs (sort-pathnames merged-input))))
 
   (:method print-object (self stream)
@@ -609,7 +609,7 @@ A pattern ref needs either an output OR at least one input (or both)."))
     (unless inputs
       (error* "Cannot default outputs without inputs."))
     (let* ((pattern (find-pattern pattern))
-           (merged-outputs (merge-pattern-output-defaults pattern inputs)))
+           (merged-outputs (merge-output-defaults pattern inputs)))
       (setf outputs (sort-pathnames merged-outputs))))
 
   (:method load-form-slot-names append (self)
