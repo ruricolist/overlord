@@ -1827,12 +1827,12 @@ For the meaning of OUT and DEST, compare the documentation for
                  finally (return (values class-options script))))
           ;; You could do this in the lambda list, but it would make
           ;; it ugly and hard to read.
-          (in   (ensure-list (or in   (string-gensym 'in))))
-          (out  (ensure-list (or out  (string-gensym 'out))))
-          (dest (ensure-list (or dest (string-gensym 'dest))))
-          (in-temp (string-gensym 'in))
+          (in   (or in   (list (string-gensym 'in))))
+          (out  (or out  (list (string-gensym 'out))))
+          (dest (or dest (list (string-gensym 'dest))))
+          (in-temp   (string-gensym 'in))
           (dest-temp (string-gensym 'dest))
-          (out-temp (string-gensym 'out)))
+          (out-temp  (string-gensym 'out)))
     `(progn
        (define-script-for ,class-name
          ;; Be careful not to splice in the gensyms.
