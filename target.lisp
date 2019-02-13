@@ -624,7 +624,7 @@ You must either provide a list of outputs, or provide a list of inputs from whic
                         #'pattern-ref-pattern))
 
   (:method target-stamp (self)
-    (combined-stamp outputs))
+    (multiple-file-stamp outputs))
 
   (:method resolve-target (self &optional base)
     (if (and (every #'absolute-pathname-p inputs)
@@ -1217,7 +1217,7 @@ current package."
                (force-symbol target)))
     (delete-target symbol)))
 
-(defun combined-stamp (files)
+(defun multiple-file-stamp (files)
   (if (null files)
       ;; Is this right? If there are no files there is nothing to
       ;; build and the constraint may be considered to be satisfied.
