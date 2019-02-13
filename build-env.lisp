@@ -43,7 +43,8 @@
    :target-stamp/cache
    :ask-for-token*
    :return-token*
-   :claim-file*))
+   :claim-file*
+   :claim-files*))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -88,20 +89,26 @@ non-caching behavior is desired.")
       (format stream "#~a" id))))
 
 (defmethod claim-file ((self build-env) target (file pathname))
-  (assert (absolute-pathname-p file))
-  (with-slots (file-owners) self
-    (let ((owner
-            #+ccl (ensure-gethash file file-owners target)
-            #-ccl
-            (synchronized (self)
-              (ensure-gethash file file-owners target))))
-      (unless (target= owner target)
-        (error* "~
+  (claim-files self target (list file)))
+
+(defmethod claim-files ((self build-env) target (files sequence))
+  (assert (every #'absolute-pathname-p files))
+  (nest
+   (with-slots (file-owners) self)
+   #-ccl (synchronized (self))
+   (do-each (file files)
+     (let ((owner
+             (ensure-gethash file file-owners target)))
+       (unless (target= owner target)
+         (error* "~
 Target ~a wants to build ~a, but it has already been built by ~a."
-                target file owner)))))
+                 target file owner))))))
 
 (defun claim-file* (target file)
   (claim-file *build-env* target file))
+
+(defun claim-files* (target files)
+  (claim-files *build-env* target files))
 
 (defclass threaded-build-env (build-env)
   ((jobs :initarg :jobs :type (integer 1 *))

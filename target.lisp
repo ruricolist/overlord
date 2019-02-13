@@ -65,7 +65,7 @@
     :nproc)
   (:import-from :overlord/build-env
     :build-env-bound?
-    :claim-file*)
+    :claim-file* :claim-files*)
   ;; Shadow for style.
   (:shadow
    :if                                  ;Always ternary.
@@ -659,8 +659,7 @@ You must either provide a list of outputs, or provide a list of inputs from whic
             (pattern.script pattern))))
 
   (:method call-with-target-locked (self fn)
-    (dolist (output outputs)
-      (claim-file* self output))
+    (claim-files* self outputs)
     (funcall
      (reduce (lambda (output fn)
                (lambda ()
