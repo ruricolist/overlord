@@ -1712,11 +1712,10 @@ not the output file (a bad design, but unfortunately a common one)."
                script))
          (script
            (if out-supplied?
-               `(call/temp-file-pathnames
+               `(call/temp-file-pathname
                  ,pathname
                  (lambda (,out)
-                   (let ((,out (first ,out)))
-                     ,script)))
+                   ,script))
                script)))
     `(progn
        ;; Make the task accessible by name.
@@ -1825,6 +1824,9 @@ request. IN is bound to the name of the input file or files.
 
 For the meaning of OUT and DEST, compare the documentation for
 `file-target'."
+  (check-type (list-of symbol) in)
+  (check-type (list-of symbol) out)
+  (check-type (list-of symbol) dest)
   (mvlet ((class-options script
            (loop for form in script
                  if (and (consp form)

@@ -33,6 +33,7 @@
    #:write-file-if-changed
    #:copy-file-if-changed
    #:call/temp-file-pathnames
+   #:call/temp-file-pathname
    #:withf
    #:lessf
    #:with-absolute-package-names
@@ -153,11 +154,14 @@
 (defun rename-by-copying (tmp dest)
   (copy-file tmp dest :if-to-exists :rename-and-delete))
 
+(defun call/temp-file-pathname (dest fn)
+  (call/temp-file-pathnames
+   (list dest)
+   (lambda (outs)
+     (funcall fn (first outs)))))
+
 (defun call/temp-file-pathnames (dests fn)
-  (let* ((dests
-           (if (typep dests 'sequence)
-               (coerce dests 'list)
-               (list dests)))
+  (let* ((dests (coerce dests 'list))
          (ok nil)
          (tmps
            (loop for nil in dests
