@@ -129,7 +129,7 @@
    :pattern-ref-outputs
    :clear-package-prereqs
    :list-package-prereqs
-   :directory-ref
+   :directory-exists
    :path
    :file))
 
@@ -413,21 +413,21 @@ inherit a method on `make-load-form', and need only specialize
 
 (fset:define-cross-type-compare-methods ref)
 
-(defclass directory-ref (ref)
+(defclass directory-exists (ref)
   ((name
     :initarg :path
-    :reader directory-ref.path
+    :reader directory-exists.path
     :type (and absolute-pathname directory-pathname)))
   (:documentation "A reference to a directory."))
 
-(defun directory-ref (name)
+(defun directory-exists (name)
   "Wrap NAME as a directory reference."
   (etypecase-of (or string directory-pathname relative-pathname) name
-    (relative-pathname (directory-ref (ensure-absolute name)))
-    (string (directory-ref (ensure-pathname name :want-pathname t)))
-    (directory-pathname (make 'directory-ref :path name))))
+    (relative-pathname (directory-exists (ensure-absolute name)))
+    (string (directory-exists (ensure-pathname name :want-pathname t)))
+    (directory-pathname (make 'directory-exists :path name))))
 
-(defmethods directory-ref (target (path name))
+(defmethods directory-exists (target (path name))
   (:method target-exists? (target)
     (~> path
         (resolve-target)
@@ -447,11 +447,11 @@ inherit a method on `make-load-form', and need only specialize
   (:method resolve-target (target &optional base)
     (if (absolute-pathname-p path)
         target
-        (directory-ref
+        (directory-exists
          (assure tame-pathname
            (resolve-file target :base (or base (base)))))))
-  (:method target= (target (y directory-ref))
-    (pathname-equal path (directory-ref.path y)))
+  (:method target= (target (y directory-exists))
+    (pathname-equal path (directory-exists.path y)))
   (:method target-build-script (target)
     (let ((dir path))
       #+sbcl (declare (notinline task))
@@ -463,13 +463,13 @@ inherit a method on `make-load-form', and need only specialize
   (:method target-node-label (target)
     (fmt "directory ~a" path))
   (:method hash-target (target)
-    (dx-sxhash (list 'directory-ref path)))
+    (dx-sxhash (list 'directory-exists path)))
   (:method print-object (target stream)
     (if (not *print-escape*)
         (call-next-method)
         (format stream "~a~s"
                 (read-eval-prefix target stream)
-                `(directory-ref ,path))))
+                `(directory-exists ,path))))
   (:method call-with-target-locked (target fn)
     "Lock the directory (file), not target."
     (claim-file* target path)
@@ -1200,15 +1200,15 @@ current package."
   (unless (absolute-pathname-p target)
     (error* "Will not attempt to delete a relative pathname."))
   (when (directory-pathname-p target)
-    (error* "To delete a directory, call delete-target on a directory-ref."))
+    (error* "To delete a directory, call delete-target on a directory-exists."))
   (when (wild-pathname-p target)
     (error* "Will not attempt to delete a wild pathname."))
   (unless (subpathp target (base))
     (error* "File ~a is not relative to current base." target))
   (delete-file-if-exists target))
 
-(defmethod delete-target ((target directory-ref))
-  (let ((dir (directory-ref.path target))
+(defmethod delete-target ((target directory-exists))
+  (let ((dir (directory-exists.path target))
         (base (base)))
     (delete-directory-tree dir
                            :if-does-not-exist :ignore
