@@ -1217,16 +1217,23 @@ current package."
       ;; Is this right? If there are no files there is nothing to
       ;; build and the constraint may be considered to be satisfied.
       far-future
-      (loop for file in files
-            if (file-exists-p file)
-              nconc (list (file-mtime file)
-                          (file-size-in-octets file))
-                into stamps
-            else
-              if (directory-exists-p file)
-                collect (file-mtime file)
-            else do (return never)
-            finally (return (fmt "sxhash:~x" (sxhash stamps))))))
+      (nlet rec ((files files)
+                 (stamps '()))
+        (if (null files)
+            (let ((stamps (nreverse stamps)))
+              (fmt "sxhash:~x" (sxhash stamps)))
+            (let ((file (first files)))
+              (cond ((file-exists-p file)
+                     (rec (rest files)
+                          (nreconc
+                           (list (file-mtime file)
+                                 (file-size-in-octets file))
+                           stamps)))
+                    ((directory-exists-p file)
+                     (rec (rest files)
+                          (cons (file-mtime file) stamps)))
+                    ;; A file does not exist; short-circuit.
+                    (t never)))))))
 
 (defun file-stamp (file)
   (assert (file-exists-p file))
