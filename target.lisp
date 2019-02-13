@@ -548,33 +548,35 @@ inherit a method on `make-load-form', and need only specialize
 ;;; merge them. The order is important: we merge the *provided* inputs
 ;;; and outputs into the *defaults*, rather than vice-versa.
 
-(defun merge-input-defaults (pattern inputs)
-  (let ((defaults (pattern.input-defaults pattern)))
-    (collecting
-      (dolist (input inputs)
-        (let ((input
-                (if (stringp input)
-                    (resolve-file input)
-                    input)))
-          (dolist (default defaults)
-            ;; Here we want to preserve the host of the provided
-            ;; input, so we use uiop:merge-pathnames*.
-            (collect (merge-pathnames* default input))))))))
+(defgeneric merge-input-defaults (pattern inputs)
+  (:method (pattern inputs)
+    (let ((defaults (pattern.input-defaults pattern)))
+      (collecting
+        (dolist (input inputs)
+          (let ((input
+                  (if (stringp input)
+                      (resolve-file input)
+                      input)))
+            (dolist (default defaults)
+              ;; Here we want to preserve the host of the provided
+              ;; input, so we use uiop:merge-pathnames*.
+              (collect (merge-pathnames* default input)))))))))
 
-(defun merge-output-defaults (pattern inputs)
-  (let ((defaults (pattern.output-defaults pattern)))
-    (collecting
-      (dolist (input inputs)
-        (let ((input
-                (if (stringp input)
-                    ;; Not resolve-file; default should be able to
-                    ;; override path.
-                    (parse-unix-namestring input)
-                    input)))
-          (dolist (default defaults)
-            ;; We want to be able to redirect to the output to a
-            ;; different host, so we use good old cl:merge-pathnames.
-            (collect (merge-pathnames default input))))))))
+(defgeneric merge-output-defaults (pattern inputs)
+  (:method (pattern inputs)
+    (let ((defaults (pattern.output-defaults pattern)))
+      (collecting
+        (dolist (input inputs)
+          (let ((input
+                  (if (stringp input)
+                      ;; Not resolve-file; default should be able to
+                      ;; override path.
+                      (parse-unix-namestring input)
+                      input)))
+            (dolist (default defaults)
+              ;; We want to be able to redirect to the output to a
+              ;; different host, so we use good old cl:merge-pathnames.
+              (collect (merge-pathnames default input)))))))))
 
 (defmethods pattern-ref (self (inputs name) outputs pattern)
   (:method initialize-instance :after (self &key (merge t))
