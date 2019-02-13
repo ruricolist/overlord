@@ -1824,9 +1824,9 @@ request. IN is bound to the name of the input file or files.
 
 For the meaning of OUT and DEST, compare the documentation for
 `file-target'."
-  (check-type (list-of symbol) in)
-  (check-type (list-of symbol) out)
-  (check-type (list-of symbol) dest)
+  (check-type in (list-of symbol))
+  (check-type out (list-of symbol))
+  (check-type dest (list-of symbol))
   (mvlet ((class-options script
            (loop for form in script
                  if (and (consp form)
