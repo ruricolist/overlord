@@ -588,7 +588,11 @@ A pattern ref needs either outputs OR at least one input (or both)."))
         (setf outputs
               (merge-output-defaults pattern
                                      (or outputs inputs)))))
-    (assert outputs))
+    (unless outputs
+      (error* "Cannot determine outputs for ~a.
+
+You must either provide a list of outputs, or provide a list of inputs from which the outputs can be default."
+              self)))
 
   (:method print-object (self stream)
     (let ((pattern-name (pattern-name pattern)))
