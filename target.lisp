@@ -576,6 +576,10 @@ inherit a method on `make-load-form', and need only specialize
             ;; different host, so we use good old cl:merge-pathnames.
             (collect (merge-pathnames default input))))))))
 
+(defun sort-pathnames (files)
+  (dsu-sort-new files #'string<
+                :stable t))
+
 (defmethods pattern-ref (self (inputs name) outputs pattern)
   (:method initialize-instance :after (self &key (merge t))
     (unless (or inputs outputs)
