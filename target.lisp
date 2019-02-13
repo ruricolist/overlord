@@ -664,13 +664,16 @@ You must either provide a list of outputs, or provide a list of inputs from whic
 
   (:method call-with-target-locked (self fn)
     (claim-files* self outputs)
-    (funcall
-     (reduce (lambda (output fn)
-               (lambda ()
-                 (call-with-target-locked output fn)))
-             outputs
-             :initial-value fn
-             :from-end t)))
+    ;; Always take locks in the same global order (to prevent
+    ;; deadlocks).
+    (let ((outputs (sort-pathnames outputs)))
+      (funcall
+       (reduce (lambda (output fn)
+                 (lambda ()
+                   (call-with-target-locked output fn)))
+               outputs
+               :initial-value fn
+               :from-end t))))
 
   (:method target-node-label (self)
     (fmt "~{~a~^, ~}"
