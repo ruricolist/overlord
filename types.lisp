@@ -164,7 +164,7 @@ If the value of `*default-pathname-defaults*' and a call to
 
 (defun force-symbol (delay)
   (match delay
-    ((delayed-symbol package-name symbol-name) delay
+    ((delayed-symbol package-name symbol-name)
      (if-let (package (find-package package-name))
        (receive (symbol status) (find-symbol symbol-name package)
          (if (null status)
