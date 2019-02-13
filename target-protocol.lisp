@@ -18,6 +18,7 @@
    #:target-build-script
    #:target-node-label
    #:call-with-target-locked
+   #:call-with-targets-locked
    #:with-target-locked
    ;; Other methods.
    #:build-script-target
@@ -138,6 +139,22 @@ should be copied.")
 
 (defgeneric call-with-target-locked (target fn)
   (:documentation "Call FN with TARGET locked."))
+
+(defun call-with-targets-locked (targets fn)
+  "Lock every target in TARGETS, then call FN.
+
+Before locking, targets are ordered according to the global order
+established by `fset:compare', to avoid deadlocks."
+  (let ((targets
+          (fset:stable-sort targets
+                            (op (eql :less (fset:compare _ _))))))
+    (funcall
+     (reduce (lambda (target fn)
+               (lambda ()
+                 (call-with-target-locked target fn)))
+             targets
+             :initial-value fn
+             :from-end t))))
 
 (defmacro with-target-locked ((target &key) &body body)
   (with-thunk (body)

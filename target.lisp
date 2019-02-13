@@ -576,10 +576,6 @@ inherit a method on `make-load-form', and need only specialize
             ;; different host, so we use good old cl:merge-pathnames.
             (collect (merge-pathnames default input))))))))
 
-(defun sort-pathnames (files)
-  (dsu-sort-new files #'string<
-                :stable t))
-
 (defmethods pattern-ref (self (inputs name) outputs pattern)
   (:method initialize-instance :after (self &key (merge t))
     (unless (or inputs outputs)
@@ -666,14 +662,7 @@ You must either provide a list of outputs, or provide a list of inputs from whic
     (claim-files* self outputs)
     ;; Always take locks in the same global order (to prevent
     ;; deadlocks).
-    (let ((outputs (sort-pathnames outputs)))
-      (funcall
-       (reduce (lambda (output fn)
-                 (lambda ()
-                   (call-with-target-locked output fn)))
-               outputs
-               :initial-value fn
-               :from-end t))))
+    (call-with-targets-locked outputs fn))
 
   (:method target-node-label (self)
     (fmt "~{~a~^, ~}"
