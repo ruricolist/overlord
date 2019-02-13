@@ -634,14 +634,14 @@ You must either provide a list of outputs, or provide a list of inputs from whic
           (make 'pattern-ref
                 :merge nil
                 :pattern (pattern-ref-pattern self)
-                ;; Cf. merge-input-defaults, merge-output-defaults.
-                :inputs (mapcar (op (ensure-absolute _ :base base)) inputs)
+                :inputs  (mapcar (op (ensure-absolute _ :base base)) inputs)
                 :outputs (mapcar (op (ensure-absolute _ :base base)) outputs)))))
 
   (:method target= (self (other pattern-ref))
-    ;; Remember the inputs and outputs are always sorted.
+    ;; Remember order is significant.
     (and (equal inputs (pattern-ref-static-inputs other))
          (equal outputs (pattern-ref-outputs other))
+         ;; Might be a delayed symbol.
          (target= pattern (pattern-ref-pattern other))))
 
   (:method hash-target (self)
