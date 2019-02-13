@@ -174,7 +174,8 @@
                  for dest in dests
                  if (equal (pathname-device tmp)
                            (pathname-device dest))
-                   do (handler-case
+                   do (ensure-directories-exist dest)
+                      (handler-case
                           (rename-file-overwriting-target tmp dest)
                         (error ()
                           (rename-by-copying tmp dest)))

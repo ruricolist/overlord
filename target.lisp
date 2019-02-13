@@ -1285,6 +1285,7 @@ current package."
   (lambda ()
     (let* ((file (resolve-target file base))
            (old (target-timestamp file)))
+      (ensure-directories-exist file)
       (funcall thunk)
       ;; Since we do not control the granularity of timestamps (and
       ;; since the user may choose not to update the file), all we can
@@ -1875,8 +1876,7 @@ For the meaning of OUT and DEST, compare the documentation for
        (defmethod pattern-build ((self ,class-name) ,in-temp ,dest-temp)
          (declare
           (ignorable
-           ,@(unsplice (unless in-supplied? in-temp))
-           ,@(unsplice (unless dest-supplied? dest-temp))))
+           ,@(unsplice (unless in-supplied? in-temp))))
          ,(let* ((form `(progn ,@script))
                  (form (wrap-save-base form))
                  (form
@@ -1895,4 +1895,6 @@ For the meaning of OUT and DEST, compare the documentation for
                   (lambda (,out-temp)
                     (cl:multiple-value-bind ,out (values-list ,out-temp)
                       ,form)))
-                form))))))
+                `(progn
+                   (mapc #'ensure-directories-exist ,dest-temp)
+                   ,form)))))))
