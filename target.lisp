@@ -1758,7 +1758,8 @@ not the output file (a bad design, but unfortunately a common one)."
 
 (defmethod initialize-instance :after ((self pattern) &key)
   (flet ((canonicalize-defaults (defaults)
-           (or defaults (list *nil-pathname*))))
+           (or (substitute *nil-pathname* nil defaults)
+               (list *nil-pathname*))))
     (with-slots (input-defaults output-defaults) self
       (callf #'canonicalize-defaults input-defaults)
       (callf #'canonicalize-defaults output-defaults))))
