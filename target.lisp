@@ -538,7 +538,11 @@ inherit a method on `make-load-form', and need only specialize
    (outputs
     :type (list-of pathname)
     :initarg :outputs
-    :reader pattern-ref-outputs))
+    :reader pattern-ref-outputs)
+   (base
+    :type pathname
+    :reader pattern-ref-base
+    :initform (base)))
   (:default-initargs
    :inputs  '()
    :outputs '()))
@@ -564,7 +568,8 @@ inherit a method on `make-load-form', and need only specialize
 
 (defgeneric merge-output-defaults (pattern inputs)
   (:method (pattern inputs)
-    (let ((defaults (pattern.output-defaults pattern)))
+    (let* ((defaults (pattern.output-defaults pattern))
+           (defaults (mapcar #'resolve-file defaults)))
       (collecting
         (dolist (input inputs)
           (let ((input
@@ -578,18 +583,18 @@ inherit a method on `make-load-form', and need only specialize
               ;; different host, so we use good old cl:merge-pathnames.
               (collect (merge-pathnames default input)))))))))
 
-(defmethods pattern-ref (self (inputs name) outputs pattern)
+(defmethods pattern-ref (self (inputs name) outputs pattern base)
   (:method initialize-instance :after (self &key (merge t))
     (unless (or inputs outputs)
       (error* "~
 A pattern ref needs either outputs OR at least one input (or both)."))
     (when merge
-      (let ((pattern (find-pattern pattern)))
+      (let* ((*base* base)
+             (pattern (find-pattern pattern)))
         (setf inputs
               (merge-input-defaults pattern inputs))
         (setf outputs
-              (merge-output-defaults pattern
-                                     (or outputs inputs)))))
+              (merge-output-defaults pattern inputs))))
     (unless outputs
       (error* "Cannot determine outputs for ~a.
 
@@ -628,16 +633,15 @@ You must either provide a list of outputs, or provide a list of inputs from whic
   (:method target-stamp (self)
     (multiple-file-stamp outputs))
 
-  (:method resolve-target (self &optional base)
+  (:method resolve-target (self &optional (base base))
     (if (and (every #'absolute-pathname-p inputs)
              (every #'absolute-pathname-p outputs))
         self
-        (let ((base (or base (base))))
-          (make 'pattern-ref
-                :merge nil
-                :pattern (pattern-ref-pattern self)
-                :inputs  (mapcar (op (ensure-absolute _ :base base)) inputs)
-                :outputs (mapcar (op (ensure-absolute _ :base base)) outputs)))))
+        (make 'pattern-ref
+              :merge nil
+              :pattern (pattern-ref-pattern self)
+              :inputs  (mapcar (op (ensure-absolute _ :base base)) inputs)
+              :outputs (mapcar (op (ensure-absolute _ :base base)) outputs))))
 
   (:method target= (self (other pattern-ref))
     ;; Remember order is significant.
