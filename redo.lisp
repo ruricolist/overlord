@@ -329,11 +329,9 @@ matter what."
 tree.
 
 As a second value, return the non-existent prereqs."
-  (if (not (target? target))
-      (values nil nil)
-      (let* ((saved-prereqs (target-saved-prereqs target))
-             (targets (mapcar #'saved-prereq-target saved-prereqs))
-             (deps (mapcar #'target-tree targets))
-             (tree (cons target deps)))
-        (values tree
-                (target-saved-prereqsne target)))))
+  (let* ((saved-prereqs (target-saved-prereqs target))
+         (targets (mapcar #'saved-prereq-target saved-prereqs))
+         (deps (mapcar #'target-tree targets))
+         (tree (cons target deps)))
+    (values tree
+            (target-saved-prereqsne target))))
