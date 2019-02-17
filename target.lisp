@@ -42,6 +42,8 @@
     :overlord/freeze
     ;; Oracles.
     :overlord/oracle)
+  (:import-from :overlord/kernel
+    :with-meta-kernel)
   (:import-from :named-readtables :in-readtable)
   (:import-from :fset)
   (:import-from :trivia
@@ -1235,23 +1237,22 @@ current package."
       ;; Is this right? If there are no files there is nothing to
       ;; build and the constraint may be considered to be satisfied.
       far-future
-      (nlet rec ((files files)
-                 (stamps '()))
-        (if (null files)
-            (let ((stamps (nreverse stamps)))
-              (fmt "sxhash:~x" (sxhash stamps)))
-            (let ((file (first files)))
-              (cond ((file-exists-p file)
-                     (rec (rest files)
-                          (nreconc
-                           (list (file-mtime file)
-                                 (file-size-in-octets file))
-                           stamps)))
-                    ((directory-exists-p file)
-                     (rec (rest files)
-                          (cons (file-mtime file) stamps)))
-                    ;; A file does not exist; short-circuit.
-                    (t never)))))))
+      (flet ((get-stamp (file)
+               (cond ((file-exists-p file)
+                      (list (file-mtime file)
+                            (file-size-in-octets file)))
+                     ((directory-exists-p file)
+                      (list (file-mtime file)))
+                     (t (list never)))))
+        (let ((stamps
+                (if (use-threads-p)
+                    (with-meta-kernel ()
+                      (lparallel:pmapcan #'get-stamp files))
+                    (mapcan #'get-stamp files))))
+          (if (find never stamps)
+              ;; A file does not exist; short-circuit.
+              never
+              (fmt "sxhash:~x" (sxhash stamps)))))))
 
 (defun file-stamp (file)
   (assert (file-exists-p file))
