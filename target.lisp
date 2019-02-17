@@ -1572,7 +1572,6 @@ exists, and as a non-existent prereq if TARGET does not exist."
      (define-script-for ,name
        ,@script)
      (save-task ',name (script-thunk ,@script))
-     (record-package-prereq* ',name)
      ',name))
 
 (defmacro var-target (name expr &body deps)
@@ -1581,6 +1580,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
      (phony-task-target ,name
        ,@deps
        (rebuild-symbol ',name ,expr))
+     (record-package-prereq* ',name)
      (defvar ,name)))
 
 (defmacro define-target-var (name expr &body deps)
