@@ -536,7 +536,8 @@ inherit a method on `make-load-form', and need only specialize
    (name
     :initarg :inputs
     :type (list-of pathname)
-    :reader pattern-ref-static-inputs)
+    :reader pattern-ref-static-inputs
+    :reader target-static-prereqs)
    (outputs
     :type (list-of pathname)
     :initarg :outputs
@@ -1112,21 +1113,20 @@ current package."
         (error 'not-a-target :designator target))))
 
 (defmethod target-build-script ((target root-target))
-  (task target
-        (lambda ()
-          (depends-on-all (list-all-packages)))
-        trivial-prereq))
+  (trivial-task target))
+
+(defmethod target-static-prereqs ((target root-target))
+  (list-all-packages))
 
 (defmethod target-build-script ((target package))
-  (task target
-        (lambda ()
-          ;; NB. Note that we do not get the prereqs of the package
-          ;; target from the database. We do not want them to be
-          ;; persistent; we only want to build the targets that have
-          ;; been defined in this image.
-          (let ((*suppress-phonies* t))
-            (depends-on-all (list-package-prereqs target))))
-        trivial-prereq))
+  (trivial-task target))
+
+(defmethod target-static-prereqs ((target package))
+  ;; NB. Note that we do not get the prereqs of the package
+  ;; target from the database. We do not want them to be
+  ;; persistent; we only want to build the targets that have
+  ;; been defined in this image.
+  (list-package-prereqs target))
 
 (defmethod build-script-target ((script task))
   (task-script script))

@@ -27,6 +27,7 @@
    #:record-prereqne
    #:target-in-db?
    #:target-build-time
+   #:target-static-prereqs
    #:target-saved-prereqs
    #:target-saved-prereqsne
    #:saved-prereq-target
@@ -193,6 +194,11 @@ Lists of targets in TARGETS are flattened."
   (:documentation "Has TARGET been built before?"))
 
 (defgeneric target-saved-prereqs (target))
+
+(defgeneric target-static-prereqs (target)
+  (:method (target)
+    (declare (ignore target))
+    nil))
 
 (defgeneric target-saved-prereqsne (target))
 

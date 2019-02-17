@@ -255,15 +255,19 @@ and return T if the stamp has changed."
 Note that this rebuilds any previously saved dependencies of TARGET
 that are themselves out of date."
   (mvlet* ((prereqsne (target-saved-prereqsne target))
-           (prereqs (target-saved-prereqs target))
+           (saved-prereqs (target-saved-prereqs target))
+           (static-prereqs (target-static-prereqs target))
            (target-does-not-exist? (not (target-exists?/cache target)))
            (non-existent-prereqs-exist?
             (psome* #'target-exists?/cache prereqsne))
            (regular-prereqs-changed?
-            (let* ((reqs (map 'vector #'saved-prereq-target prereqs))
-                   (outdated (filter #'out-of-date? reqs)))
+            (let* ((prereqs
+                     (concatenate 'vector
+                                  (map 'vector #'saved-prereq-target saved-prereqs)
+                                  static-prereqs))
+                   (outdated (filter #'out-of-date? prereqs)))
               (redo-all outdated)
-              (psome* #'prereq-changed? prereqs)))
+              (psome* #'prereq-changed? saved-prereqs)))
            (not-in-db?
             (and (target? target)
                  (not (target-in-db? target)))))
