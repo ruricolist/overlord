@@ -1,7 +1,8 @@
 (cl:defpackage #:overlord/util
   (:use :cl :alexandria :serapeum :trivial-file-size)
   (:import-from :overlord/types
-    :case-mode :file-pathname :tame-pathname)
+    :case-mode :file-pathname :tame-pathname
+    :error*)
   (:import-from :fset :with :less)
   (:import-from :uiop
     :pathname-directory-pathname
@@ -162,6 +163,10 @@
 
 (defun call/temp-file-pathnames (dests fn)
   (let* ((dests (coerce dests 'list))
+         (start-times
+           (mapcar #'file-write-date dests))
+         (start-sizes
+           (mapcar #'file-size-in-octets dests))
          (ok nil)
          (tmps
            (loop for nil in dests
@@ -170,12 +175,22 @@
     (unwind-protect
          (progn
            (funcall fn tmps)
+           ;; Check that the destinations have not been written to.
+           (loop for dest in dests
+                 for start-time in start-times
+                 for start-size in start-sizes
+                 for end-time = (file-write-date dest)
+                 for end-size = (file-size-in-octets dest)
+                 unless (and (eql start-time end-time)
+                             (eql start-size end-size))
+                   do (error* "Destination file ~a has been written to directly."
+                              dest))
            (loop for tmp in tmps
                  for dest in dests
+                 do (ensure-directories-exist dest)
                  if (equal (pathname-device tmp)
                            (pathname-device dest))
-                   do (ensure-directories-exist dest)
-                      (handler-case
+                   do (handler-case
                           (rename-file-overwriting-target tmp dest)
                         (error ()
                           (rename-by-copying tmp dest)))

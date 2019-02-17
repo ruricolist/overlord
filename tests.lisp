@@ -174,3 +174,26 @@
   (let ((path (overlord/db::log-file-path)))
     (is-true (file-exists-p (overlord/db::log-file-path))
              "DB log does not exist: ~a" path)))
+
+(test temp-pathname-edit-dest
+  (let ((dest
+          (uiop:with-temporary-file (:pathname d :keep t)
+            d)))
+    (signals overlord-error
+      (overlord/util:call/temp-file-pathname
+       dest (lambda (out)
+              (declare (ignore out))
+              (write-string-into-file "hello" dest
+                                      :if-exists :supersede))))
+    (delete-file dest)))
+
+(test temp-pathname
+  (let ((dest
+          (uiop:with-temporary-file (:pathname d :keep t)
+            d)))
+    (overlord/util:call/temp-file-pathname
+     dest (lambda (out)
+            (write-string-into-file "hello" out
+                                    :if-exists :supersede)))
+    (is (equal "hello" (read-file-into-string dest)))
+    (delete-file dest)))
