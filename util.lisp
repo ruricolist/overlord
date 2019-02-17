@@ -53,16 +53,6 @@
 (define-modify-macro lessf (&rest item-or-tuple) less
   "Modify macro for removing from an Fset map or set.")
 
-;;; TODO This cries out for a compiler macro.
-(-> compare (function function &rest t) t)
-(defun compare (test accessor &rest xs)
-  (cond ((null xs) t)
-        ((single xs) t)
-        (t (let* ((accessor (ensure-function accessor))
-                  (test (ensure-function test))
-                  (xs (mapcar accessor xs)))
-             (every test xs (rest xs))))))
-
 (defun locate-dominating-file (file name)
   (nlet rec ((dir (pathname-directory-pathname file))
              (name (pathname name)))
