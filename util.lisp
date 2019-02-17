@@ -158,7 +158,7 @@
   (call/temp-file-pathnames
    (list dest)
    (lambda (outs)
-     (funcall fn (first outs)))))
+     (funcall fn (only-elt outs)))))
 
 (defun call/temp-file-pathnames (dests fn)
   (let* ((dests (coerce dests 'list))
