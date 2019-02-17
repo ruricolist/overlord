@@ -170,15 +170,17 @@
 
 ;;; Sanity checks.
 
+(defun mktemp ()
+  (uiop:with-temporary-file (:pathname d :keep t)
+    d))
+
 (test db-exists
   (let ((path (overlord/db::log-file-path)))
     (is-true (file-exists-p (overlord/db::log-file-path))
              "DB log does not exist: ~a" path)))
 
 (test temp-pathname-edit-dest
-  (let ((dest
-          (uiop:with-temporary-file (:pathname d :keep t)
-            d)))
+  (let ((dest (mktemp)))
     (signals overlord-error
       (overlord/util:call/temp-file-pathname
        dest (lambda (out)
@@ -188,12 +190,21 @@
     (delete-file dest)))
 
 (test temp-pathname
-  (let ((dest
-          (uiop:with-temporary-file (:pathname d :keep t)
-            d)))
+  (let ((dest (mktemp)))
     (overlord/util:call/temp-file-pathname
      dest (lambda (out)
             (write-string-into-file "hello" out
                                     :if-exists :supersede)))
     (is (equal "hello" (read-file-into-string dest)))
     (delete-file dest)))
+
+(test multiple-file-stamp
+  (let* ((temps (loop repeat 3 collect (mktemp)))
+         (stamp (overlord/target::multiple-file-stamp temps)))
+    (is (stringp stamp))
+    (loop for s in '("x" "y" "z")
+          for temp in temps
+          do (write-string-into-file s temp :if-exists :supersede))
+    (is (not (equal stamp
+                    (overlord/target::multiple-file-stamp temps))))
+    (mapc #'delete-file temps)))
