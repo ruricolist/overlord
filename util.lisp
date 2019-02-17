@@ -154,7 +154,7 @@
 (defun call/temp-file-pathnames (dests fn)
   (let* ((dests (coerce dests 'list))
          (start-times
-           (mapcar #'file-write-date dests))
+           (mapcar #'file-mtime dests))
          (start-sizes
            (mapcar #'file-size-in-octets dests))
          (ok nil)
@@ -169,7 +169,7 @@
            (loop for dest in dests
                  for start-time in start-times
                  for start-size in start-sizes
-                 for end-time = (file-write-date dest)
+                 for end-time = (file-mtime dest)
                  for end-size = (file-size-in-octets dest)
                  unless (and (eql start-time end-time)
                              (eql start-size end-size))
