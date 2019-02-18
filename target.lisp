@@ -54,10 +54,10 @@
   ;; Portability shim for "global" or "static" vars. They  global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
-    :define-global-var)
-  ;; How to test similarity (CLHS 3.2.4.2.2) of externalizable objects.
-  (:import-from :overlord/similarity
-    :similar?)
+    :define-global-var
+    :define-global-parameter)
+  (:import-from :cl-murmurhash
+    :murmurhash)
   (:import-from :uiop
     :implementation-identifier
     :with-temporary-file
@@ -878,7 +878,8 @@ treated as out-of-date, regardless of file metadata."))
   #+(or) (unless (boundp target)
            (error* "Trying to set timestamp for unbound symbol ~s"
                    target))
-  (setf (gethash target *symbol-timestamps*) timestamp))
+  (setf (gethash target *symbol-timestamps*)
+        (assure stamp timestamp)))
 
 (defmethod (setf target-timestamp) (timestamp (target cl:pathname))
   (declare (ignore timestamp))
@@ -1277,18 +1278,18 @@ current package."
          (target-timestamp target))
         (t never)))
 
-(defun rebuild-symbol (symbol value &key config)
+(defun rebuild-symbol (symbol value &key hash)
   (let ((stamp
-          (if config
-              (config-stamp value)
+          (if hash
+              (funcall hash value)
               (now))))
     (setf (symbol-value symbol) value
           (target-timestamp symbol) stamp)))
 
-(defun wrap-rebuild-symbol (symbol thunk &key config)
+(defun wrap-rebuild-symbol (symbol thunk &key hash)
   (lambda ()
     (let* ((value (funcall thunk)))
-      (rebuild-symbol symbol value :config config))))
+      (rebuild-symbol symbol value :hash hash))))
 
 (defun rebuild-file (file thunk &optional (base (base)))
   (lambda ()
@@ -1330,18 +1331,6 @@ Otherwise nil."
                (progn
                  (message "Cannot use digest for ~a." name)
                  nil))))))))
-
-(defun update-config-if-changed (name new test)
-  "Initialize NAME, if it is not set, or reinitialize it, if the old
-value and NEW do not match under TEST."
-  (let ((old (symbol-value name)))
-    (if (funcall test old new) old
-        (progn
-          (simple-style-warning "Redefining configuration ~s" name)
-          (setf (symbol-value name) new
-                (target-timestamp name)
-                (or (config-stamp new :name name)
-                    (now)))))))
 
 
 ;;; Freezing the build system.
@@ -1495,40 +1484,39 @@ exists, and as a non-existent prereq if TARGET does not exist."
      (with-current-dir (*base*)
        ,form)))
 
-;;; `defconfig' is extremely important and rather tricky. Semantically
-;;; is it closer to `defconstant' than `defvar' -- the provided
-;;; expression is evaluated at compile time -- but unlike
-;;; `defconstant' it can always be redefined.
-
-(defun update-config-stamp (name val)
+(defun update-config-stamp (name val hash-fun)
   "Update the stamp for NAME with VAL."
-  (let ((stamp
+  (let ((old-stamp
           (if (boundp name)
               (target-timestamp name)
-              (or (config-stamp val :name name)
-                  (now)))))
-    (touch-target name stamp)
+              never))
+        (new-stamp
+          (assure stamp
+            (funcall hash-fun val))))
+    (unless (stamp= old-stamp new-stamp)
+      (unless (stamp= old-stamp never)
+        (simple-style-warning "Redefining configuration ~s" name))
+      (touch-target name new-stamp))
     val))
 
 (defmacro defconfig (name &body (init &body body))
   (check-type name symbol)
-  (mvlet* ((test documentation
+  (mvlet* ((documentation hash
             (ematch body
               ((list (and docstring (type string)))
-               (values '#'equal docstring))
-              ((trivia:lambda-list &key (test '#'equal) documentation)
-               (values test documentation))))
+               (values docstring '#'sxhash))
+              ((trivia:lambda-list &key
+                                   documentation
+                                   (hash '#'sxhash))
+               (values documentation hash))))
            (init
             (wrap-save-base init)))
     `(progn
-       (eval-always
-         (define-global-var ,name
-             (update-config-stamp ',name ,init)
-           ,@(unsplice documentation)))
+       (define-global-parameter ,name
+           (update-config-stamp ',name ,init ,hash)
+         ,@(unsplice documentation))
        (eval-always
          (save-task ',name (constantly ,init) trivial-prereq))
-       (eval-always
-         (update-config-if-changed ',name ,init ,test))
        ',name)))
 
 (defmacro script-thunk (&body body)
@@ -1556,7 +1544,11 @@ exists, and as a non-existent prereq if TARGET does not exist."
   `(progn
      (register-script ',name)
      (defconfig ,name ',script
-       :test #'source=)))
+       ;; NB. Murmurhash observes the rules for similarity of
+       ;; externalizable objects from CLHS 3.2.4.2.to for everything
+       ;; except hash tables. Ordering the keys to hash them is not
+       ;; practical.
+       :hash #'murmurhash)))
 
 (defmacro define-script-for (name &body body)
   `(define-script ,(script-for name)
@@ -1565,11 +1557,6 @@ exists, and as a non-existent prereq if TARGET does not exist."
 (defun script-for (name)
   (intern (coerce-case (fmt "~a.do" name))
           (symbol-package name)))
-
-(defun source= (x y)
-  ;; TODO How to test equality in the presence of macros?
-  ;; Maybe expand with a code walker?
-  (similar? x y))
 
 (defmacro phony-task-target (name &body script)
   "Like `var-target', but does not actually declare a variable."
@@ -1594,9 +1581,10 @@ A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  (let ((docstring
-          (and (stringp (car deps))
-               (pop deps))))
+  (mvlet ((docstring deps
+           (if (stringp (first deps))
+               (values (first deps) (rest deps))
+               (values nil deps))))
     `(progn
        (var-target ,name ,expr
          ,@deps)
@@ -1622,10 +1610,11 @@ A dependency can be a file or another variable.
 
 If any of those files or variables change, then the variable is
 rebuilt."
-  (let* ((docstring
-           (and (stringp (car deps))
-                (pop deps)))
-         (script (append1 deps expr)))
+  (mvlet* ((docstring deps
+            (if (stringp (car deps))
+                (values (first deps) (rest deps))
+                (values nil deps)))
+           (script (append1 deps expr)))
     `(progn
        ;; The script must be available at compile time to be depended
        ;; on.
@@ -1639,26 +1628,29 @@ rebuilt."
          ,@script))))
 
 (defmacro define-target-config/aux (name &body script)
-  (unless (boundp name)
-    (let* ((*base* (base))
-           (script-thunk (eval* `(script-thunk ,@script)))
-           (script-thunk (wrap-rebuild-symbol name script-thunk :config t)))
-      (save-task name script-thunk))
-    (depends-on name))
-  (assert (boundp name))
-  (let ((init (symbol-value name))
-        (timestamp (target-timestamp name)))
-    `(progn
-       (define-global-var ,name
-           (progn
-             (setf (target-timestamp ',name) ,timestamp)
-             ',init))
-       (save-task ',name
-                  (wrap-rebuild-symbol ',name (script-thunk ,@script)
-                                       :config t))
-       (depends-on ',name)
-       (record-package-prereq* ',name)
-       ',name)))
+  (receive (keywords script)
+      (parse-leading-keywords script)
+    (destructuring-bind (&key hash) keywords
+      (unless (boundp name)
+        (let* ((*base* (base))
+               (script-thunk (eval* `(script-thunk ,@script)))
+               (script-thunk (wrap-rebuild-symbol name script-thunk :hash hash)))
+          (save-task name script-thunk))
+        (depends-on name))
+      (assert (boundp name))
+      (let ((init (symbol-value name))
+            (timestamp (target-timestamp name)))
+        `(progn
+           (define-global-var ,name
+               (progn
+                 (setf (target-timestamp ',name) ,timestamp)
+                 ',init))
+           (save-task ',name
+                      (wrap-rebuild-symbol ',name (script-thunk ,@script)
+                                           :hash ,hash))
+           (depends-on ',name)
+           (record-package-prereq* ',name)
+           ',name)))))
 
 
 ;;;; Phony targets.
