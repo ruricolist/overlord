@@ -1314,21 +1314,22 @@ current package."
 If VALUE is simple enough to hash, return a hash.
 
 Otherwise nil."
-  (flet ((digest-as-printed (x)
-           (string-digest-string
-            (with-standard-io-syntax
-              (prin1-to-string x)))))
-    (cl:typecase value
-      ((or string cl:pathname number character keyword)
-       (digest-as-printed value))
-      (otherwise
-       (let ((digest
-               (ignore-errors
-                (digest-as-printed value))))
-         (or digest
-             (progn
-               (message "Cannot use digest for ~a." name)
-               nil)))))))
+  (assure (or stamp null)
+    (flet ((digest-as-printed (x)
+             (string-digest-string
+              (with-standard-io-syntax
+                (prin1-to-string x)))))
+      (cl:typecase value
+        ((or string cl:pathname number character keyword)
+         (digest-as-printed value))
+        (otherwise
+         (let ((digest
+                 (ignore-errors
+                  (digest-as-printed value))))
+           (or digest
+               (progn
+                 (message "Cannot use digest for ~a." name)
+                 nil))))))))
 
 (defun update-config-if-changed (name new test)
   "Initialize NAME, if it is not set, or reinitialize it, if the old
