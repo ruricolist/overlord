@@ -605,7 +605,10 @@ You must either provide a list of outputs, or provide a list of inputs from whic
               self)))
 
   (:method print-object (self stream)
-    (let ((pattern-name (pattern-name pattern)))
+    (let ((pattern-name
+            (if (typep pattern '(or delayed-symbol symbol))
+                pattern
+                (pattern-name pattern))))
       (if *print-escape*
           (let* ((name (maybe-delay-symbol pattern-name))
                  (name-form
