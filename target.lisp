@@ -1309,7 +1309,7 @@ current package."
              (rebuild-file file thunk (base))
              script))
 
-(defun config-stamp (value &optional (name :unknown))
+(defun config-stamp (value &key (name :unknown))
   "Compute a stamp for a config.
 If VALUE is simple enough to hash, return a hash.
 
@@ -1339,7 +1339,7 @@ value and NEW do not match under TEST."
           (simple-style-warning "Redefining configuration ~s" name)
           (setf (symbol-value name) new
                 (target-timestamp name)
-                (or (config-stamp new)
+                (or (config-stamp new :name name)
                     (now)))))))
 
 
@@ -1504,7 +1504,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
   (let ((stamp
           (if (boundp name)
               (target-timestamp name)
-              (or (config-stamp val)
+              (or (config-stamp val :name name)
                   (now)))))
     (touch-target name stamp)
     val))
