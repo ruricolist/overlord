@@ -903,6 +903,7 @@ treated as out-of-date, regardless of file metadata."))
             path))))
 
 (defmethod target= ((x delayed-symbol) y)
+  (declare (ignore y))
   ;; If Y is not a symbol, or a delayed symbol, the answer is no.
   nil)
 
