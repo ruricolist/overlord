@@ -172,7 +172,10 @@ If the value of `*default-pathname-defaults*' and a call to
                      package-name
                      symbol-name)
              symbol))
-       (error* "Cannot force symbol: no such package as ~a" package-name)))
+       (error* "Cannot force symbol ~a::~a because: no such package as ~a"
+               package-name
+               symbol-name
+               package-name)))
     (otherwise delay)))
 
 (defun delayed-symbol= (ds1 ds2)
