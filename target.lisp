@@ -900,17 +900,17 @@ treated as out-of-date, regardless of file metadata."))
             path))))
 
 (defmethod target= ((x delayed-symbol) y)
-  (target= (force-symbol x)
-           (force-symbol y)))
+  ;; If Y is not a symbol, or a delayed symbol, the answer is no.
+  nil)
 
 (defmethod target= (x (y delayed-symbol))
-  (target= x y))
+  (target= y x))
 
 (defmethod target= ((x delayed-symbol) (y symbol))
   (target= x (delay-symbol y)))
 
 (defmethod target= ((x symbol) (y delayed-symbol))
-  (target= (delay-symbol x) y))
+  (target= y x))
 
 (defmethod target= ((x delayed-symbol) (y delayed-symbol))
   (fset:equal? x y))
