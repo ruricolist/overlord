@@ -137,9 +137,6 @@
                   (target-up-to-date? target) t)))
         (target-stamp target)))))
 
-(defvar *already-sorted* nil)
-(register-worker-special '*already-sorted*)
-
 (defun walk-targets (fn targets &key (jobs nproc))
   "Call FN on each targets in TARGETS, in some order, and possibly in
 parallel."
