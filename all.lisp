@@ -21,8 +21,6 @@
   (:import-from :overlord/build-env :*use-build-cache*)
   (:export :*use-build-cache*)
 
-  (:import-from :overlord/cmd :cmd :$cmd)
-  (:export :cmd :$cmd)
   (:export
    :recursive-dependency :missing-script
    :module-ref :module-ref* :module-exports :module-static-exports
@@ -39,7 +37,8 @@
    :overlord/freeze
    :overlord/message
    :overlord/target-protocol
-   :overlord/oracle))
+   :overlord/oracle
+   :overlord/cmd))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord))

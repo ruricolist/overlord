@@ -3,7 +3,8 @@
   (:mix :cl :serapeum :alexandria)
   (:import-from :overlord :with-imports :require-as
     :with-import-default :require-default
-    :depends-on)
+    :depends-on
+    :cmd :$cmd)
   (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :overlord/asdf
@@ -168,16 +169,11 @@
     (is (not (eq string2 string3)))))
 
 
-;;; Sanity checks.
+;;; Temporary pathnames.
 
 (defun mktemp ()
   (uiop:with-temporary-file (:pathname d :keep t)
     d))
-
-(test db-exists
-  (let ((path (overlord/db::log-file-path)))
-    (is-true (file-exists-p (overlord/db::log-file-path))
-             "DB log does not exist: ~a" path)))
 
 (test temp-pathname-edit-dest
   (let ((dest (mktemp)))
@@ -198,6 +194,9 @@
     (is (equal "hello" (read-file-into-string dest)))
     (delete-file dest)))
 
+
+;;; Multiple file stamps.
+
 (test multiple-file-stamp
   (let* ((temps (loop repeat 3 collect (mktemp)))
          (stamp (overlord/target::multiple-file-stamp temps)))
@@ -208,3 +207,29 @@
     (is (not (equal stamp
                     (overlord/target::multiple-file-stamp temps))))
     (mapc #'delete-file temps)))
+
+
+;;; Tests for external programs.
+
+(test cmd
+  "Tests that work on Unix and Windows."
+  (is (equal* "hello"
+              ($cmd "echo hello")
+              ($cmd '("echo" "hello"))
+              ($cmd "echo" #p"hello")
+              ($cmd '("echo" #p "hello")))))
+
+(test unix-cmd
+  (if (uiop:os-unix-p)
+      (let ((file (asdf-system-relative-pathname :overlord "tests/literal.txt")))
+        (is (equal (read-file-into-string file)
+                   ($cmd "cat" file))))
+      (skip "Not on Unix.")))
+
+
+;;; Sanity checks.
+
+(test db-exists
+  (let ((path (overlord/db::log-file-path)))
+    (is-true (file-exists-p (overlord/db::log-file-path))
+             "DB log does not exist: ~a" path)))
