@@ -104,7 +104,7 @@ an argument to the command. The native namestring is not permitted to
 start with a dash.
 
 A property list is treated as a list of arguments to `uiop:run-program'."
-  (multiple-value-bind (tokens plist) (parse-cmd-args (cons cmd args))
+  (receive (tokens plist) (parse-cmd-args (cons cmd args))
     (multiple-value-call #'uiop:run-program
       (wrap-with-current-dir tokens)
       (values-list plist)
