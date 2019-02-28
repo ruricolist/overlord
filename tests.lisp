@@ -219,6 +219,10 @@
               ($cmd "echo" #p"hello")
               ($cmd '("echo" #p "hello")))))
 
+(test filename-starts-with-dash
+  (signals error
+    (cmd "ls" #p"-file")))
+
 (test unix-cmd
   (if (uiop:os-unix-p)
       (let ((file (asdf-system-relative-pathname :overlord "tests/literal.txt")))
