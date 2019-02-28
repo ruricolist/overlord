@@ -1,26 +1,18 @@
 # Overlord
 
-Overlord is an experimental build system for Common Lisp,
-inspired by [Redo][].
+Overlord is a build system written in Common Lisp. It is a real build
+system, with the features you would expect of any reasonably modern
+build system: rules with multiple outputs, parallel builds, immunity
+to clock issues, and dynamic dependencies. It also solves certain
+problems specific to Lisp programming (namely, it lets you you
+reproducibly specify the desired state of a Lisp system which is to be
+saved as an image.)
 
-Overlord addresses two problems which might seem unrelated, but which,
-on closer examination, turn out to the same problem:
-
-1. It lets you reproducibly specify the desired state of a Lisp system
-   which is to be saved as an image.
-
-2. It provides a general-purpose build system (a superset of [Make][],
-   inspired by [Redo][]).
-
-Overlord expects to be used alongside ASDF, with ASDF responsible for
-compiling and loading Lisp code, and Overlord doing everything else.
-
-For more discussion of the thinking behind Overlord, how it relates to
-Redo and other build systems, [consult the wiki][wiki].
+For more discussion of the thinking behind Overlord and how it relates to other build systems, [consult the wiki][wiki].
 
 ## Advice for users
 
-Before loading Overlord, it would be a good idea to make sure you are
+Before using Overlord, it would be a good idea to make sure you are
 running the latest version of [ASDF][].
 
 Note that, to run the test suite, you will need to
@@ -35,12 +27,11 @@ directory from time to time to delete obsolete files.
 
 Overlord is developed and tested on Clozure and SBCL. In the future it
 may officially support other Lisp implementations, but that is not a
-priority. Lisp implementations that do not support image-based
-persistence (e.g. ECL) are unlikely to receive support.
+priority.
 
 ## Examples
 
-Here are some examples of how to make direct use of Overlord:
+Here are some projects that make direct use of Overlord:
 
 1. [cl-https-everywhere][]. In-process [HTTPS Everywhere][] rulesets,
    automatically fetched from the HTTPS Everywhere repository and
@@ -52,56 +43,6 @@ Here are some examples of how to make direct use of Overlord:
 
 3. [Vernacular][]. Provides a module system for embedding languages,
    with arbitrary syntaxes, into Common Lisp systems.
-
-## (Non-)Parallelism
-
-One thing that might not be obvious about Redo-style build systems is
-that they afford unusually good opportunities for parallelism.
-
-Overlord supports parallelism, but it is not on by default. For an explanation of how to turn it on, and how it works, see the [Parallelism in Overlord][parallelism] article in the wiki.
-
-Even without parallelism, it tries to discourage reliance on side
-effects by, whenever possible, randomizing the order in which targets
-are built.
-
-# Freezing the Lisp image
-
-During development, as targets are defined and re-defined, and rebuilt
-or not rebuilt, the actual state of the Lisp world will drift away
-from the one specified by Overlord’s dependency graph. Before an image
-is saved, Overlord needs to do two things to resolve such
-discrepancies:
-
-1. Finalize the state of the image by making sure that all defined
-   targets have been built.
-
-2. Disable itself.
-
-If you use `uiop:dump-image` to save the image, you don’t need to do
-anything else; Overlord will finalize the state of the image, and
-disable itself, automatically.
-
-If you are using implementation-specific means to save an image,
-however, you will need to arrange to call `overlord:freeze` before the
-image is saved.
-
-The default policy is to allow the restored image to be unfrozen, and
-development to be resumed, by calling `overlord:unfreeze`. This is
-probably what you want when, say, saving an image on a server. In
-other scenarios, however — like delivering a binary – you may want to
-strip the build system from the image entirely. This is possible by
-changing Overlord’s “freeze policy”, using the `freeze-policy`
-accessor.
-
-    ;;; The default: can be reversed after
-    ;;; loading the image by calling
-    ;;; `overlord:unfreeze`.
-    (setf (overlord:freeze-policy) t)
-
-    ;;; Irreversible: before saving the
-    ;;; image, Overlord should destroy its
-    ;;; internal state.
-    (setf (overlord:freeze-policy) :hard)
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
