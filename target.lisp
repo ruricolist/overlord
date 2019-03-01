@@ -1710,7 +1710,12 @@ with OUT.
 
 You should generally prefer OUT to DEST. DEST is most useful when you
 are using an external program that lets you specify the input file but
-not the output file (a bad design, but unfortunately a common one)."
+not the output file (a bad design, but unfortunately a common one).
+
+There are legitimate cases where you might want to use both OUT and
+DEST: for example, while writing to OUT, you might still need to know
+the name of the destination file in order to derive the names of input
+files to depend on dynamically."
   (ensure-pathnamef pathname)
   (check-type pathname tame-pathname)
   (check-type dest symbol)
