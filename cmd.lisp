@@ -121,7 +121,14 @@ process to change its own working directory."
           "&" ,command ,@args))))
 
 (defun stringify-pathname (arg)
-  (lret ((string (uiop:native-namestring arg)))
+  (lret ((string
+          (let ((string (uiop:native-namestring arg)))
+            (if (and (os-windows-p)
+                     (or #+ccl t)
+                     (position #\/ string))
+                ;; Work around a CCL bug; issue #103 on GitHub.
+                (substitute #\\ #\/ string)
+                string))))
     (when (string^= "-" string)
       ;; Should we ignore the unsafe file names if `--' or
       ;; `---' is already present in the list of tokens?
