@@ -6,6 +6,7 @@
   (:import-from :overlord/message :*message-stream*)
   (:import-from :uiop :os-windows-p :file-exists-p :getenv
     :pathname-directory-pathname)
+  (:import-from :trivia :match)
   (:export
    :cmd :$cmd
    :run-program-in-dir
@@ -46,13 +47,37 @@ output is sent to `*message-stream*`.
 
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
-  (receive (tokens args) (parse-cmd-args (cons cmd args))
+  (receive (tokens args) (parse-cmd-args (cons (exe cmd) args))
     (multiple-value-call #'run-program-in-dir*
-      (cons (exe (first tokens))
-            (rest tokens))
+      tokens
       (values-list args)
       :output t
       :error-output *message-stream*)))
+
+(define-compiler-macro cmd (&rest args)
+  "At compile time, make sure the keyword arguments are syntactically
+valid."
+  (nlet rec ((args-in args)
+             (args-out '()))
+    (match args-in
+      ((list)
+       `(locally (declare (notinline cmd))
+          (cmd ,@(reverse args-out))))
+      ((list (and _ (type keyword)))
+       (error "Dangling keyword argument to cmd."))
+      ((list* (and k (type keyword)) v rest)
+       (rec rest
+            (cons `(list ,k ,v) args-out)))
+      ((list* (and s (type string)) xs)
+       (rec xs
+            (cons `(quote (,@(tokens s)))
+                  args-out)))
+      ((list* (and p (type pathname)) xs)
+       (rec xs
+            (cons (stringify-pathname p)
+                  args-out)))
+      ((list* x xs)
+       (rec xs (cons x args-out))))))
 
 (defun run-program-in-dir* (tokens &rest args)
   "Run a program (with uiop:run-program) in the current base directory."
@@ -65,32 +90,43 @@ executable."
     (apply #'uiop:run-program tokens args)))
 
 (defun parse-cmd-args (args)
-  (receive (tokens plist)
-      (mvfold (lambda (tokens plist arg)
-                (typecase arg
-                  (string
-                   (values (nreconc (tokens arg) tokens)
-                           plist))
-                  (pathname
-                   (values (cons (stringify-pathname arg) tokens)
-                           plist))
-                  (plist
-                   (values tokens
-                           (revappend arg plist)))
-                  (sequence
-                   (values
-                    (nreconc
-                     (collecting
-                       (do-each (token arg)
-                         (collect (etypecase token
-                                    (string token)
-                                    (pathname (stringify-pathname token))))))
-                     tokens)
-                    plist))
-                  (t (error "Can't use ~a as a cmd argument." arg))))
-              args '() '())
-    (values (nreverse tokens)
-            (nreverse plist))))
+  (nlet rec ((args args)
+             (tokens '())
+             (plist '()))
+    (match args
+      ((list)
+       (values (nreverse tokens)
+               (nreverse plist)))
+      ((list* (and arg (type string)) args)
+       (rec args
+            (nreconc (tokens arg) tokens)
+            plist))
+      ((list* (and arg (type pathname)) args)
+       (rec args
+            (cons (stringify-pathname arg) tokens)
+            plist))
+      ((list* (and arg (type plist)) args)
+       (rec args
+            tokens
+            (revappend arg plist)))
+      ((list* (and arg (type sequence)) args)
+       (rec args
+            (nreconc
+             (collecting
+               (do-each (token arg)
+                 (collect (etypecase token
+                            (string token)
+                            (pathname (stringify-pathname token))))))
+             tokens)
+            plist))
+      ((list (and _ (type keyword)))
+       (error "Dangling keyword argument to cmd."))
+      ((list* (and k (type keyword)) v args)
+       (rec args
+            tokens
+            (nreconc (list k v) plist)))
+      ((list* arg _)
+       (error "Can't use ~a as a cmd argument." arg)))))
 
 (defun wrap-with-dir (dir tokens)
   "Wrap TOKENS with the necessary code to run the process in DIR.
