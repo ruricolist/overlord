@@ -52,7 +52,7 @@ executable."
       :output t
       :error-output *message-stream*)))
 
-(define-compiler-macro cmd (&rest args)
+(define-compiler-macro cmd (cmd &rest args)
   "At compile time, make sure the keyword arguments are syntactically
 valid."
   (nlet rec ((args-in args)
@@ -60,7 +60,7 @@ valid."
     (match args-in
       ((list)
        `(locally (declare (notinline cmd))
-          (cmd ,@(reverse args-out))))
+          (cmd ,cmd ,@(reverse args-out))))
       ((list (and _ (type keyword)))
        (error "Dangling keyword argument to cmd."))
       ((list* (and k (type keyword)) v rest)
