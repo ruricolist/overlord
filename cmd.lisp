@@ -40,10 +40,14 @@ start with a dash.
 A property list is treated as a list of arguments to `uiop:run-program'.
 
 By default, standard output is sent to `*standard-output*', and error
-output is sent to `*message-stream*`."
+output is sent to `*message-stream*`.
+
+On Windows, the .exe suffix may be omitted from the name of the
+executable."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (multiple-value-call #'run-program-in-dir*
-      tokens
+      (cons (exe (first tokens))
+            (rest tokens))
       (values-list args)
       :output t
       :error-output *message-stream*)))
@@ -135,3 +139,12 @@ process to change its own working directory."
       (cerror "Allow the unsafe file name"
               "File name ~a begins with a dash"
               string))))
+
+(defun exe (p)
+  (let* ((p (pathname p))
+         (type (pathname-type p)))
+    (if (and (os-windows-p)
+             (no type))
+        (make-pathname :type "exe"
+                       :defaults p)
+        p)))
