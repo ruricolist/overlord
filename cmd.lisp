@@ -4,11 +4,13 @@
   (:import-from :overlord/base :base :current-dir!)
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream*)
-  (:import-from :uiop :os-windows-p)
+  (:import-from :uiop :os-windows-p :file-exists-p :getenv
+    :pathname-directory-pathname)
   (:export
    :cmd :$cmd
    :run-program-in-dir
-   :run-program-in-dir*))
+   :run-program-in-dir*
+   :resolve-executable))
 (cl:in-package :overlord/cmd)
 
 (defun $cmd (cmd &rest args)
@@ -148,3 +150,25 @@ process to change its own working directory."
         (make-pathname :type "exe"
                        :defaults p)
         p)))
+
+(defconst pathsep
+  (if (os-windows-p) #\; #\:))
+
+(defun $path ()
+  (mapcar #'uiop:pathname-directory-pathname
+          ;; Neither Windows nor POSIX supports escaping the separator
+          ;; in $PATH.
+          (split-sequence pathsep
+                          (getenv "PATH")
+                          :remove-empty-subseqs t)))
+
+(defun resolve-executable (p)
+  (let* ((p (exe p))
+         (name (pathname-name p))
+         (type (pathname-type p)))
+    (loop for dir in ($path)
+          for pathname = (make-pathname :name name
+                                        :type type
+                                        :defaults dir)
+          when (file-exists-p pathname)
+            do (return pathname))))
