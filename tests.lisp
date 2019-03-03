@@ -211,24 +211,22 @@
 
 ;;; Tests for external programs.
 
-(test cmd
-  "Tests that work on Unix and Windows."
-  (is (equal* "hello"
-              ($cmd "echo hello")
-              ($cmd '("echo" "hello"))
-              ($cmd "echo" #p"hello")
-              ($cmd '("echo" #p "hello")))))
-
 (test filename-starts-with-dash
   (signals error
-    (cmd "ls" #p"-file")))
+    (eval '(cmd "ls" #p"-file"))))
 
 (test unix-cmd
   (if (uiop:os-unix-p)
-      (let ((file (asdf-system-relative-pathname :overlord "tests/literal.txt")))
-        (is (equal (read-file-into-string file)
-                   ($cmd "cat" file))))
-      (skip "Not on Unix.")))
+      (progn
+        (is (equal* "hello"
+                    ($cmd "echo hello")
+                    ($cmd '("echo" "hello"))
+                    ($cmd "echo" #p"hello")
+                    ($cmd '("echo" #p "hello"))))
+        (let ((file (asdf-system-relative-pathname :overlord "tests/literal.txt")))
+          (is (equal (read-file-into-string file)
+                     ($cmd "cat" file)))))
+      (skip "Not on Unix")))
 
 
 ;;; Sanity checks.
