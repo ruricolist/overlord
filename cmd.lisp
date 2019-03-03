@@ -17,12 +17,10 @@
 (defun $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell."
-  (let ((string
-          (apply #'cmd
-                 cmd
-                 '(:output :string)
-                 args)))
-    (chomp string)))
+  (apply #'cmd
+         cmd
+         :output '(:string :stripped t)
+         args))
 
 (defun cmd (cmd &rest args)
   "Run a program.
