@@ -3,7 +3,7 @@
   (:shadowing-import-from :serapeum :collecting :summing :in)
   (:import-from :overlord/base :base :current-dir!)
   (:import-from :overlord/types :list-of :plist :error*)
-  (:import-from :overlord/message :*message-stream*)
+  (:import-from :overlord/message :*message-stream* :message)
   (:import-from :uiop :os-windows-p :file-exists-p :getenv
     :pathname-directory-pathname)
   (:import-from :trivia :match)
@@ -46,6 +46,7 @@ output is sent to `*message-stream*`.
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
   (receive (tokens args) (parse-cmd-args (cons (exe cmd) args))
+    (message "$ ~{~a~^ ~}" tokens)
     (multiple-value-call #'run-program-in-dir*
       tokens
       (values-list args)
