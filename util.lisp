@@ -5,6 +5,7 @@
     :error*)
   (:import-from :fset :with :less)
   (:import-from :uiop
+    :enough-pathname
     :pathname-directory-pathname
     :pathname-parent-directory-pathname
     :file-exists-p
@@ -44,7 +45,8 @@
    #:url-encode
    #:byte-array-to-hex-string
    #:version-major-version
-   #:timestamp-diff))
+   #:timestamp-diff
+   #:strip-directory))
 (cl:in-package #:overlord/util)
 
 (define-modify-macro withf (&rest item-or-tuple) with
@@ -306,3 +308,10 @@ nanoseconds."
          (ns1 (+ ns1 (* s1 (expt 10 9))))
          (ns2 (+ ns2 (* s2 (expt 10 9)))))
     (- ns2 ns1)))
+
+(defun strip-directory (pathname)
+  "Return PATHNAME without its directory (or device)."
+  (make-pathname
+   :directory nil
+   :device nil
+   :defaults pathname))

@@ -1372,9 +1372,6 @@ If PATH is wild, expand it."
       `(file (path ,path))
       call))
 
-(defun basename (file)
-  (enough-pathname file (pathname-directory-pathname file)))
-
 (defun extension (ext)
   (assure pathname
     (etypecase-of (or null string pathname) ext

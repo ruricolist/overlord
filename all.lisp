@@ -9,7 +9,8 @@
     :*message-stream*)
   (:import-from :overlord/util
     :write-file-if-changed
-    :copy-file-if-changed)
+    :copy-file-if-changed
+    :strip-directory)
   (:import-from :overlord/specials
     :use-threads-p)
   (:import-from :overlord/redo
@@ -28,6 +29,7 @@
    :ensure-file-package :reset-file-package
    :message :*message-stream*
    :write-file-if-changed :copy-file-if-changed
+   :strip-directory
    :use-threads-p
    :building? :redo-always
    :overlord-error-target :overlord-error)
