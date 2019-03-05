@@ -16,6 +16,10 @@
     :require-db
     :saving-database)
   (:import-from :lparallel
+    #:end-kernel
+    #:make-kernel
+    #:no-kernel-error
+    #:*kernel*
     #:broadcast-task
     :task-handler-bind
     :invoke-transfer-error
@@ -170,34 +174,48 @@ actually being used, so we know how many to allocate for the next run."
         ;; The DB cannot be loaded from within worker threads.
         (funcall fn)))))
 
+(defmethod make-env-kernel ((env threaded-build-env) thread-count)
+  (with-slots (jobs id) env
+    (message "Initializing ~a thread~:p for build ~a."
+             thread-count
+             id)
+    (let ((kernel-name (fmt "Kernel for build ~a." id)))
+      (make-kernel thread-count
+                   :name kernel-name
+                   :context (lambda (fn)
+                              (nest
+                               ;; Propagate the build env here.
+                               (let ((*build-env* env)))
+                               ;; Give each thread its own random state.
+                               ;; (Clozure CL, at least, gives every
+                               ;; thread the same initial random state.
+                               ;; This can cause race conditions when
+                               ;; generating temporary file names.)
+                               (let ((*random-state* (make-random-state t))))
+                               (funcall fn)))))))
+
 (defmethod call-in-build-env ((env threaded-build-env) fn)
   (declare (ignore fn))
   (require-db)
   (with-slots (jobs id tokens jobs-used handler) env
-    (let ((thread-count (max 1 (1- jobs)))
-          (kernel-name (fmt "Kernel for build ~a." id)))
-      (message "Initializing ~a thread~:p for build ~a."
-               thread-count
-               id)
+    (let ((thread-count (max 1 (1- jobs))))
       (if (zerop thread-count) (call-next-method)
-          (with-temp-kernel
-              (thread-count
-               :name kernel-name
-               :context (lambda (fn)
-                          (nest
-                           ;; Propagate the build env here.
-                           (let ((*build-env* env)))
-                           ;; Give each thread its own random state.
-                           ;; (Clozure CL, at least, gives every
-                           ;; thread the same initial random state.
-                           ;; This can cause race conditions when
-                           ;; generating temporary file names.)
-                           (let ((*random-state* (make-random-state t))))
-                           (funcall fn))))
-            (task-handler-bind ((error handler))
-              (multiple-value-prog1 (call-next-method)
-                (message "A maximum of ~a/~a jobs were used."
-                         jobs-used jobs))))))))
+          (let ((*kernel* nil))
+            (unwind-protect
+                 ;; Initialize the kernel lazily.
+                 (handler-bind ((no-kernel-error
+                                  (lambda (e) (declare (ignore e))
+                                    (synchronized (env)
+                                      (unless *kernel*
+                                        (invoke-restart
+                                         'store-value
+                                         (make-env-kernel env thread-count)))))))
+                   (task-handler-bind ((error handler))
+                     (multiple-value-prog1 (call-next-method)
+                       (message "A maximum of ~a/~a jobs were used."
+                                jobs-used jobs))))
+              (when *kernel*
+                (end-kernel :wait t))))))))
 
 (defmacro with-build-env ((&key (jobs 'nproc) debug) &body body)
   (with-thunk (body)
