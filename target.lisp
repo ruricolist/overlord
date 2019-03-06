@@ -51,7 +51,7 @@
     :multiple-value-match)
   (:import-from :trivial-file-size
     :file-size-in-octets)
-  ;; Portability shim for "global" or "static" vars. They  global
+  ;; Portability shim for "global" or "static" vars. They have global
   ;; scope, but cannot be rebound.
   (:import-from :global-vars
     :define-global-var
