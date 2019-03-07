@@ -227,9 +227,6 @@ built; otherwise it is the current package."
 (defmethod record-prereq (target &aux (parent (current-parent)))
   (record-parent-prereq parent target))
 
-(defmethod record-prereq ((target trivial-prereq))
-  (declare (ignore target)))
-
 (defmethod record-prereq ((target null))
   (error 'not-a-target :designator target))
 
@@ -241,8 +238,6 @@ built; otherwise it is the current package."
 
 (defgeneric record-parent-prereq (parent target)
   (:documentation "Record TARGET as a prerequisite of PARENT.")
-  (:method ((parent root-target) target)
-    (declare (ignore target)))
   (:method ((parent package) target)
     (declare (ignore target)))
   (:method (parent target)
@@ -252,9 +247,6 @@ built; otherwise it is the current package."
 
 (defmethod record-prereqne (target &aux (parent (current-parent)))
   (record-parent-prereqne parent target))
-
-(defmethod record-prereqne ((target impossible-prereq))
-  (declare (ignore target)))
 
 (defmethod record-prereqne ((target symbol))
   (let ((target (maybe-delay-symbol target)))
@@ -278,10 +270,7 @@ built; otherwise it is the current package."
                   prereqsne
                   prereqsne-temp)))
 
-(defmethod target-in-db? ((target root-target)) t)
 (defmethod target-in-db? ((target package)) t)
-(defmethod target-in-db? ((target impossible-prereq)) t)
-(defmethod target-in-db? ((target trivial-prereq)) t)
 
 (defmethod clear-temp-prereqs (target)
   (delete-prop target prereqs-temp))
@@ -357,6 +346,83 @@ larger files will be built before smaller files."
     (if (eql build-time unknown)
         (reduce #'+ files :key (op (or (file-size-in-octets _) 0)))
         build-time)))
+
+
+;;; Simple types.
+
+(defmethods root-target (target)
+  (:method target-exists? (target)
+    t)
+  (:method record-parent-prereq (target child)
+    (declare (ignore child)))
+  (:method target-in-db? (target)
+    t)
+  (:method target-timestamp (target)
+    never)
+  (:method hash-target (target)
+    (load-time-value (sxhash root-target)))
+  (:method hash-friendly? (target)
+    t)
+  (:method call-with-target-locked (target fn)
+    (funcall fn))
+  (:method target-saved-prereqs (target)
+    (mapcar (op (saved-prereq _1 (target-stamp _1)))
+            (list-all-packages)))
+  (:method target-build-script (target)
+    (trivial-task target))
+  (:method target-static-prereqs (target)
+    (list-all-packages))
+  (:method target-node-label (target)
+    (progn "everything")))
+
+(defmethods trivial-prereq (target)
+  (:method record-prereq (target))
+  (:method target-in-db? (target)
+    t)
+  (:method target-exists? (target)
+    t)
+  (:method target-timestamp (target)
+    far-future)
+  (:method hash-target (target)
+    (load-time-value (sxhash trivial-prereq)))
+  (:method hash-friendly? (target)
+    t)
+  (:method call-with-target-locked (target fn)
+    (funcall fn))
+  (:method target-build-time (target)
+    0)
+  (:method (setf target-build-time) (value target)
+    (declare (ignore value))
+    (values))
+  (:method target-build-script (target)
+    (trivial-task target))
+  ;; Shouldn't happen
+  (:method target-node-label (target)
+    (progn "TRIVIAL TARGET")))
+
+(defmethods impossible-prereq (target)
+  (:method record-prereqne (target)
+    (declare (ignore target)))
+  (:method target-in-db? (target) t)
+  (:method target-exists? (target)
+    nil)
+  (:method target-timestamp (target)
+    never)
+  (:method hash-target (target)
+    (load-time-value (sxhash impossible-prereq)))
+  (:method hash-friendly? (target)
+    t)
+  (:method call-with-target-locked (target fn)
+    (funcall fn))
+  (:method target-build-time (target)
+    0)
+  (:method (setf target-build-time) (value target)
+    (declare (ignore value)))
+  (:method target-build-script (target)
+    (trivial-task target))
+  ;;; Shouldn't happen either.
+  (:method target-node-label (target)
+    (progn "IMPOSSIBLE TARGET")))
 
 
 ;;; Types.
@@ -817,17 +883,8 @@ treated as out-of-date, regardless of file metadata."))
      (or (file-exists-p path)
          (directory-exists-p path)))))
 
-(defmethod target-exists? ((target root-target))
-  t)
-
 (defmethod target-exists? ((target package))
   t)
-
-(defmethod target-exists? ((target trivial-prereq))
-  t)
-
-(defmethod target-exists? ((target impossible-prereq))
-  nil)
 
 (defmethod target-exists? ((target symbol))
   (boundp target))
@@ -838,17 +895,8 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target-exists? ((target cl:pathname))
   (pathname-exists? (resolve-target target)))
 
-(defmethod target-timestamp ((target root-target))
-  never)
-
 (defmethod target-timestamp ((target package))
   never)
-
-(defmethod target-timestamp ((target impossible-prereq))
-  never)
-
-(defmethod target-timestamp ((target trivial-prereq))
-  far-future)
 
 (defmethod target-timestamp ((target symbol))
   (if (boundp target)
@@ -923,24 +971,6 @@ treated as out-of-date, regardless of file metadata."))
 (defmethod target= ((x cl:pathname) (y cl:pathname))
   (pathname-equal x y))
 
-(defmethod hash-target ((target root-target))
-  (load-time-value (sxhash root-target)))
-
-(defmethod hash-friendly? ((target root-target))
-  t)
-
-(defmethod hash-target ((target trivial-prereq))
-  (load-time-value (sxhash trivial-prereq)))
-
-(defmethod hash-friendly? ((target trivial-prereq))
-  t)
-
-(defmethod hash-target ((target impossible-prereq))
-  (load-time-value (sxhash impossible-prereq)))
-
-(defmethod hash-friendly? ((target impossible-prereq))
-  t)
-
 (defun deduplicate-targets (targets &key (key #'identity))
   ;; (test-chamber:with-experiment
   ;;     (:class 'test-chamber:noisy-experiment
@@ -960,15 +990,6 @@ treated as out-of-date, regardless of file metadata."))
 
 ;;; Locking targets.
 
-(defmethod call-with-target-locked ((target root-target) fn)
-  (funcall fn))
-
-(defmethod call-with-target-locked ((target trivial-prereq) fn)
-  (funcall fn))
-
-(defmethod call-with-target-locked ((target impossible-prereq) fn)
-  (funcall fn))
-
 (defmethod call-with-target-locked ((target delayed-symbol) fn)
   (let ((target (force-symbol target)))
     (call-with-target-locked target fn)))
@@ -980,17 +1001,6 @@ treated as out-of-date, regardless of file metadata."))
         (call-with-target-locked target fn))))
 
 ;;; Targets not worth metering.
-
-(defmethod target-build-time ((target trivial-prereq))
-  0)
-(defmethod (setf target-build-time) (value (target trivial-prereq))
-  (declare (ignore value))
-  (values))
-
-(defmethod target-build-time ((target impossible-prereq))
-  0)
-(defmethod (setf target-build-time) (value (target impossible-prereq))
-  (declare (ignore value)))
 
 (defmethod target-build-time ((target delayed-symbol))
   (target-build-time (force-symbol target)))
@@ -1072,16 +1082,12 @@ Return TARGET."
   (record-package-prereq *package* target))
 
 (defun ensure-target-recorded (target)
-  "Ensure that TARGET is recorded as a prerequisite.
+"Ensure that TARGET is recorded as a prerequisite.
 If there is no current parent, make TARGET a prerequisite of the
 current package."
-  (if *parents*
-      (record-prereq target)
-      (record-package-prereq* target)))
-
-(defmethod target-saved-prereqs ((rt root-target))
-  (mapcar (op (saved-prereq _1 (target-stamp _1)))
-          (list-all-packages)))
+(if *parents*
+    (record-prereq target)
+    (record-package-prereq* target)))
 
 (defmethod target-saved-prereqs ((pkg package))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
@@ -1100,12 +1106,6 @@ current package."
 (defmethod target-build-script ((target t))
   (impossible-task target))
 
-(defmethod target-build-script ((target trivial-prereq))
-  (trivial-task target))
-
-(defmethod target-build-script ((target impossible-prereq))
-  (trivial-task target))
-
 (defmethod target-build-script ((target cl:pathname))
   (let ((target (resolve-target target)))
     (or (gethash target *tasks*)
@@ -1116,12 +1116,6 @@ current package."
     (if (typep task 'task)
         task
         (error 'not-a-target :designator target))))
-
-(defmethod target-build-script ((target root-target))
-  (trivial-task target))
-
-(defmethod target-static-prereqs ((target root-target))
-  (list-all-packages))
 
 (defmethod target-build-script ((target package))
   (trivial-task target))
@@ -1193,19 +1187,8 @@ current package."
 (defmethod target-node-label ((target delayed-symbol))
   (target-node-label (force-symbol target)))
 
-(defmethod target-node-label ((target root-target))
-  (progn "everything"))
-
 (defmethod target-node-label ((target package))
   (fmt "package ~a" (package-name target)))
-
-;; Shouldn't happen
-(defmethod target-node-label ((target trivial-prereq))
-  (progn "TRIVIAL TARGET"))
-
-;;; Shouldn't happen either.
-(defmethod target-node-label ((target impossible-prereq))
-  (progn "IMPOSSIBLE TARGET"))
 
 (defmethod delete-target ((target cl:pathname))
   (unless (absolute-pathname-p target)
