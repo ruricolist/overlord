@@ -1795,7 +1795,15 @@ files to depend on dynamically."
     '(name))
   (:method pattern-build (self input output)
     (pattern-build (make (force-symbol name))
-                   input output)))
+                   input output))
+  (:method print-object (self stream)
+    (print-unreadable-object (self stream :type t)
+      (format stream "~a" name)))
+  ;; Don't override the computed inputs/outputs.
+  (:method merge-input-defaults (self inputs)
+    inputs)
+  (:method merge-output-defaults (self outputs)
+    outputs))
 
 (defun find-pattern (pattern &optional (errorp t))
   (assure pattern
