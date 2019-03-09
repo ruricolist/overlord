@@ -151,6 +151,27 @@ If the value of `*default-pathname-defaults*' and a call to
   (package-name string)
   (symbol-name string))
 
+(defcondition delayed-symbol-error (overlord-error)
+  ((package-name :type string :initarg :package-name)
+   (symbol-name :type string :initarg :symbol-name)))
+
+(defcondition delayed-symbol-package-error (delayed-symbol-error)
+  ()
+  (:report (lambda (c s)
+             (with-slots (package-name symbol-name) c
+               (format s "Cannot force symbol ~a::~a because: no such package as ~a"
+                       package-name
+                       symbol-name
+                       package-name)))))
+
+(defcondition delayed-symbol-name-error (delayed-symbol-error)
+  ()
+  (:report (lambda (c s)
+             (with-slots (package-name symbol-name) c
+               (format s "Cannot force symbol: no such symbol as ~a::~a"
+                       package-name
+                       symbol-name)))))
+
 (defun delay-symbol (symbol)
   (assure delayed-symbol
     (match symbol
@@ -168,15 +189,31 @@ If the value of `*default-pathname-defaults*' and a call to
      (if-let (package (find-package package-name))
        (receive (symbol status) (find-symbol symbol-name package)
          (if (null status)
-             (error* "Cannot force symbol: no such symbol as ~a::~a"
-                     package-name
-                     symbol-name)
+             (error 'delayed-symbol-name-error
+                    :symbol-name symbol-name
+                    :package-name package-name)
              symbol))
-       (error* "Cannot force symbol ~a::~a because: no such package as ~a"
-               package-name
-               symbol-name
-               package-name)))
+       (error 'delayed-symbol-package-error
+              :symbol-name symbol-name
+              :package-name package-name)))
     (otherwise delay)))
+
+(defun try-force-symbol (delay)
+  "Try to force delayed symbol DELAY.
+
+If forcing was successful, return the symbol and, as a second value, T.
+
+If forcing failed, returned nil and, as a second value, T.
+
+If DELAY is not a delayed symbol, return it (second value T)."
+  (match delay
+    ((delayed-symbol _ _)
+     (handler-case
+         (values (force-symbol delay) t)
+       (delayed-symbol-error ()
+         (values nil nil))))
+    ((and _ (type symbol)) (values delay t))
+    (otherwise (values delay nil))))
 
 (defun delayed-symbol= (ds1 ds2)
   (multiple-value-ematch (values ds1 ds2)
