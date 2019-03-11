@@ -198,7 +198,6 @@ bound as a generic function."
 (defconst prereqsne      :prereqsne)
 (defconst prereqsne-temp :prereqsne-temp)
 (defconst stamp          :stamp)
-(defconst uptodate       :uptodate)
 (defconst build-time     :build-time)
 
 (defun saved-prereq (x &optional (stamp (target-stamp x)))
@@ -260,11 +259,6 @@ built; otherwise it is the current package."
 (defmethod target-in-db? (target)
   (and (not *force*)
        (has-prop? target
-                  ;; The uptodate key is sort of a fallback for a target
-                  ;; that, for whatever reason, has no prerequisites.
-                  ;; Otherwise such a target would be built once, and then
-                  ;; never again.
-                  uptodate
                   prereqs
                   prereqs-temp
                   prereqsne
@@ -280,26 +274,13 @@ built; otherwise it is the current package."
 
 (defmethod save-temp-prereqs (target)
   (let ((map (temp-prereqs target)))
-    (if (fset:empty? map)
-        (delete-prop target prereqs)
-        (setf (prop target prereqs) map))
+    (setf (prop target prereqs) map)
     (clear-temp-prereqs target)))
 
 (defmethod save-temp-prereqsne (target)
   (let ((set (temp-prereqsne target)))
-    (if (fset:empty? set)
-        (delete-prop target prereqsne)
-        (setf (prop target prereqsne) set))
+    (setf (prop target prereqsne) set)
     (clear-temp-prereqsne target)))
-
-(defmethod target-up-to-date? (target)
-  (prop target uptodate))
-
-(defmethod (setf target-up-to-date?) (value target)
-  (check-type value boolean)
-  (if value
-      (setf (prop target uptodate) t)
-      (delete-prop target uptodate)))
 
 (defmethod target-saved-prereqs (target)
   (let ((map (prop target prereqs)))

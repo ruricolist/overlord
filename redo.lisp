@@ -125,7 +125,6 @@
           (clear-temp-prereqs target)
           (clear-temp-prereqsne target)
           (let ((build-script (resolve-build-script target)))
-            (nix (target-up-to-date? target))
             (unwind-protect
                  (let ((*parents* (cons target *parents*)))
                    (setf start (now))
@@ -133,8 +132,8 @@
                    (setf end (now)))
               (save-temp-prereqs target)
               (save-temp-prereqsne target))
-            (setf (target-build-time  target) (timestamp-diff end start)
-                  (target-up-to-date? target) t)))
+            (setf (target-build-time  target)
+                  (timestamp-diff end start))))
         (target-stamp target)))))
 
 (defun walk-targets (fn targets &key (jobs nproc))

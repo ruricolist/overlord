@@ -32,7 +32,6 @@
    #:target-saved-prereqsne
    #:saved-prereq-target
    #:saved-prereq-stamp
-   #:target-up-to-date?
    #:save-temp-prereqs
    #:clear-temp-prereqs
    #:save-temp-prereqsne
@@ -205,10 +204,6 @@ Lists of targets in TARGETS are flattened."
 (defgeneric saved-prereq-target (prereq))
 
 (defgeneric saved-prereq-stamp (prereq))
-
-(defgeneric target-up-to-date? (target))
-
-(defgeneric (setf target-up-to-date?) (value target))
 
 (defgeneric clear-temp-prereqs (target))
 
