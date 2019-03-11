@@ -260,9 +260,7 @@ built; otherwise it is the current package."
   (and (not *force*)
        (has-prop? target
                   prereqs
-                  prereqs-temp
-                  prereqsne
-                  prereqsne-temp)))
+                  prereqsne)))
 
 (defmethod target-in-db? ((target package)) t)
 
