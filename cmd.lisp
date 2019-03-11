@@ -45,7 +45,8 @@ output is sent to `*message-stream*`.
 
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
-  (receive (tokens args) (parse-cmd-args (cons (exe cmd) args))
+  (receive (tokens args) (parse-cmd-args (cons cmd args))
+    (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
     (message "$ ~{~a~^ ~}" tokens)
     (multiple-value-call #'run-program-in-dir*
       tokens
@@ -162,6 +163,8 @@ process to change its own working directory."
           "&" ,command ,@args))))
 
 (defun stringify-pathname (arg)
+  (unless (pathnamep arg)
+    (return-from stringify-pathname arg))
   (lret ((string
           (let ((string (uiop:native-namestring arg)))
             (if (and (os-windows-p)
@@ -185,6 +188,9 @@ process to change its own working directory."
         (make-pathname :type "exe"
                        :defaults p)
         p)))
+
+(defun exe-string (p)
+  (stringify-pathname (exe p)))
 
 (defconst pathsep
   (if (os-windows-p) #\; #\:))
