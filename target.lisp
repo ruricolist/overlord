@@ -1342,6 +1342,10 @@ If PATH is wild, expand it."
       (pathname ext))))
 
 (defun change-pathname-type (file ext)
+  (check-type file pathname)
+  (check-type ext string-designator)
+  (unless (stringp ext)
+    (setf ext (string-downcase ext)))
   (merge-pathnames* (extension ext) file))
 
 (defun run (target &optional system-name)
