@@ -1377,23 +1377,27 @@ If PATH is wild, expand it."
       (values target system-name package))))
 
 (defun build (target/s &key force (jobs nproc)
-                            debug)
+                            debug
+                            (on-exit (constantly nil)))
   "Build TARGET/S, a single target or a list of targets."
   (check-type jobs (integer 1 *))
+  (check-type on-exit function)
   (when (build-env-bound?)
     (error* "Do not call ~s recursively; use ~s instead."
             'build
             'depends-on))
-  (let ((*force* force))
-    (redo-all (ensure-list target/s)
-              :jobs jobs
-              :debug debug)))
+  (multiple-value-prog1
+      (let ((*force* force))
+        (redo-all (ensure-list target/s)
+                  :jobs jobs
+                  :debug debug))
+    (funcall on-exit)))
 
 ;;; build-package-tree? That is, build a package and all of its
 ;;; sub-packages \(packages beginning with $package/ or $package).
 
-(defun build-package (package &key force)
-  (build (find-package package) :force force))
+(defun build-package (package &rest kws &key &allow-other-keys)
+  (apply #'build (find-package package) kws))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all targets))
