@@ -643,6 +643,8 @@ A pattern ref needs either outputs OR at least one input (or both)."))
               (merge-input-defaults pattern inputs))
         (setf outputs
               (merge-output-defaults pattern inputs))))
+    (when (equal inputs outputs)
+      (error* "Invalid pattern ref: inputs and outputs are the same."))
     (unless outputs
       (error* "Cannot determine outputs for ~a.
 
@@ -665,7 +667,8 @@ You must either provide a list of outputs, or provide a list of inputs from whic
                     `(make 'pattern-ref
                            :pattern ,name-form
                            :inputs ',inputs
-                           :outputs ',outputs)))
+                           :outputs ',outputs
+                           :merge nil)))
           (print-unreadable-object (self stream :type t)
             (format stream "~a ~a -> ~a"
                     pattern-name
