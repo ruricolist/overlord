@@ -161,9 +161,17 @@
            (mapcar #'file-size-in-octets dests))
          (ok nil)
          (tmps
-           (loop for nil in dests
-                 collect (with-temporary-file (:pathname p :keep t)
-                           p))))
+           (loop for dest in dests
+                 for extension = (pathname-type dest)
+                 collect (if extension
+                             ;; Preserve the extension.
+                             (with-temporary-file (:pathname p
+                                                   :keep t
+                                                   :type extension)
+                               p)
+                             (with-temporary-file (:pathname p
+                                                   :keep t)
+                               p)))))
     (unwind-protect
          (progn
            (funcall fn tmps)
