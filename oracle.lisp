@@ -22,6 +22,8 @@
     :asdf-system-version)
   (:import-from :overlord/util
     :version-major-version)
+  (:import-from :overlord/cmd
+    :$cmd)
   (:import-from :fset)
   (:import-from #:cl-strftime
     #:format-time)
@@ -37,7 +39,8 @@
    :feature-oracle
    :dist-version-oracle
    :function-oracle
-   :daily-oracle))
+   :daily-oracle
+   :--version))
 (in-package :overlord/oracle)
 
 ;;; TODO Would it be worthwhile to provide oracles for optimization
@@ -327,6 +330,16 @@ By default this is the Quicklisp dist itself.")
   "Depend on today's date.
 This is for targets that should be no more than one a day."
   (function-oracle 'todays-date-string))
+
+
+
+(defun get-version (command)
+  ($cmd command "--version"))
+
+(defun --version (command)
+  "An oracle that monitors the version of COMMAND (by calling it with
+an argument of `--version'."
+  (function-oracle 'get-version command))
 
 
 ;;; Function oracles.
