@@ -1114,10 +1114,7 @@ current package."
 
 (defmethod run-script (task &aux (parent (current-parent)))
   (check-not-frozen)
-  ;; XXX exhaustive?
-  (unless (typep parent
-                 '(or impossible-prereq trivial-prereq))
-    (print-target-being-built parent))
+  (print-target-being-built parent)
   (funcall (task-thunk task)))
 
 (defgeneric save-task* (target thunk script)
@@ -1145,15 +1142,18 @@ current package."
           (task-thunk task)
           (task-script task)))
 
-(defun print-target-being-built (target)
-  "Print some information about the target being built."
-  (let* ((depth (max 0 (1- (length *parents*))))
-         (spaces (make-string depth :initial-element #\Space))
-         ;; In case we are saving the database.
-         (*print-readably*))
-    (message "~a@ ~a"
-             spaces
-             (target-node-label target))))
+(defgeneric print-target-being-built (target)
+  (:documentation "Print some information about the target being built.")
+  (:method ((target impossible-prereq)))
+  (:method ((target trivial-prereq)))
+  (:method (target)
+    (let* ((depth (max 0 (1- (length *parents*))))
+           (spaces (make-string depth :initial-element #\Space))
+           ;; In case we are saving the database.
+           (*print-readably*))
+      (message "~a@ ~a"
+               spaces
+               (target-node-label target)))))
 
 (defmethod target-node-label ((target cl:pathname))
   (native-namestring target))
