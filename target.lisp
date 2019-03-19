@@ -1653,6 +1653,12 @@ Unlike tasks defined using `deftask', tasks defined using
 ;;; the same file should not be a target under two names, with two
 ;;; scripts.
 
+(defun ensure-file-target-pathname (pathname)
+  (ensure-pathname pathname
+                   :want-pathname t
+                   :want-relative t
+                   :want-non-wild t))
+
 (defmacro file-target (name pathname (&key (dest nil dest-supplied?)
                                            (out nil out-supplied?))
                        &body body)
@@ -1685,7 +1691,7 @@ There are legitimate cases where you might want to use both OUT and
 DEST: for example, while writing to OUT, you might still need to know
 the name of the destination file in order to derive the names of input
 files to depend on dynamically."
-  (ensure-pathnamef pathname)
+  (setf pathname (ensure-file-target-pathname pathname))
   (check-type pathname tame-pathname)
   (check-type dest symbol)
   (check-type out symbol)
