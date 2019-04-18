@@ -1064,12 +1064,12 @@ Return TARGET."
   (record-package-prereq *package* target))
 
 (defun ensure-target-recorded (target)
-"Ensure that TARGET is recorded as a prerequisite.
+  "Ensure that TARGET is recorded as a prerequisite.
 If there is no current parent, make TARGET a prerequisite of the
 current package."
-(if *parents*
-    (record-prereq target)
-    (record-package-prereq* target)))
+  (if *parents*
+      (record-prereq target)
+      (record-package-prereq* target)))
 
 (defmethod target-saved-prereqs ((pkg package))
   (mapcar (op (saved-prereq _1 (target-stamp _1)))
