@@ -101,7 +101,8 @@
 
 (defun redo (&rest targets)
   "Unconditionally build each target in TARGETS."
-  (redo-all (or targets (list root-target))))
+  (unless (emptyp targets)
+    (redo-all targets)))
 
 (defun target-build-script-target (target)
   (build-script-target
@@ -320,7 +321,7 @@ This ensures that the script for the current target is always run, no
 matter what."
   (record-prereq impossible-prereq))
 
-(defun target-tree (&optional (target root-target))
+(defun target-tree (target)
   "Return a list of (target . deps), where each dep is also a target
 tree.
 
