@@ -168,6 +168,13 @@
     (is (stringp string3))
     (is (not (eq string2 string3)))))
 
+(test force-config
+  "Check that forcing doesn't change the timestamp of a config."
+  (eval '(overlord:defconfig +hello+ "hello"))
+  (let ((stamp (overlord:target-stamp '+hello+)))
+    (overlord:build '+hello+ :force t)
+    (is (eql stamp (overlord:target-stamp '+hello+)))))
+
 
 ;;; Temporary pathnames.
 
