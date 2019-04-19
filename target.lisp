@@ -1475,7 +1475,8 @@ exists, and as a non-existent prereq if TARGET does not exist."
          ,@(unsplice documentation))
        (eval-always
          (save-task (task ',name
-                          (constantly ,init)
+                          (lambda ()
+                            (setq ,name (update-config-stamp ',name ,init ,hash)))
                           trivial-prereq
                           ,(base))))
        ',name)))

@@ -170,10 +170,24 @@
 
 (test force-config
   "Check that forcing doesn't change the timestamp of a config."
-  (eval '(overlord:defconfig +hello+ "hello"))
-  (let ((stamp (overlord:target-stamp '+hello+)))
-    (overlord:build '+hello+ :force t)
-    (is (eql stamp (overlord:target-stamp '+hello+)))))
+  (let ((sym (intern "+HELLO+" :overlord/tests)))
+    (eval `(overlord:defconfig ,sym "hello"))
+    (unwind-protect
+         (let ((stamp (overlord:target-stamp sym)))
+           (overlord:build sym :force t)
+           (is (eql stamp (overlord:target-stamp sym))))
+      (unintern sym))))
+
+(test unbound-config
+  "Do the right thing if a config somehow ends up unbound."
+  (let ((sym (intern "+GOODBYE+" :overlord/tests)))
+    (eval `(overlord:defconfig ,sym "goodbye"))
+    (unwind-protect
+         (let ((stamp (overlord:target-stamp sym)))
+           (makunbound sym)
+           (overlord:build sym)
+           (is (eql stamp (overlord:target-stamp sym))))
+      (unintern sym))))
 
 
 ;;; Temporary pathnames.
