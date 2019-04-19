@@ -4,6 +4,7 @@
   (:use :cl :alexandria :serapeum
     :overlord/target-table
     :overlord/target-protocol)
+  (:import-from :fset)
   (:import-from :bordeaux-threads
     :make-lock :make-recursive-lock
     :with-lock-held :with-recursive-lock-held)
@@ -48,7 +49,9 @@
    :ask-for-token*
    :return-token*
    :claim-file*
-   :claim-files*))
+   :claim-files*
+   :temp-prereqs
+   :temp-prereqsne))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -152,7 +155,15 @@ actually being used, so we know how many to allocate for the next run."
   (target (error "No target")
    :read-only t)
   (stamp nil)
-  (lock (bt:make-lock)))
+  (lock (bt:make-lock))
+  (temp-prereqs (fset:empty-map) :type fset:map)
+  (temp-prereqsne (fset:empty-set) :type fset:set))
+
+(defplace temp-prereqs (target)
+  (target-meta.temp-prereqs (target-meta target)))
+
+(defplace temp-prereqsne (target)
+  (target-meta.temp-prereqsne (target-meta target)))
 
 (defun call/build-env (fn &key jobs debug)
   (if (build-env-bound?)

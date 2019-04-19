@@ -67,7 +67,9 @@
     :nproc)
   (:import-from :overlord/build-env
     :build-env-bound?
-    :claim-file* :claim-files*)
+    :claim-file* :claim-files*
+    :temp-prereqs
+    :temp-prereqsne)
   ;; Shadow for style.
   (:shadow
    :if                                  ;Always ternary.
@@ -194,9 +196,7 @@ bound as a generic function."
 ;;; Define properties for targets in the database.
 (defconst nonexist       :nonexist)
 (defconst prereqs        :prereqs)
-(defconst prereqs-temp   :prereqs-temp)
 (defconst prereqsne      :prereqsne)
-(defconst prereqsne-temp :prereqsne-temp)
 (defconst stamp          :stamp)
 (defconst build-time     :build-time)
 
@@ -206,16 +206,6 @@ bound as a generic function."
 
 (defmethod saved-prereq-target (p) (car p))
 (defmethod saved-prereq-stamp (p) (cdr p))
-
-;;; TODO Is there any value at this point to storing temporary prereqs
-;;; in the database? They could simply be stored in a special variable
-;;; in redo.lisp.
-
-(defplace temp-prereqs (target)
-  (prop target prereqs-temp (fset:empty-map)))
-
-(defplace temp-prereqsne (target)
-  (prop target prereqsne-temp (fset:empty-set)))
 
 (defun current-parent ()
   "The current parent. If we are building, it is the target being
@@ -265,10 +255,12 @@ built; otherwise it is the current package."
 (defmethod target-in-db? ((target package)) t)
 
 (defmethod clear-temp-prereqs (target)
-  (delete-prop target prereqs-temp))
+  (setf (temp-prereqs target)
+        (fset:empty-map)))
 
 (defmethod clear-temp-prereqsne (target)
-  (delete-prop target prereqsne-temp))
+  (setf (temp-prereqsne target)
+        (fset:empty-set)))
 
 (defmethod save-temp-prereqs (target)
   (let ((map (temp-prereqs target)))
