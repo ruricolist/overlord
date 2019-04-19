@@ -498,7 +498,8 @@ inherit a method on `make-load-form', and need only specialize
             (lambda ()
               (let ((dir (resolve-target dir)))
                 (ensure-directories-exist dir)))
-            trivial-prereq)))
+            trivial-prereq
+            nil)))
   (:method target-node-label (target)
     (fmt "directory ~a" path))
   (:method hash-target (target)
@@ -708,7 +709,8 @@ You must either provide a list of outputs, or provide a list of inputs from whic
             (lambda ()
               (depends-on inputs)
               (pattern-build pattern inputs outputs))
-            (pattern.script pattern))))
+            (pattern.script pattern)
+            base)))
 
   (:method call-with-target-locked (self fn)
     (claim-files* self outputs)
@@ -837,7 +839,8 @@ treated as out-of-date, regardless of file metadata."))
   "A task."
   (target target)
   (thunk function)
-  (script target))
+  (script target)
+  (base (or null directory-pathname)))
 
 (defmethod target-build-script :around ((target t))
   (check-not-frozen)
@@ -1070,12 +1073,14 @@ current package."
 (defun trivial-task (target)
   (task target
         (constantly nil)
-        trivial-prereq))
+        trivial-prereq
+        nil))
 
 (defun impossible-task (target)
   (task target
         (constantly nil)
-        impossible-prereq))
+        impossible-prereq
+        nil))
 
 (defmethod target-build-script ((target t))
   (impossible-task target))
@@ -1107,24 +1112,25 @@ current package."
 (defmethod run-script (task &aux (parent (current-parent)))
   (check-not-frozen)
   (print-target-being-built parent)
-  (funcall (task-thunk task)))
+  (let ((base (task-base task))
+        (thunk (task-thunk task)))
+    (if (null base)
+        (funcall thunk)
+        (let ((*base* base))
+          (with-current-dir (*base*)
+            (funcall thunk))))))
 
-(defgeneric save-task* (target thunk script)
-  (:method (target thunk script)
-    (declare (ignore thunk script))
-    (error* "Task for ~a cannot be redefined." target))
-  (:method ((target symbol) thunk script)
-    (setf (gethash target *tasks*)
-          (task target thunk script)))
-  (:method ((target cl:pathname) thunk script)
-    (setf (gethash target *tasks*)
-          (task target thunk script)))
-  (:method ((target delayed-symbol) thunk script)
-    (save-task (force-symbol target) thunk script)))
-
-(defun save-task (target thunk &optional (script (script-for target)))
+(defun save-task (task)
   (check-not-frozen)
-  (save-task* target thunk script))
+  (let ((target (task-target task)))
+    (cl:typecase target
+      ((or symbol cl:pathname)
+       (setf (gethash target *tasks*) task))
+      (delayed-symbol
+       (let ((target (force-symbol target)))
+         (save-task (copy-task task :target target))))
+      (otherwise
+       (error* "Task for ~a cannot be redefined." target)))))
 
 (defgeneric print-target-being-built (target)
   (:documentation "Print some information about the target being built.")
@@ -1252,12 +1258,11 @@ current package."
       ;; old timestamp.
       (assert (not (timestamp-newer? old (target-timestamp file)))))))
 
-(defun save-file-task (file thunk script)
-  (check-type file cl:pathname)
-  (check-type thunk function)
-  (save-task file
-             (rebuild-file file thunk (base))
-             script))
+(defun save-file-task (task)
+  (let* ((thunk (task-thunk task))
+         (file (assure cl:pathname (task-target task)))
+         (thunk (rebuild-file file thunk (base))))
+    (save-task (copy-task task :thunk thunk))))
 
 (defun config-stamp (value &key (name :unknown))
   "Compute a stamp for a config.
@@ -1469,13 +1474,11 @@ exists, and as a non-existent prereq if TARGET does not exist."
            (update-config-stamp ',name ,init ,hash)
          ,@(unsplice documentation))
        (eval-always
-         (save-task ',name (constantly ,init) trivial-prereq))
+         (save-task (task ',name
+                          (constantly ,init)
+                          trivial-prereq
+                          ,(base))))
        ',name)))
-
-(defmacro script-thunk (&body body)
-  `(lambda ()
-     ,(wrap-save-base
-       `(progn ,@body))))
 
 (defvar *scripts* (make-hash-table)
   "Set of registered scripts.")
@@ -1516,7 +1519,10 @@ exists, and as a non-existent prereq if TARGET does not exist."
   `(progn
      (define-script-for ,name
        ,@script)
-     (save-task ',name (script-thunk ,@script))
+     (save-task (task ',name
+                      (lambda () ,@script)
+                      ',(script-for name)
+                      ,(base)))
      ',name))
 
 (defmacro var-target (name expr &body deps)
@@ -1585,10 +1591,14 @@ rebuilt."
       (parse-leading-keywords script)
     (destructuring-bind (&key hash) keywords
       (unless (boundp name)
-        (let* ((*base* (base))
-               (script-thunk (eval* `(script-thunk ,@script)))
+        (let* ((base (base))
+               (*base* base)
+               (script-thunk (eval* `(lambda () ,@script)))
                (script-thunk (wrap-rebuild-symbol name script-thunk :hash hash)))
-          (save-task name script-thunk))
+          (save-task (task name
+                           script-thunk
+                           (script-for name)
+                           base)))
         (depends-on name))
       (assert (boundp name))
       (let ((init (symbol-value name))
@@ -1598,9 +1608,12 @@ rebuilt."
                (progn
                  (setf (target-timestamp ',name) ,timestamp)
                  ',init))
-           (save-task ',name
-                      (wrap-rebuild-symbol ',name (script-thunk ,@script)
-                                           :hash ,hash))
+           (save-task (task ',name
+                            (wrap-rebuild-symbol ',name
+                                                 (lambda () ,@script)
+                                                 :hash ,hash)
+                            ',(script-for name)
+                            ,(base)))
            (depends-on ',name)
            (record-package-prereq* ',name)
            ',name)))))
@@ -1704,8 +1717,9 @@ files to depend on dynamically."
        (define-script-for ,name
          ,script)
        (save-file-task ,pathname
-                       (script-thunk ,script)
-                       (script-for ',name))
+                       (lambda () ,script)
+                       ',(script-for name)
+                       ,(base))
        (record-package-prereq* ,pathname)
        ',pathname)))
 
@@ -1852,7 +1866,6 @@ For the meaning of OUT and DEST, compare the documentation for
           (ignorable
            ,@(unsplice (unless in-supplied? in-temp))))
          ,(let* ((form `(progn ,@script))
-                 (form (wrap-save-base form))
                  (form
                    (if (not in-supplied?) form
                        `(cl:multiple-value-bind ,in
