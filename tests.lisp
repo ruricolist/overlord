@@ -180,14 +180,16 @@
 
 (test unbound-config
   "Do the right thing if a config somehow ends up unbound."
-  (let ((sym (intern "+GOODBYE+" :overlord/tests)))
-    (eval `(overlord:defconfig ,sym "goodbye"))
-    (unwind-protect
-         (let ((stamp (overlord:target-stamp sym)))
-           (makunbound sym)
-           (overlord:build sym)
-           (is (eql stamp (overlord:target-stamp sym))))
-      (unintern sym))))
+  (if (eql :sbcl uiop:*implementation-type*)
+      (skip "Can't make configs unbound on SBCL.")
+      (let ((sym (intern "+GOODBYE+" :overlord/tests)))
+        (eval `(overlord:defconfig ,sym "goodbye"))
+        (unwind-protect
+             (let ((stamp (overlord:target-stamp sym)))
+               (makunbound sym)
+               (overlord:build sym)
+               (is (eql stamp (overlord:target-stamp sym))))
+          (unintern sym)))))
 
 
 ;;; Temporary pathnames.
