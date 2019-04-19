@@ -1110,9 +1110,6 @@ current package."
   (funcall (task-thunk task)))
 
 (defgeneric save-task* (target thunk script)
-  (:method :before (target thunk script)
-    (declare (ignore target thunk script))
-    (check-not-frozen))
   (:method (target thunk script)
     (declare (ignore thunk script))
     (error* "Task for ~a cannot be redefined." target))
