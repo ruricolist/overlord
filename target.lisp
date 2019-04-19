@@ -1129,11 +1129,6 @@ current package."
   (check-not-frozen)
   (save-task* target thunk script))
 
-(defun task-values (task)
-  (values (task-target task)
-          (task-thunk task)
-          (task-script task)))
-
 (defgeneric print-target-being-built (target)
   (:documentation "Print some information about the target being built.")
   (:method ((target impossible-prereq)))
