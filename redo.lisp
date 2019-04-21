@@ -327,7 +327,9 @@ tree.
 
 As a second value, return the non-existent prereqs."
   (let* ((saved-prereqs (target-saved-prereqs target))
-         (targets (mapcar #'saved-prereq-target saved-prereqs))
+         (targets
+           (append (target-static-prereqs target)
+                   (mapcar #'saved-prereq-target saved-prereqs)))
          (deps (mapcar #'target-tree targets))
          (tree (cons target deps)))
     (values tree
