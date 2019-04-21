@@ -514,7 +514,7 @@ inherit a method on `make-load-form', and need only specialize
     "Lock the directory (file), not target."
     (claim-file* target path)
     (call-with-target-locked path fn))
-  ;; The time it takes to create directory -- not worth measuring.
+  ;; The time it takes to create a directory -- not worth measuring.
   (:method target-build-time (target) 0)
   (:method (setf target-build-time) (value target)
     (declare (ignore value))))
