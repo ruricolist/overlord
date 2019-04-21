@@ -210,8 +210,8 @@ parallel."
   "Find a build script for TARGET, and depend on it.
 If there is no script for TARGET, signal an error."
   ;; TODO What directory should be current? Or should the script take care of that?
-  (setf target (resolve-target target))
-  (let* ((script (target-build-script target))
+  (let* ((target (resolve-target target))
+         (script (target-build-script target))
          (script-target (build-script-target script)))
     (if (target-exists? script-target)
         (let ((*parents* (cons target *parents*)))
