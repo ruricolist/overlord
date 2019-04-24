@@ -186,6 +186,10 @@ parallel."
                                                (unwind-protect
                                                     (walk-targets/serial fn batch)
                                                  (return-token* token))))))
+                     ;; NB Because there is one fewer token than there
+                     ;; are batches, when this loop exits there is one
+                     ;; batch left.
+                     (assert (single batches))
                      ;; The last batch is handled by the current
                      ;; thread.
                      (walk-targets/serial fn (lastcar batches))
