@@ -144,7 +144,16 @@ parallel."
   (check-type jobs (integer 1 *))
   (assert (build-env-bound?))
   (labels ((walk-targets/serial (fn targets)
-             (map nil fn targets))
+             ;; Send locked targets to the back of the line.
+             (let ((pending targets)
+                   (skipped nil))
+               (loop while pending do
+                 (do-each (target targets)
+                   (if (target-locked-p target)
+                       (push target skipped)
+                       (funcall fn target)))
+                 (nreversef skipped)
+                 (shiftf pending skipped nil))))
            (try-get-tokens (build-times)
              (let ((ideal (optimal-machine-count build-times)))
                (loop for n below (min jobs
