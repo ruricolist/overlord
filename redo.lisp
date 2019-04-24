@@ -143,8 +143,6 @@ parallel."
   (check-type fn function)
   (check-type jobs (integer 1 *))
   (assert (build-env-bound?))
-  ;; We wrap the FN regardless of whether we are using parallelism or
-  ;; not, to prevent reliance on side-effects.
   (labels ((walk-targets/serial (fn targets)
              (map nil fn targets))
            (try-get-tokens (build-times)
@@ -194,6 +192,8 @@ parallel."
                      ;; thread.
                      (walk-targets/serial fn (lastcar batches))
                      (map nil #'receive-result channels))))))
+    ;; We wrap the FN regardless of whether we are using parallelism or
+    ;; not, to prevent reliance on side-effects.
     (let ((fn (wrap-worker-specials fn))
           (targets (reshuffle targets)))
       (if (and (use-threads-p)
