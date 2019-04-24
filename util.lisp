@@ -16,7 +16,6 @@
     :rename-file-overwriting-target
     :delete-file-if-exists)
   (:import-from :babel :string-to-octets)
-  (:import-from :quri :url-encode)
   (:import-from :bit-smasher :octets->hex)
   (:import-from #:local-time
     #:nsec-of
@@ -42,7 +41,6 @@
    #:resolve-package
    #:file-mtime
    #:propagate-side-effect
-   #:url-encode
    #:byte-array-to-hex-string
    #:version-major-version
    #:timestamp-diff
