@@ -51,7 +51,8 @@
    :claim-file*
    :claim-files*
    :temp-prereqs
-   :temp-prereqsne))
+   :temp-prereqsne
+   :target-locked-p))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -156,6 +157,7 @@ actually being used, so we know how many to allocate for the next run."
    :read-only t)
   (stamp nil)
   (lock (bt:make-lock))
+  (lockedp nil :type boolean)
   (temp-prereqs (fset:empty-map) :type fset:map)
   (temp-prereqsne (fset:empty-set) :type fset:set))
 
@@ -248,12 +250,18 @@ actually being used, so we know how many to allocate for the next run."
       (let* ((meta (target-meta target))
              (lock (target-meta.lock meta)))
         (bt:with-lock-held (lock)
-          (funcall fn)))))
+          (setf (target-meta.lockedp meta) t)
+          (unwind-protect
+               (funcall fn)
+            (setf (target-meta.lockedp meta) nil))))))
 
 (defmethod call-with-target-locked (target fn)
   "Make call-with-target-meta-locked the default for call-with-target-locked."
   (with-target-meta-locked (target)
     (funcall fn)))
+
+(defun target-locked-p (target)
+  (target-meta.lockedp (target-meta target)))
 
 (defun cached-stamp (target)
   (when (build-env-bound?)
