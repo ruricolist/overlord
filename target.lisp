@@ -1717,10 +1717,11 @@ files to depend on dynamically."
        (def ,name ,pathname)
        (define-script-for ,name
          ,script)
-       (save-file-task ,pathname
-                       (lambda () ,script)
-                       ',(script-for name)
-                       ,(base))
+       (save-file-task
+        (task ,pathname
+              (lambda () ,script)
+              ',(script-for name)
+              ,(base)))
        (record-package-prereq* ,pathname)
        ',pathname)))
 
