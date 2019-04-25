@@ -145,15 +145,14 @@ parallel."
   (assert (build-env-bound?))
   (labels ((walk-targets/serial (fn targets)
              ;; Send locked targets to the back of the line.
-             (let ((pending targets)
-                   (skipped nil))
-               (loop while pending do
+             (let ((skipped nil))
+               (loop while targets do
                  (do-each (target targets)
                    (if (target-locked-p target)
                        (push target skipped)
                        (funcall fn target)))
                  (nreversef skipped)
-                 (shiftf pending skipped nil))))
+                 (shiftf targets skipped nil))))
            (try-get-tokens (build-times)
              (let ((ideal (optimal-machine-count build-times)))
                (loop for n below (min jobs
