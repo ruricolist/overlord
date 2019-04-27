@@ -144,7 +144,7 @@ process to change its own working directory."
           ;; chroot or su, so we wouldn't have to spin up a shell.
           ;; Hopefully your distro uses something lighter than bash
           ;; for /bin/sh.)
-          "set -e; env CDPATH=. cd -P $1; shift; exec \"$@\""
+          "set -e; CDPATH='' cd -P \"$1\"; shift; exec \"$@\""
           ;; Terminate processing of shell options; everything
           ;; after this is passed through.
           "--"
@@ -158,7 +158,8 @@ process to change its own working directory."
         ;; escaping.
         `("cmd"
           "/c"
-          "cd" ,dir
+          ;; Note that /d is required for cd to work across drives.
+          "cd" "/d" ,dir
           ;; Ampersand is the command separator.
           "&" ,command ,@args))))
 
