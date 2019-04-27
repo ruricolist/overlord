@@ -7,6 +7,7 @@
   (:import-from :uiop :os-windows-p :file-exists-p :getenv
     :pathname-directory-pathname)
   (:import-from :trivia :match)
+  (:import-from :overlord/build-env :register-proc*)
   (:export
    :cmd :$cmd
    :run-program-in-dir
@@ -17,10 +18,12 @@
 (defun $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell."
-  (apply #'cmd
-         cmd
-         :output '(:string :stripped t)
-         args))
+  (chomp
+   (with-output-to-string (s)
+     (apply #'cmd
+            cmd
+            :output s
+            args))))
 
 (defun cmd (cmd &rest args)
   "Run a program.
@@ -51,7 +54,7 @@ executable."
     (multiple-value-call #'run-program-in-dir*
       tokens
       (values-list args)
-      :output t
+      :output *standard-output*
       :error-output *message-stream*)))
 
 (define-compiler-macro cmd (cmd &rest args)
@@ -86,8 +89,19 @@ valid."
 
 (defun run-program-in-dir (dir tokens &rest args)
   "Run a program (with `uiop:run-program`) with DIR as its working directory."
-  (let ((tokens (wrap-with-dir dir tokens)))
-    (apply #'uiop:run-program tokens args)))
+  (let ((proc
+          (multiple-value-call #'uiop:launch-program
+            ;; NB The :directory argument to launch-program may end up
+            ;; calling `chdir', which is unacceptable.
+            (wrap-with-dir dir tokens)
+            (values-list args))))
+    (register-proc* proc)
+    (let ((abnormal? t))
+      (unwind-protect
+           (multiple-value-prog1 (uiop:wait-process proc)
+             (setf abnormal? nil))
+        (when abnormal?
+          (uiop:terminate-process proc))))))
 
 (defun parse-cmd-args (args)
   (nlet rec ((args args)

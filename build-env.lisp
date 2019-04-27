@@ -12,7 +12,7 @@
   (:import-from :overlord/specials
     :use-threads-p
     :register-worker-special)
-  (:import-from :overlord/message :message)
+  (:import-from :overlord/message :message :*message-stream*)
   (:import-from :overlord/db
     :require-db
     :saving-database)
@@ -38,7 +38,10 @@
   (:import-from #:overlord/types
     #:error*)
   (:import-from #:uiop
-    #:absolute-pathname-p)
+    #:absolute-pathname-p
+    #:wait-process
+    #:terminate-process
+    #:process-alive-p)
   (:export
    :with-build-env
    :*use-build-cache*
@@ -52,7 +55,8 @@
    :claim-files*
    :temp-prereqs
    :temp-prereqsne
-   :target-locked-p))
+   :target-locked-p
+   :register-proc*))
 (in-package :overlord/build-env)
 
 (defvar *use-build-cache* t
@@ -88,13 +92,19 @@ non-caching behavior is desired.")
     :reader build-env.table)
    (file-owners
     :initform (dict)
-    :reader build-env.file-owners))
+    :reader build-env.file-owners)
+   (procs
+    :initform nil
+    :accessor build-env-procs
+    :documentation "Processes being run asynchronously."))
   (:documentation "Metadata for the build run."))
 
 (defmethod print-object ((self build-env) stream)
   (print-unreadable-object (self stream :type t)
     (with-slots (id) self
       (format stream "#~a" id))))
+
+;;; Claiming files.
 
 (defmethod claim-file ((self build-env) target (file pathname))
   (claim-files self target (list file)))
@@ -117,6 +127,45 @@ Target ~a wants to build ~a, but it has already been built by ~a."
 
 (defun claim-files* (target files)
   (claim-files *build-env* target files))
+
+;;; Tracking processes (so they can be shut down on abnormal exit).
+
+(defun register-proc* (proc)
+  (when (build-env-bound?)
+    (register-proc *build-env* proc)))
+
+(defmethod register-proc ((env build-env) proc)
+  "Remember PROC in ENV. Return PROC."
+  (synchronized (env)
+    (push proc (build-env-procs env)))
+  proc)
+
+(defmethod kill-procs ((env build-env) &key urgent)
+  "Kill all live processes tracked by ENV."
+  (do-each (proc (build-env-procs env))
+    (when (process-alive-p proc)
+      (terminate-process proc :urgent urgent))))
+
+(defmethod await-procs ((env build-env))
+  "Wait for processes tracked by ENV to exit."
+  (do-each (proc (build-env-procs env))
+    (wait-process proc)))
+
+(defmethod call-with-procs-tracked ((env build-env) (fn function))
+  (let ((abnormal? t))
+    (unwind-protect
+         (multiple-value-prog1 (funcall fn)
+           (setf abnormal? nil))
+      (when (some #'process-alive-p (build-env-procs env))
+        (message "Waiting for launched programs...")
+        (force-output *message-stream*))
+      (when abnormal?
+        (kill-procs env))
+      (await-procs env))))
+
+(defmacro with-procs-tracked ((env) &body body)
+  (with-thunk (body)
+    `(call-with-procs-tracked ,env ,body)))
 
 (defclass threaded-build-env (build-env)
   ((jobs :initarg :jobs :type (integer 1 *))
@@ -183,9 +232,10 @@ actually being used, so we know how many to allocate for the next run."
 (defmethod call-in-build-env (env fn)
   (with-slots (id) env
     (let ((*build-env* env))
-      (saving-database
+      (with-procs-tracked (env)
         ;; The DB cannot be loaded from within worker threads.
-        (funcall fn)))))
+        (saving-database
+          (funcall fn))))))
 
 (defmethod make-env-kernel ((env threaded-build-env) thread-count)
   (with-slots (jobs id) env
@@ -214,21 +264,22 @@ actually being used, so we know how many to allocate for the next run."
     (let ((thread-count (max 1 (1- jobs))))
       (if (zerop thread-count) (call-next-method)
           (let ((*kernel* nil))
-            (unwind-protect
-                 ;; Initialize the kernel lazily.
-                 (handler-bind ((no-kernel-error
-                                  (lambda (e) (declare (ignore e))
-                                    (synchronized (env)
-                                      (unless *kernel*
-                                        (invoke-restart
-                                         'store-value
-                                         (make-env-kernel env thread-count)))))))
-                   (task-handler-bind ((error handler))
-                     (multiple-value-prog1 (call-next-method)
-                       (message "A maximum of ~a/~a jobs were used."
-                                jobs-used jobs))))
-              (when *kernel*
-                (end-kernel :wait t))))))))
+            (with-procs-tracked (env)
+              (unwind-protect
+                   ;; Initialize the kernel lazily.
+                   (handler-bind ((no-kernel-error
+                                    (lambda (e) (declare (ignore e))
+                                      (synchronized (env)
+                                        (unless *kernel*
+                                          (invoke-restart
+                                           'store-value
+                                           (make-env-kernel env thread-count)))))))
+                     (task-handler-bind ((error handler))
+                       (multiple-value-prog1 (call-next-method)
+                         (message "A maximum of ~a/~a jobs were used."
+                                  jobs-used jobs))))
+                (when *kernel*
+                  (end-kernel :wait t)))))))))
 
 (defmacro with-build-env ((&key (jobs 'nproc) debug) &body body)
   (with-thunk (body)
