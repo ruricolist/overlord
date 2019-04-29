@@ -113,8 +113,6 @@
   (let ((target (resolve-target target))
         start end)
     (ensure (cached-stamp target)
-      ;; This only needs to be checked if we are actually building.
-      ;; E.g. `trivial-prereq'.
       (with-target-locked (target)
         (when (member target *parents* :test #'target=)
           (error 'recursive-dependency
