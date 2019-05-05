@@ -87,18 +87,35 @@ valid."
   (let ((dir (stringify-pathname (current-dir!))))
     (apply #'run-program-in-dir dir tokens args)))
 
-(defun run-program-in-dir (dir tokens &rest args)
+(defun run-program-in-dir (dir tokens
+                           &rest args
+                           &key ignore-error-status
+                                &allow-other-keys)
   "Run a program (with `uiop:run-program`) with DIR as its working directory."
-  (let ((proc
-          (multiple-value-call #'uiop:launch-program
-            ;; NB The :directory argument to launch-program may end up
-            ;; calling `chdir', which is unacceptable.
-            (wrap-with-dir dir tokens)
-            (values-list args))))
+  (let* ((cmd
+           ;; NB The :directory argument to launch-program may end up
+           ;; calling `chdir', which is unacceptable.
+           (wrap-with-dir dir tokens))
+         (proc
+           (multiple-value-call #'uiop:launch-program cmd
+             (values-list args))))
     (register-proc* proc)
     (let ((abnormal? t))
       (unwind-protect
-           (multiple-value-prog1 (uiop:wait-process proc)
+           (multiple-value-prog1
+               (let ((status (uiop:wait-process proc)))
+                 (cond ((zerop status)
+                        status)
+                       (ignore-error-status
+                        nil)
+                       (t
+                        (finish-output *message-stream*)
+                        (cerror "IGNORE-ERROR-STATUS"
+                                'uiop:subprocess-error
+                                :command tokens
+                                :code status
+                                :process proc)
+                        status)))
              (setf abnormal? nil))
         (when abnormal?
           (uiop:terminate-process proc))))))
