@@ -146,12 +146,15 @@
   (copy-file tmp dest :if-to-exists :rename-and-delete))
 
 (defun call/temp-file-pathname (dest fn)
+  "Like `call/temp-file-pathnames`, but for a single file."
   (call/temp-file-pathnames
    (list dest)
    (lambda (outs)
      (funcall fn (only-elt outs)))))
 
 (defun call/temp-file-pathnames (dests fn)
+  "Create a set of temp files, call FN on them, and then copy the temp
+files into DESTS."
   (let* ((dests (coerce dests 'list))
          (start-times
            (mapcar #'file-mtime dests))
