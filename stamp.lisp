@@ -24,7 +24,8 @@
    #:timestamp-newer?
    #:target-timestamp=
    #:stamp=
-   #:stamp-satisfies-p))
+   #:stamp-satisfies-p
+   #:round-down-to-nearest-second))
 (in-package :overlord/stamp)
 
 ;;; Timestamps can be exact timestamps (from local-time), universal
@@ -147,6 +148,13 @@ shadowed."
         ts2))
     ((universal-time timestamp)
      (> ts1 (timestamp-to-universal ts2)))))
+
+(defun round-down-to-nearest-second (ts)
+  (etypecase-of target-timestamp ts
+    ((or never far-future universal-time) ts)
+    (timestamp
+     (adjust-timestamp ts
+       (set :nsec 0)))))
 
 (defun target-timestamp= (ts1 ts2)
   "Is TS1 greater than TS2?"

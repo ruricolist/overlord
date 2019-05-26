@@ -1255,8 +1255,12 @@ current package."
       ;; Since we do not control the granularity of timestamps (and
       ;; since the user may choose not to update the file), all we can
       ;; be certain of is that the new timestamp is not older than the
-      ;; old timestamp.
-      (assert (not (timestamp-newer? old (target-timestamp file)))))))
+      ;; old timestamp. (But even this is only true to the nearest
+      ;; second; because of leap seconds, timestamps can go backward
+      ;; when a second repeats.)
+      (assert (not (timestamp-newer?
+                    (round-down-to-nearest-second old)
+                    (round-down-to-nearest-second (target-timestamp file))))))))
 
 (defun save-file-task (task)
   (save-task (file-task task)))
