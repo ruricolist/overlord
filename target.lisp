@@ -1669,9 +1669,11 @@ PATHNAME may be a literal pathname or a string (in which case it is
 parsed with `uiop:parse-unix-namestring'). Using a string is preferred
 for programs that care about portability.
 
-NAME is not a target; it is a lexical binding that serves as a
-convenient handle for the name of the target. (It is also necessary to
-be able to recognize that the file is out of date when BODY changes.)
+NAME is not a target; it is a binding that serves as a convenient
+handle for the name of the target. (It is also necessary to be able to
+recognize that the file is out of date when BODY changes.) The binding
+is a lexical binding, unless NAME has earmuffs (`*NAME*') in which
+case it is bound as a special variable.
 
 The behavior of `file-target' depends on which, if any, bindings are
 requested. If DEST is supplied, then it is simply bound to PATHNAME,
@@ -1717,7 +1719,9 @@ files to depend on dynamically."
                script)))
     `(progn
        ;; Make the task accessible by name.
-       (def ,name ,pathname)
+       ,(if (has-earmuffs? name)
+            `(defparameter ,name ,pathname)
+            `(def ,name ,pathname))
        (define-script-for ,name
          ,script)
        (save-file-task
@@ -1727,6 +1731,14 @@ files to depend on dynamically."
               ,(base)))
        (record-package-prereq* ,pathname)
        ',pathname)))
+
+(defun has-earmuffs? (sym)
+  "Does SYM have earmuffs?
+That is, does it begin and end with an asterisk?"
+  (let ((name (string sym)))
+    (and (> (length name) 2)
+         (string^= "*" name)
+         (string$= "*" name))))
 
 
 ;;;; File patterns.
