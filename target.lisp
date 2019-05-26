@@ -1259,10 +1259,13 @@ current package."
       (assert (not (timestamp-newer? old (target-timestamp file)))))))
 
 (defun save-file-task (task)
+  (save-task (file-task task)))
+
+(defun file-task (task)
   (let* ((thunk (task-thunk task))
          (file (assure cl:pathname (task-target task)))
          (thunk (rebuild-file file thunk (base))))
-    (save-task (copy-task task :thunk thunk))))
+    (copy-task task :thunk thunk)))
 
 (defun config-stamp (value &key (name :unknown))
   "Compute a stamp for a config.
