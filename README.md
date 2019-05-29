@@ -8,9 +8,10 @@ clock issues, and dynamic dependencies.
 
 It also solves certain problems specific to Lisp programming (namely,
 it lets you you reproducibly specify the desired state of a Lisp
-system which is to be saved as an image.)
+system which is to be saved as an image).
 
-For more discussion of the thinking behind Overlord and how it relates to other build systems, [consult the wiki][wiki].
+For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
+might want to jump straight to the [tutorial for Lispers][tutorial].
 
 ## Advice for users
 
@@ -104,6 +105,7 @@ You might want them again later. -->
 [parallelism]: https://github.com/ruricolist/overlord/wiki/Parallelism-in-Overlord
 [Proctor]: https://github.com/ruricolist/proctor
 [Vernacular]: https://github.com/ruricolist/vernacular
+[tutorial]: https://github.com/ruricolist/overlord/wiki/Overlord-for-Lispers:-A-Tutorial
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
