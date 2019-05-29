@@ -1,19 +1,18 @@
 # Overlord
 
-Overlord is a build system written in Common Lisp. It is a real build
-system, with the features you would expect of any reasonably modern
-build system: rules with multiple outputs, parallel builds, immunity
-to clock issues, and dynamic dependencies. It also solves certain
-problems specific to Lisp programming (namely, it lets you you
-reproducibly specify the desired state of a Lisp system which is to be
-saved as an image.)
+Overlord is a build system written in Common Lisp.
+
+It has the features you would expect of any reasonably modern build
+system: rules with multiple outputs, parallel builds, immunity to
+clock issues, and dynamic dependencies.
+
+It also solves certain problems specific to Lisp programming (namely,
+it lets you you reproducibly specify the desired state of a Lisp
+system which is to be saved as an image.)
 
 For more discussion of the thinking behind Overlord and how it relates to other build systems, [consult the wiki][wiki].
 
 ## Advice for users
-
-Before using Overlord, it would be a good idea to make sure you are
-running the latest version of [ASDF][].
 
 Note that, to run the test suite, you will need to
 download [Core Lisp][], and, if not on Windows, you must have the
