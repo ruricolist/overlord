@@ -1724,7 +1724,15 @@ files to depend on dynamically."
     `(progn
        ;; Make the task accessible by name.
        ,(if (has-earmuffs? name)
-            `(defparameter ,name ,pathname)
+            `(progn
+               (defparameter ,name ,pathname)
+               (save-task
+                (task ',name
+                      (lambda ()
+                        (depends-on ,pathname)
+                        ,pathname)
+                      trivial-prereq
+                      ,(base))))
             `(def ,name ,pathname))
        (define-script-for ,name
          ,script)
