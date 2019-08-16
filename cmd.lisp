@@ -8,6 +8,7 @@
     :pathname-directory-pathname)
   (:import-from :trivia :match)
   (:import-from :overlord/build-env :register-proc*)
+  (:import-from :shlex)
   (:export
    :cmd :$cmd
    :run-program-in-dir
@@ -25,6 +26,10 @@ newlines, like $(cmd) would in a shell."
             :output s
             args))))
 
+(define-compiler-macro $cmd (cmd &rest args)
+  `(locally (declare (notinline $cmd))
+     ($cmd ,@(simplify-cmd-args (cons cmd args)))))
+
 (defun cmd (cmd &rest args)
   "Run a program.
 
@@ -34,8 +39,9 @@ thread-safe manner.
 
 A list of strings or pathnames is added to the list of arguments.
 
-A string in ARGS is split into a list of space-separated tokens. (To
-protect a string with spaces, enclose it in a singleton list.)
+A string in ARGS is split into a list of tokens using shell-style
+tokenization rules. (To protect a string with spaces, either add
+quotation marks, or enclose it in a singleton list.)
 
 A pathname in ARGS is translated to a native namestring and passed as
 an argument to the command. The native namestring is not permitted to
@@ -44,7 +50,7 @@ start with a dash.
 A property list is treated as a list of arguments to `uiop:run-program'.
 
 By default, standard output is sent to `*standard-output*', and error
-output is sent to `*message-stream*`.
+output is sent to `*message-stream*'.
 
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
@@ -60,20 +66,26 @@ executable."
 (define-compiler-macro cmd (cmd &rest args)
   "At compile time, make sure the keyword arguments are syntactically
 valid."
+  `(locally (declare (notinline cmd))
+     (cmd ,@(simplify-cmd-args (cons cmd args)))))
+
+(defun simplify-cmd-args (args)
   (nlet rec ((args-in args)
              (args-out '()))
     (match args-in
       ((list)
-       `(locally (declare (notinline cmd))
-          (cmd ,cmd ,@(reverse args-out))))
+       (reverse args-out))
       ((list (and _ (type keyword)))
        (error "Dangling keyword argument to cmd."))
       ((list* (and k (type keyword)) v rest)
        (rec rest
-            (cons `(list ,k ,v) args-out)))
+            (cons (if (constantp v)
+                      `'(,k ,v)
+                      `(list ,k ,v))
+                  args-out)))
       ((list* (and s (type string)) xs)
        (rec xs
-            (cons `(quote (,@(tokens s)))
+            (cons `(quote (,@(split-cmd s)))
                   args-out)))
       ((list* (and p (type pathname)) xs)
        (rec xs
@@ -130,7 +142,7 @@ valid."
                (nreverse plist)))
       ((list* (and arg (type string)) args)
        (rec args
-            (nreconc (tokens arg) tokens)
+            (nreconc (split-cmd arg) tokens)
             plist))
       ((list* (and arg (type pathname)) args)
        (rec args
@@ -245,3 +257,9 @@ process to change its own working directory."
                                         :defaults dir)
           when (file-exists-p pathname)
             do (return pathname))))
+
+(defun split-cmd (cmd)
+  ;; NB UIOP expects simple-strings for arguments.
+  (mapcar (op (coerce _ '(simple-array character (*))))
+          (shlex:split cmd :whitespace-split nil
+                           :punctuation-chars t)))
