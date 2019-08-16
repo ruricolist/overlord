@@ -35,6 +35,7 @@
    #:absolute-pathname
    #:relative-pathname
    #:directory-pathname
+   #:absolute-directory-pathname
    #:file-pathname
    #:physical-pathname
    #:temporary-file
@@ -267,6 +268,9 @@ If DELAY is not a delayed symbol, return it (second value T)."
 
 (deftype directory-pathname ()
   '(and pathname (satisfies directory-pathname-p)))
+
+(deftype absolute-directory-pathname ()
+  '(and absolute-pathname directory-pathname))
 
 (deftype file-pathname ()
   '(and pathname (satisfies file-pathname-p)))

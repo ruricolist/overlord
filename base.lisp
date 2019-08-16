@@ -33,9 +33,6 @@
 
 (in-package :overlord/base)
 
-(deftype absolute-directory-pathname ()
-  '(and absolute-pathname directory-pathname))
-
 (defun absolute-directory-pathname? (x)
   "Is X an absolute directory pathname?"
   (and (absolute-pathname-p x)
