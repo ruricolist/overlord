@@ -7,8 +7,6 @@
     :overlord/asdf)
   (:import-from :overlord/specials
     :*base* :*cli*)
-  (:import-from :named-readtables
-    :find-readtable)
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
@@ -24,10 +22,10 @@
    :*base* :base
    :set-package-base
    :base-relative-pathname
-   :infer-system
    :ensure-absolute
    :with-current-dir
    :package-base
+   :package-system
    :current-system
    :resolve-file))
 
@@ -86,38 +84,80 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       ensure-pathname*
       (ensure-absolute :base base)))
 
+(deftype pkg-base-spec ()
+  "One of the three ways of specifying the base of a package: (1) an
+  absolute pathname, (2) a system (whose base should be used), or (3)
+  a pair of a system and a relative pathname (in which case the
+  relative pathname should be merged with the system base)."
+  '(or
+    asdf-system absolute-pathname
+    (cons asdf-system relative-pathname)))
+
 (define-global-state *package-bases*
     (dict* (make-hash-table)
            (find-package :cl-user) (user-homedir-pathname)))
 
-(defun set-package-base* (base &optional (system nil system-supplied?))
-  "Set the base for the current package.
-If SYSTEM is supplied, resolve BASE as a system-relative pathname."
-  (setf (gethash *package* *package-bases*)
-        (assure (and absolute-pathname directory-pathname)
-          (if system-supplied?
-              (asdf-system-relative-pathname system base)
-              base))))
+(defun set-package-base-1 (package base system)
+  "Set the base and/or system of PACKAGE."
+  (setf package (find-package package))
+  (setf (gethash package *package-bases*)
+        (assure pkg-base-spec
+          (econd
+            ((and base system)
+             (cons (find-asdf-system system) base))
+            (system (find-asdf-system system))
+            (base
+             (assure absolute-directory-pathname
+               base))
+            (t (error "No path or system."))))))
 
-(defmacro set-package-base (base &optional (system nil system-supplied?))
+(defun set-package-base* (base &optional system)
+  "Set the base and/or system, for the current package."
+  (set-package-base-1 *package* base system))
+
+(defmacro set-package-base (base &optional system)
+  "Set the base and/or system, for the current package, at compile
+time as well as load time."
   `(eval-always
-     (set-package-base* ,base
-                        ,@(if system-supplied? (list system) nil))))
-
-(define-global-state *supplied-package-systems* (make-hash-table))
+     (set-package-base* ,base ,system)))
 
 (defun base ()
-  #+(or) (or *compile-file-truename*
-             *load-truename*)
+  "Return the current base, which is either the current value of
+`*base*' (if that is bound) or the base of the current package."
+  #+(or) (or *compile-file-truename* *load-truename*)
   (absolute-directory-pathname
    (if (boundp '*base*) *base*
        (package-base *package*))))
 
+(defun saved-package-base (package)
+  "If a base has been set for PACKAGE, return it."
+  (setf package (find-package package))
+  (let ((spec (gethash package *package-bases*)))
+    (and spec
+         (etypecase-of pkg-base-spec spec
+           (asdf-system (asdf-system-base spec))
+           (absolute-pathname spec)
+           ((cons asdf-system relative-pathname)
+            (asdf-system-relative-pathname (car spec) (cdr spec)))))))
+
+(defun saved-package-system (package)
+  "If a system has been set for PACKAGE, return it."
+  (setf package (find-package package))
+  (let ((spec (gethash package *package-bases*)))
+    (and spec
+         (etypecase-of pkg-base-spec spec
+           (asdf-system spec)
+           (absolute-pathname nil)
+           ((cons asdf-system relative-pathname)
+            (car spec))))))
+
 (defun package-base (package &key (errorp t))
-  (let ((base
-          (or (gethash package *package-bases*)
-              (system-base
-               (infer-system package :errorp errorp)))))
+  "Retrieve or infer the base of PACKAGE."
+  (setf package (find-package package))
+  (let* ((base
+           (or (saved-package-base package)
+               (asdf-system-base
+                (package-system package :errorp errorp)))))
     (if (absolute-pathname-p base) base
         (and errorp
              (error* "Cannot infer base.~%Package: ~a~%File: ~a"
@@ -125,49 +165,40 @@ If SYSTEM is supplied, resolve BASE as a system-relative pathname."
                      (current-lisp-file))))))
 
 (defun current-system ()
-  (infer-system *package*))
+  "Retrieve or infer the system the current package comes from."
+  (package-system *package*))
 
-(defun find-system (system &optional error-p)
-  (let ((*readtable* (find-readtable :standard))
-        (*read-base* 10)
-        (*read-default-float-format* 'double-float))
-    (find-asdf-system system :error (not error-p))))
-
-(defun system-base (system)
-  (setf system (find-system system))
-  (let ((base (asdf-system-relative-pathname system "")))
-    (if (absolute-pathname-p base)
-        base
-        (if (package-inferred-asdf-system? system)
-            (let* ((system-name (primary-asdf-system-name system))
-                   (base-system-name (take-while (op (not (eql _ #\/))) system-name))
-                   (base-system (find-system base-system-name)))
-              (system-base base-system))
-            (error* "System ~a has no base." system)))))
+(defun package-system (package &key errorp)
+  "Retrieve or infer the system PACKAGE comes from."
+  (or (saved-package-system package)
+      (infer-system package :errorp errorp)))
 
 (defun infer-system (package &key (errorp t))
-  (assure (or null (satisfies asdf-system?))
+  (setf package (find-package package))
+  (assure (or null asdf-system)
     (or (infer-system-from-package package)
         (look-for-asd)
         (and errorp
-             (assure (satisfies asdf-system?)
-               (ensure2 (gethash package *supplied-package-systems*)
-                 (cerror* "Supply a system name"
-                          "Cannot infer a system for ~a.
+             (setf (gethash package *package-bases*)
+                   (assure asdf-system
+                     (progn
+                       (cerror* "Supply a system name"
+                                "Cannot infer a system for ~a.
 
 To avoid this error in the future, use ~s."
-                          *package*
-                          'set-package-base)
-                 (read-system-by-name)))))))
+                                *package*
+                                'set-package-base)
+                       (read-system-by-name))))))))
 
 (defun read-system-by-name ()
   (format t "~&Type a system name: ")
-  (let ((name (make-keyword (string (read)))))
-    (or (find-system name nil)
-        (progn
-          (cerror* "Supply another name"
-                   "No such system as ~a" name)
-          (read-system-by-name)))))
+  (assure asdf-system
+    (let ((name (make-keyword (string (read)))))
+      (or (find-asdf-system name :error nil)
+          (progn
+            (cerror* "Supply another name"
+                     "No such system as ~a" name)
+            (read-system-by-name))))))
 
 (defun current-lisp-file ()
   (or *compile-file-truename* *load-truename*))
@@ -197,14 +228,14 @@ To avoid this error in the future, use ~s."
 
 (defun guess-system-from-package-name (name)
   (when-let (guess (package-name-asdf-system name))
-    (find-system guess nil)))
+    (find-asdf-system guess :error nil)))
 
 (defun look-for-asd ()
   "Look for the nearest .asd file and return its name."
   (and-let* ((file (current-lisp-file))
              ((not (typep file 'temporary-file)))
              (.asd (nearest-asdf-file file)))
-    (find-system (pathname-name .asd) nil)))
+    (find-asdf-system (pathname-name .asd) :error nil)))
 
 (defun nearest-asdf-file (file)
   (locate-dominating-file file "*.asd"))
