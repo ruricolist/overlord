@@ -174,19 +174,26 @@ To avoid this error in the future, use ~s."
 
 (defun infer-system-from-package (&optional (package *package*))
   (or (infer-system-from-package-names package)
-      (infer-system-from-package-prefix package)))
+      (infer-system-from-package-affix package)))
 
 (defun infer-system-from-package-names (package)
   (some #'guess-system-from-package-name
         (package-names package)))
 
-(defun infer-system-from-package-prefix (package)
+(defun infer-system-from-package-affix (package)
   (let ((name (package-name package)))
-    (and (find #\/ name)
-         (let ((prefix (first (split-sequence #\/ name :count 1))))
-           (and prefix
-                (guess-system-from-package-name
-                 (string-downcase prefix)))))))
+    (or (and (find #\/ name)
+             (let ((prefix (first (split-sequence #\/ name :count 1))))
+               (and prefix
+                    (guess-system-from-package-name
+                     (string-downcase prefix)))))
+        (let ((-user "-USER"))
+          (and (string$= -user name)
+               (let ((pkg
+                       (find-package
+                        (slice name 0 (- (length -user))))))
+                 (and pkg
+                      (infer-system-from-package pkg))))))))
 
 (defun guess-system-from-package-name (name)
   (when-let (guess (package-name-asdf-system name))
