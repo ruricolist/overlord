@@ -17,7 +17,8 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
    :load-asdf-system
    :asdf-system-base
    :require-asdf-system
-   :asdf-system-name-keyword))
+   :asdf-system-name-keyword
+   :asdf-system-name))
 (in-package :overlord/asdf)
 
 ;;; Did you know that, in SBCL, calls to `asdf:find-system' from
@@ -62,6 +63,9 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
          string-upcase
          make-keyword))
     (keyword system)))
+
+(defun asdf-system-name (system)
+  (asdf:component-name (asdf:find-system system)))
 
 (defun asdf-system-loaded? (system)
   (let ((system (asdf:find-system system nil)))
