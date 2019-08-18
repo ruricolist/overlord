@@ -6,7 +6,8 @@
     :overlord/global-state
     :overlord/asdf)
   (:import-from :overlord/specials
-    :*base* :*cli*)
+    :*base* :*cli*
+    :*base-package* :base-package)
   (:import-from :uiop
     :pathname-directory-pathname
     :absolute-pathname-p
@@ -113,7 +114,7 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
 
 (defun set-package-base* (base &optional system)
   "Set the base and/or system, for the current package."
-  (set-package-base-1 *package* base system))
+  (set-package-base-1 (base-package) base system))
 
 (defmacro set-package-base (base &optional system)
   "Set the base and/or system, for the current package, at compile
@@ -127,7 +128,7 @@ time as well as load time."
   #+(or) (or *compile-file-truename* *load-truename*)
   (absolute-directory-pathname
    (if (boundp '*base*) *base*
-       (package-base *package*))))
+       (package-base (base-package)))))
 
 (defun saved-package-base (package)
   "If a base has been set for PACKAGE, return it."
@@ -166,7 +167,7 @@ time as well as load time."
 
 (defun current-system ()
   "Retrieve or infer the system the current package comes from."
-  (package-system *package*))
+  (package-system (base-package)))
 
 (defun package-system (package &key errorp)
   "Retrieve or infer the system PACKAGE comes from."
@@ -186,7 +187,7 @@ time as well as load time."
                                 "Cannot infer a system for ~a.
 
 To avoid this error in the future, use ~s."
-                                *package*
+                                (base-package)
                                 'set-package-base)
                        (read-system-by-name))))))))
 
@@ -203,7 +204,7 @@ To avoid this error in the future, use ~s."
 (defun current-lisp-file ()
   (or *compile-file-truename* *load-truename*))
 
-(defun infer-system-from-package (&optional (package *package*))
+(defun infer-system-from-package (&optional (package (base-package)))
   (or (infer-system-from-package-names package)
       (infer-system-from-package-affix package)))
 

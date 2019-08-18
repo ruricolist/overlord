@@ -16,7 +16,9 @@
            #:unregister-worker-special
            #:register-worker-specials
            #:unregister-worker-specials
-           #:wrap-worker-specials))
+           #:wrap-worker-specials
+           #:*base-package*
+           #:base-package))
 (in-package #:overlord/specials)
 
 (defvar *worker-specials* '()
@@ -119,3 +121,12 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defvar *force* nil
   "Whether to force rebuilding.")
 (register-worker-special '*force*)
+
+(declaim (type package *base-package*))
+(defvar-unbound *base-package*
+  "The package relative to which (if bound) the base should be computed.")
+
+(-> base-package () package)
+(defun base-package ()
+  (or (bound-value '*base-package*)
+      *package*))
