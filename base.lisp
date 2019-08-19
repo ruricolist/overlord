@@ -22,6 +22,7 @@
    :current-dir!
    :*base* :base
    :set-package-base
+   :set-package-system
    :base-relative-pathname
    :ensure-absolute
    :with-current-dir
@@ -95,22 +96,34 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
     (cons asdf-system relative-pathname)))
 
 (define-global-state *package-bases*
-    (dict* (make-hash-table)
-           (find-package :cl-user) (user-homedir-pathname)))
+    (dict 'eql
+          (find-package :cl-user) (user-homedir-pathname)))
 
 (defun set-package-base-1 (package base system)
   "Set the base and/or system of PACKAGE."
   (setf package (find-package package))
-  (setf (gethash package *package-bases*)
-        (assure pkg-base-spec
-          (econd
-            ((and base system)
-             (cons (find-asdf-system system) base))
-            (system (find-asdf-system system))
-            (base
-             (assure absolute-directory-pathname
-               base))
-            (t (error "No path or system."))))))
+  (when system
+    (setf system (find-asdf-system system :error t)))
+  (let ((table *package-bases*))
+    (econd
+      ((and base system)
+       (setf base
+             (uiop:ensure-pathname base
+                                   :want-directory t
+                                   :want-pathname t
+                                   :want-relative t))
+       (setf (href table package)
+             (cons system base)))
+      (system
+       (set-package-system-1 package system))
+      (base
+       (setf (href table package)
+             (uiop:ensure-pathname base
+                                   :want-directory t
+                                   :want-pathname t
+                                   :want-absolute t)))
+      (t (error "No path or system.")))
+    (assert (typep (href table package) 'pkg-base-spec))))
 
 (defun set-package-base* (base &optional system)
   "Set the base and/or system, for the current package."
@@ -121,6 +134,20 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
 time as well as load time."
   `(eval-always
      (set-package-base* ,base ,system)))
+
+(defun set-package-system-1 (package system)
+  (let* ((table *package-bases*)
+         (package (find-package package))
+         (system (find-asdf-system system :error t)))
+    (setf (href table package)
+          (assure pkg-base-spec system))))
+
+(defun set-package-system* (system)
+  (set-package-system-1 *package* system))
+
+(defmacro set-package-system (system)
+  `(eval-always
+     (set-package-system* ,system)))
 
 (defun base ()
   "Return the current base, which is either the current value of
