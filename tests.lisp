@@ -20,7 +20,7 @@
            :touch))
 (in-package :overlord/tests)
 
-(overlord:set-package-base (asdf-system-relative-pathname :overlord ""))
+(overlord:set-package-system :overlord)
 
 (defun nap (&optional (n 1))
   "Sleep until the universal time counter ticks over."
@@ -258,3 +258,35 @@
   (let ((path (overlord/db::log-file-path)))
     (is-true (file-exists-p (overlord/db::log-file-path))
              "DB log does not exist: ~a" path)))
+
+
+;;; Setting the base.
+
+(def-suite package-base :in overlord)
+(in-suite package-base)
+
+(defpackage :overlord/test.test-package)
+
+(def pkg (find-package :overlord/test.test-package))
+
+(test package-system
+  (let ((*package* pkg))
+    (overlord:set-package-system :overlord)
+    (is-true (file-exists-p (overlord:resolve-file "tests/literal.txt")))))
+
+(test package-base
+  (let ((*package* pkg))
+    (overlord:set-package-base "" :overlord)
+    (is-true (file-exists-p (overlord:resolve-file "tests/literal.txt")))))
+
+(test package-base-dir
+  (let ((*package* pkg))
+    (overlord:set-package-base "tests/" :overlord)
+    (is-true (file-exists-p (overlord:resolve-file "literal.txt")))))
+
+(test package-base-temp
+  (let ((*package* pkg))
+    (overlord:set-package-base uiop:*temporary-directory*)
+    (is-false (file-exists-p (overlord:resolve-file "tests/literal.txt")))))
+
+(in-suite overlord)
