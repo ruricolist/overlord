@@ -86,7 +86,7 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
       ensure-pathname*
       (ensure-absolute :base base)))
 
-(deftype pkg-base-spec ()
+(deftype package-base-spec ()
   "One of the three ways of specifying the base of a package: (1) an
   absolute pathname, (2) a system (whose base should be used), or (3)
   a pair of a system and a relative pathname (in which case the
@@ -99,31 +99,42 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
     (dict 'eql
           (find-package :cl-user) (user-homedir-pathname)))
 
+(defun package-base-spec (package)
+  (check-type package package)
+  (let ((table *package-bases*))
+    (synchronized (table)
+      (href table package))))
+
+(defun (setf package-base-spec) (spec package)
+  (check-type package package)
+  (check-type spec package-base-spec)
+  (let ((table *package-bases*))
+    (synchronized (table)
+      (setf (href table package) spec))))
+
 (defun set-package-base-1 (package base system)
   "Set the base and/or system of PACKAGE."
   (setf package (find-package package))
   (when system
     (setf system (find-asdf-system system :error t)))
-  (let ((table *package-bases*))
-    (econd
-      ((and base system)
-       (setf base
-             (uiop:ensure-pathname base
-                                   :want-directory t
-                                   :want-pathname t
-                                   :want-relative t))
-       (setf (href table package)
-             (cons system base)))
-      (system
-       (set-package-system-1 package system))
-      (base
-       (setf (href table package)
-             (uiop:ensure-pathname base
-                                   :want-directory t
-                                   :want-pathname t
-                                   :want-absolute t)))
-      (t (error "No path or system.")))
-    (assert (typep (href table package) 'pkg-base-spec))))
+  (econd
+    ((and base system)
+     (setf base
+           (uiop:ensure-pathname base
+                                 :want-directory t
+                                 :want-pathname t
+                                 :want-relative t))
+     (setf (package-base-spec package)
+           (cons system base)))
+    (system
+     (set-package-system-1 package system))
+    (base
+     (setf (package-base-spec package)
+           (uiop:ensure-pathname base
+                                 :want-directory t
+                                 :want-pathname t
+                                 :want-absolute t)))
+    (t (error "No path or system."))))
 
 (defun set-package-base* (base &optional system)
   "Set the base and/or system, for the current package."
@@ -136,11 +147,9 @@ time as well as load time."
      (set-package-base* ,base ,system)))
 
 (defun set-package-system-1 (package system)
-  (let* ((table *package-bases*)
-         (package (find-package package))
+  (let* ((package (find-package package))
          (system (find-asdf-system system :error t)))
-    (setf (href table package)
-          (assure pkg-base-spec system))))
+    (setf (package-base-spec package) system)))
 
 (defun set-package-system* (system)
   (set-package-system-1 *package* system))
@@ -160,9 +169,9 @@ time as well as load time."
 (defun saved-package-base (package)
   "If a base has been set for PACKAGE, return it."
   (setf package (find-package package))
-  (let ((spec (gethash package *package-bases*)))
+  (let ((spec (package-base-spec package)))
     (and spec
-         (etypecase-of pkg-base-spec spec
+         (etypecase-of package-base-spec spec
            (asdf-system (asdf-system-base spec))
            (absolute-pathname spec)
            ((cons asdf-system relative-pathname)
@@ -171,9 +180,9 @@ time as well as load time."
 (defun saved-package-system (package)
   "If a system has been set for PACKAGE, return it."
   (setf package (find-package package))
-  (let ((spec (gethash package *package-bases*)))
+  (let ((spec (package-base-spec package)))
     (and spec
-         (etypecase-of pkg-base-spec spec
+         (etypecase-of package-base-spec spec
            (asdf-system spec)
            (absolute-pathname nil)
            ((cons asdf-system relative-pathname)
@@ -207,16 +216,15 @@ time as well as load time."
     (or (infer-system-from-package package)
         (look-for-asd)
         (and errorp
-             (setf (gethash package *package-bases*)
-                   (assure asdf-system
-                     (progn
-                       (cerror* "Supply a system name"
-                                "Cannot infer a system for ~a.
+             (setf (package-base-spec package)
+                   (progn
+                     (cerror* "Supply a system name"
+                              "Cannot infer a system for ~a.
 
 To avoid this error in the future, use ~s."
-                                (base-package)
-                                'set-package-base)
-                       (read-system-by-name))))))))
+                              (base-package)
+                              'set-package-base)
+                     (read-system-by-name)))))))
 
 (defun read-system-by-name ()
   (format t "~&Type a system name: ")
