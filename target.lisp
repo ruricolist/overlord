@@ -306,8 +306,7 @@ recorded build time, fall back to using the size of FILE.
 
 This heuristic ensures that, in the absence of other information,
 larger files will be built before smaller files."
-  (check-type file cl:pathname)
-  (assert (file-pathname-p file))
+  (declare (file-pathname file))
   (build-time-from-files target (list file)))
 
 (defun build-time-from-files (target files)
