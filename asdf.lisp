@@ -39,7 +39,7 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
   (let ((*readtable* (find-readtable :standard))
         (*read-base* 10)
         (*read-default-float-format* 'double-float))
-    (asdf:find-system system (not error))))
+    (asdf:find-system system error)))
 
 (defun asdf-system-version (system &key error)
   (if-let (system (asdf:find-system system (not error)))
