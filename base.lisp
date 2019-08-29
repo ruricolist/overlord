@@ -21,6 +21,7 @@
   (:export
    :current-dir!
    :*base* :base
+   :*base-package* :base-package
    :set-package-base
    :set-package-system
    :base-relative-pathname
