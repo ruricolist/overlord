@@ -1,5 +1,5 @@
 (uiop:define-package :overlord/all
-    (:nicknames :overlord)
+  (:nicknames :overlord)
   (:import-from :overlord/types
     :overlord-error :overlord-warning
     :overlord-error-target)
@@ -12,7 +12,7 @@
     :copy-file-if-changed
     :strip-directory)
   (:import-from :overlord/specials
-    :use-threads-p)
+    :use-threads-p #:*force*)
   (:import-from :overlord/redo
     :recursive-dependency
     :missing-script
@@ -30,7 +30,7 @@
    :message :*message-stream*
    :write-file-if-changed :copy-file-if-changed
    :strip-directory
-   :use-threads-p
+   :use-threads-p :*force*
    :building? :redo-always
    :overlord-error-target :overlord-error)
   (:use-reexport
