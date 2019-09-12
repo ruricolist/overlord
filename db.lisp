@@ -19,7 +19,8 @@
     :delete-file-if-exists
     :directory-exists-p
     :delete-directory-tree
-    :register-image-dump-hook)
+    :register-image-dump-hook
+    :pathname-parent-directory-pathname)
   (:import-from :bordeaux-threads
     :make-thread)
   (:import-from :trivial-file-size :file-size-in-octets)
@@ -102,10 +103,10 @@
 (def no-log-data (make-log-data)
   "An empty set of log data.")
 
-(defun delete-versioned-db (&optional (version (db-version)))
+(defun delete-versioned-db (&key (version (db-version)))
   "Delete a specific version of the database.
 The database is always implicitly versioned."
-  (let ((dir (current-cache-dir version)))
+  (let ((dir (pathname-parent-directory-pathname (current-cache-dir version))))
     (when (directory-exists-p dir)
       (delete-directory-tree
        dir
