@@ -40,7 +40,8 @@
    :overlord/message
    :overlord/target-protocol
    :overlord/oracle
-   :overlord/cmd))
+   :overlord/cmd
+   :overlord/asdf-extension))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord))
