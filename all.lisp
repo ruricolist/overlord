@@ -41,7 +41,7 @@
    :overlord/target-protocol
    :overlord/oracle
    :overlord/cmd
-   :overlord/asdf-extension))
+   :overlord/project-system))
 
 (defpackage :overlord-user
   (:use :cl :alexandria :serapeum :overlord))
