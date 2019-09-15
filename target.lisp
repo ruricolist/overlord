@@ -128,6 +128,7 @@
    :pattern-ref
    :pattern-from
    :pattern-into
+   :make-pattern
    :define-script
    :pattern-ref-static-inputs
    :pattern-ref-outputs
@@ -743,6 +744,16 @@ You must either provide a list of outputs, or provide a list of inputs from whic
 
 (defun pattern (name inputs)
   (pattern-ref name inputs))
+
+(defun make-pattern (pattern-name
+                     &key (inputs nil inputs-supplied?)
+                          (outputs nil outputs-supplied?))
+  (unless (or inputs-supplied? outputs-supplied?)
+    (error* "You must supply either or both of INPUTS or OUTPUTS."))
+  (make 'pattern-ref
+        :pattern pattern-name
+        :inputs (ensure-list inputs)
+        :outputs (ensure-list outputs)))
 
 ;;; NB Figure out whether this actually replaces all possible uses of
 ;;; ifcreate. (It replaces the original use case, resolving files, but
