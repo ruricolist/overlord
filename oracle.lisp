@@ -11,11 +11,13 @@
     :redo-ifchange
     :redo-ifcreate)
   (:import-from :overlord/types
+    :absolute-pathname
     :delayed-symbol
     :delayed-symbol=
     :force-symbol
     :delay-symbol
-    :overlord-error)
+    :overlord-error
+    :wild-pathname)
   (:import-from :overlord/digest
     :string-digest-string)
   (:import-from :overlord/asdf
@@ -29,6 +31,8 @@
     #:format-time)
   (:import-from #:local-time
     #:now)
+  (:import-from #:cl-murmurhash
+    #:murmurhash)
   (:export
    :oracle
    :oracle-question
@@ -40,7 +44,8 @@
    :dist-version-oracle
    :function-oracle
    :daily-oracle
-   :--version))
+   :--version
+   :glob-target))
 (in-package :overlord/oracle)
 
 ;;; TODO Would it be worthwhile to provide oracles for optimization
@@ -332,6 +337,7 @@ This is for targets that should be no more than one a day."
   (function-oracle 'todays-date-string))
 
 
+;;; Version oracles.
 
 (defun get-version (command)
   ($cmd command "--version"))
@@ -340,6 +346,22 @@ This is for targets that should be no more than one a day."
   "An oracle that monitors the version of COMMAND (by calling it with
 an argument of `--version'."
   (function-oracle 'get-version command))
+
+
+;;; Glob oracles.
+
+(defun wildcard-hash (wildcard)
+  (declare ((and absolute-pathname wild-pathname) wildcard))
+  (let* ((files (directory wildcard))
+         (files (map 'vector #'namestring files))
+         (files (sort files #'string<))
+         (hash (murmurhash files)))
+    (print (integer-length hash))
+    (fmt "murmurhash3:~(~x~)" hash)))
+
+(defun glob-target (wildcard)
+  (check-type wildcard (and absolute-pathname wild-pathname))
+  (function-oracle 'wildcard-hash wildcard))
 
 
 ;;; Function oracles.

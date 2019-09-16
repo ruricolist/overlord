@@ -1408,11 +1408,21 @@ If PATH is wild, expand it."
 (defun build-package (package &rest kws &key &allow-other-keys)
   (apply #'build (find-package package) kws))
 
+(defun unglobify (targets)
+  "Look for globs in TARGETS, and replace them with the expansion of the glob, and an oracle that recomputes the expansion of the glob."
+  (let ((q (queue)))
+    (do-each (target targets (qlist q))
+      (if (typep target 'wild-pathname)
+          (let ((target (resolve-file target)))
+            (enq (glob-target target) q)
+            (qappend q (directory target)))
+          (enq target q)))))
+
 (defun depends-on-all (targets)
-  (redo-ifchange-all targets))
+  (redo-ifchange-all (unglobify targets)))
 
 (defun depends-on-all* (targets)
-  (map nil #'redo-ifchange targets))
+  (map nil #'redo-ifchange (unglobify targets)))
 
 (defun depends-on (&rest targets)
   "Depend on each target in TARGETS, in no particular order.
@@ -1424,7 +1434,7 @@ Descends into lists."
   (depends-on-all* (flatten targets)))
 
 (defun depends-not-all (targets)
-  (redo-ifcreate-all targets))
+  (redo-ifcreate-all (unglobify targets)))
 
 (defun depends-not (&rest targets)
   "Depend on the targets in TARGETS not existing.
@@ -1434,7 +1444,7 @@ Descends into lists."
 (defun use-all* (targets)
   "Depend on each target in TARGET -- as a normal prereq if TARGET
 exists, and as a non-existent prereq if TARGET does not exist."
-  (do-each (target targets targets)
+  (do-each (target (unglobify targets) targets)
     (if (target-exists? target)
         (redo-ifchange target)
         (redo-ifcreate target))))
