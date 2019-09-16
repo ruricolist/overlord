@@ -1,7 +1,6 @@
 (defpackage :overlord/project-system
   (:use :cl :alexandria :serapeum)
   (:import-from :overlord/types :error*)
-  (:import-from :overlord/base :*base*)
   (:import-from :overlord/target :build)
   (:import-from :quickproject :make-project)
   (:import-from :uiop :ensure-directory-pathname)
@@ -33,8 +32,7 @@ Use `asdf:make' to get the desired behavior.")
            (or (find-symbol (string-upcase target-name)
                             package)
                (error* "No such symbol as ~a in ~a"
-                       'all package)))
-         (*base* (asdf:system-source-directory system)))
+                       'all package))))
     (build symbol)))
 
 (defmethod asdf:operate :after ((op asdf-utilities:build-op)
