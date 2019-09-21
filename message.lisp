@@ -21,7 +21,8 @@
                     (string$= "." control))
                (string-right-trim "." control)
                control)))
-    (format stream "~&[Overlord] ~?~%" control args)))
+    (prog1 (format stream "~&[Overlord] ~?~%" control args)
+      (force-output stream))))
 
 (define-compiler-macro message (&whole call format-control &rest format-arguments)
   (if (not (stringp format-control)) call
