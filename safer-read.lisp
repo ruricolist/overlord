@@ -7,30 +7,30 @@
 
 ;;; Adapted from LoL.
 
-(defparameter *safer-read-from-string-blacklist*
+(defparameter *safer-read-blacklist*
   '(#\# #+(or) #\: #\|))
 
 (def rt (copy-readtable nil))
 
 (defun safer-reader-error (stream closech)
   (declare (ignore stream closech))
-  (error "safer-read-from-string failure"))
+  (error "safer-read failure"))
 
-(dolist (c *safer-read-from-string-blacklist*)
+(dolist (c *safer-read-blacklist*)
   (set-macro-character
    c #'safer-reader-error nil rt))
 
-(defun safer-read-from-string (s &optional fail)
+(defun safer-read-from-string (s &key fail)
   (if (stringp s)
       (with-input-from-string (s s)
-        (safer-read s fail))
+        (safer-read s :fail fail))
       fail))
 
-(defun safer-read (s &optional fail)
+(defun safer-read (s &key fail recursive)
   (let ((*readtable* rt) *read-eval*)
     (handler-bind
         ((error (lambda (condition)
                   (declare (ignore condition))
                   (return-from
                    safer-read fail))))
-      (read s))))
+      (read s t nil recursive))))
