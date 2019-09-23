@@ -1703,9 +1703,11 @@ Unlike tasks defined using `deftask', tasks defined using
                        &body body)
   "Define PATHNAME as a target.
 
-PATHNAME may be a literal pathname or a string (in which case it is
-parsed with `uiop:parse-unix-namestring'). Using a string is preferred
-for programs that care about portability.
+If supplied, PATHNAME may be a literal pathname or a string (in which
+case it is parsed with `uiop:parse-unix-namestring'). Using a string
+is preferred for programs that care about portability. If not
+supplied, PATHNAME defaults to NAME, as a string, with its case
+inverted, and any earmuffs removed.
 
 NAME is not a target; it is a binding that serves as a convenient
 handle for the name of the target. (It is also necessary to be able to
