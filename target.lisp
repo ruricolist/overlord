@@ -1688,8 +1688,18 @@ Unlike tasks defined using `deftask', tasks defined using
                    :want-relative t
                    :want-non-wild t))
 
-(defmacro file-target (name pathname (&key (dest nil dest-supplied?)
-                                           (out nil out-supplied?))
+(defun file-target-name-file-name (name)
+  (setf name (string name))
+  (string-invert-case
+   (if (and (string^= "*" name)
+            (string$= "*" name))
+       (slice name 1 -1)
+       name)))
+
+(defmacro file-target (name (&key ((:path pathname)
+                                   (file-target-name-file-name name))
+                                  (dest nil dest-supplied?)
+                                  (out nil out-supplied?))
                        &body body)
   "Define PATHNAME as a target.
 
