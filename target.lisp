@@ -1412,11 +1412,15 @@ If PATH is wild, expand it."
   "Look for globs in TARGETS, and replace them with the expansion of the glob, and an oracle that recomputes the expansion of the glob."
   (let ((q (queue)))
     (do-each (target targets (qlist q))
-      (if (typep target 'wild-pathname)
-          (let ((target (resolve-file target)))
-            (enq (glob-target target) q)
-            (qappend q (directory target)))
-          (enq target q)))))
+      (let ((target
+              (if (stringp target)
+                  (parse-unix-namestring target)
+                  target)))
+        (if (typep target 'wild-pathname)
+            (let ((target (resolve-file target)))
+              (enq (glob-target target) q)
+              (qappend q (directory target)))
+            (enq target q))))))
 
 (defun depends-on-all (targets)
   (redo-ifchange-all (unglobify targets)))
