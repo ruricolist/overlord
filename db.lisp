@@ -28,6 +28,8 @@
   (:import-from :local-time)
   (:import-from :lparallel
     :kernel-worker-index)
+  (:import-from :exit-hooks
+    :add-exit-hook)
   (:import-from :overlord/util
     :withf :lessf)
   (:export
@@ -468,6 +470,8 @@ properties."
   (values))
 
 (register-image-dump-hook 'save-database)
+
+(add-exit-hook #'save-database)
 
 (defun call/saving-database (thunk)
   "Call THUNK, saving the database afterwards, unless a save is
