@@ -102,35 +102,40 @@ valid."
 (defun run-program-in-dir (dir tokens
                            &rest args
                            &key ignore-error-status
-                                &allow-other-keys)
+                                (output *standard-output*)
+                                (error-output *message-stream*)
+                           &allow-other-keys)
   "Run a program (with `uiop:run-program`) with DIR as its working directory."
-  (let* ((cmd
-           ;; NB The :directory argument to launch-program may end up
-           ;; calling `chdir', which is unacceptable.
-           (wrap-with-dir dir tokens))
-         (proc
-           (multiple-value-call #'uiop:launch-program cmd
-             (values-list args))))
-    (register-proc* proc)
-    (let ((abnormal? t))
-      (unwind-protect
-           (multiple-value-prog1
-               (let ((status (uiop:wait-process proc)))
-                 (cond ((zerop status)
-                        status)
-                       (ignore-error-status
-                        nil)
-                       (t
-                        (finish-output *message-stream*)
-                        (cerror "IGNORE-ERROR-STATUS"
-                                'uiop:subprocess-error
-                                :command tokens
-                                :code status
-                                :process proc)
-                        status)))
-             (setf abnormal? nil))
-        (when abnormal?
-          (uiop:terminate-process proc))))))
+  (handler-bind ((serious-condition
+                   (lambda (e) (declare (ignore e))
+                     (finish-output output)
+                     (finish-output error-output))))
+    (let* ((cmd
+             ;; NB The :directory argument to launch-program may end up
+             ;; calling `chdir', which is unacceptable.
+             (wrap-with-dir dir tokens))
+           (proc
+             (multiple-value-call #'uiop:launch-program cmd
+               (values-list args))))
+      (register-proc* proc)
+      (let ((abnormal? t))
+        (unwind-protect
+             (multiple-value-prog1
+                 (let ((status (uiop:wait-process proc)))
+                   (cond ((zerop status)
+                          status)
+                         (ignore-error-status
+                          nil)
+                         (t
+                          (cerror "IGNORE-ERROR-STATUS"
+                                  'uiop:subprocess-error
+                                  :command tokens
+                                  :code status
+                                  :process proc)
+                          status)))
+               (setf abnormal? nil))
+          (when abnormal?
+            (uiop:terminate-process proc)))))))
 
 (defun parse-cmd-args (args)
   (nlet rec ((args args)
