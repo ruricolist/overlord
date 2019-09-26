@@ -1385,10 +1385,11 @@ If PATH is wild, expand it."
       (build (intern (string target) package))
       (values target system-name package))))
 
-(defun build (target/s &key force (jobs nproc)
+(defun build (target/s &key force jobs
                             debug
                             (on-exit (constantly nil)))
   "Build TARGET/S, a single target or a list of targets."
+  (setf jobs (or jobs *jobs* nproc))
   (check-type jobs (integer 1 *))
   (check-type on-exit function)
   (when (build-env-bound?)

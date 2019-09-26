@@ -18,7 +18,8 @@
            #:unregister-worker-specials
            #:wrap-worker-specials
            #:*base-package*
-           #:base-package))
+           #:base-package
+           #:*jobs*))
 (in-package #:overlord/specials)
 
 (defvar *worker-specials* '()
@@ -130,3 +131,6 @@ Incrementing this should be sufficient to invalidate old fasls.")
 (defun base-package ()
   (or (bound-value '*base-package*)
       *package*))
+
+(declaim (type (or null (integer 1 *)) jobs))
+(defvar *jobs* nil)

@@ -12,17 +12,17 @@
     :copy-file-if-changed
     :strip-directory)
   (:import-from :overlord/specials
-    :use-threads-p #:*force*)
+    :use-threads-p #:*force* #:*jobs*)
   (:import-from :overlord/redo
     :recursive-dependency
     :missing-script
     :building?
     :redo-always)
-
   (:import-from :overlord/build-env :*use-build-cache*)
-  (:export :*use-build-cache*)
+  (:import-from :overlord/kernel :nproc)
 
   (:export
+   :*use-build-cache*
    :recursive-dependency :missing-script
    :module-ref :module-ref* :module-exports :module-static-exports
    :simple-module :hash-table-module
@@ -32,7 +32,8 @@
    :strip-directory
    :use-threads-p :*force*
    :building? :redo-always
-   :overlord-error-target :overlord-error)
+   :overlord-error-target :overlord-error
+   :nproc :*jobs*)
   (:use-reexport
    :overlord/base
    :overlord/target
