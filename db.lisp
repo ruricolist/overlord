@@ -114,13 +114,6 @@ The database is always implicitly versioned."
        dir
        :validate (op (subpathp _ (xdg-cache-home)))))))
 
-(eval-always
-  (defun cas-friendly (type)
-    "Return a type that can be used for a CAS-friendly structure slot.
-This is necessary on SBCL, where CAS can only be used on structure slots of type T."
-    (if (eql (implementation-type) :sbcl) t
-        type)))
-
 ;;; NB. This is a structure rather than a CLOS class so the slots work
 ;;; with SBCL's compare-and-swap.
 (defstruct (db (:conc-name db.))
