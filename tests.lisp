@@ -42,12 +42,13 @@
          ;; everything is being compiled clean.
          (version (random most-positive-fixnum))
          (overlord/specials:*db-version* version)
-         (overlord/db::*db* (overlord/db::reload-db)))
+         (overlord/db::*db* nil))
     (unwind-protect
          (funcall fn)
       (when (equal (overlord/specials:db-version) version)
         ;; Busy-wait until we can actually delete the temp db (we may
         ;; still be writing to it, regardless of `finish-output').
+        (overlord/db:unload-db)
         (loop (ignore-errors
                (overlord/db:delete-versioned-db)
                (return))

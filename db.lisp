@@ -90,6 +90,12 @@
 (defgeneric db.sync (db)
   (:documentation "Sync the database to disk."))
 
+(defgeneric lock-db (db)
+  (:documentation "Create a lockfile for the DB."))
+
+(defgeneric unlock-db (db)
+  (:documentation "Remove the lockfile for the DB."))
+
 (defunit tombstone "A tombstone value.")
 
 (defstruct-read-only (log-record (:conc-name log-record.))
@@ -187,7 +193,61 @@ For debugging."
                (setf last-saved-map current-map))))
       (if (use-threads-p)
           (make-thread #'sync :name "Overlord: saving database")
-          (sync)))))
+          (sync))))
+
+  (:method db.lock-file (db)
+    (make-pathname :type "lock" :defaults log-file))
+
+  (:method lock-db (db)
+    (let* ((file (db.lock-file db))
+           (pid (or (getpid)
+                    ;; Just in case we missed one.
+                    (load-time-value
+                     (let ((*random-state* (make-random-state t)))
+                       (random 1000000))))))
+      (ensure-directories-exist file)
+      (tagbody
+       :retry
+         (handler-case
+             (with-output-to-file (out file
+                                       :if-exists :error
+                                       :if-does-not-exist :create
+                                       :external-format :ascii)
+               ;; "HDB UUCP lock file format" (according to the FHS).
+               (format out "~10d~%" pid))
+           (file-error ()
+             (go :try)))
+       :try
+         (let ((saved-pid
+                 (parse-integer
+                  (read-file-into-string file
+                                         :external-format :ascii))))
+           (unless (= saved-pid pid)
+             (cerror "Steal the database"
+                     "The database is already locked by another process.")
+             (delete-file-if-exists file)
+             (go :retry))))))
+
+  (:method unlock-db (db)
+    (delete-file-if-exists (db.lock-file db))))
+
+(defun getpid ()
+  ;; Adapted from the sources of Sly. Should there be a trivial-getpid
+  ;; library?
+  #+ccl (ccl::getpid)
+  #+sbcl (sb-posix:getpid)
+  #+ecl (ext:getpid)
+  #+clisp (os:process-id)
+  #+cmucl (unix:unix-getpid)
+  #+abcl (ext:get-pid)
+  #+allegro (excl.osi:getpid)
+  #+(and lispworks win32) (win32:get-current-process-id)
+  #+(and lispworks (not win32))
+  (system::getpid)
+  #+mkcl (mkcl:getpid)
+  #+scl (unix:unix-getpid)
+  #+clasp (si:getpid)
+  #+cormanlisp ccl:*current-process-id*)
 
 (defstruct (dead-db (:include db)
                     (:conc-name db.))
@@ -367,7 +427,8 @@ If there is no difference, write nothing."
   (synchronized ('*db)
     (ensure *db*
       (reload-db))
-    (check-version))
+    (check-version)
+    (lock-db *db*))
   *db*)
 
 (defun db-loaded? ()
@@ -384,11 +445,13 @@ If there is no difference, write nothing."
 reloaded on demand."
   ;; TODO Force a full GC afterwards?
   (synchronized ('*db*)
+    (unlock-db *db*)
     (nix *db*)))
 
 (defun deactivate-db ()
   "Clear the DB out of memory in such a way that it will not be reloaded on demand."
   (synchronized ('*db*)
+    (unlock-db *db*)
     (setq *db* (make-dead-db))))
 
 (defun check-version ()
@@ -461,9 +524,12 @@ properties."
   (db.sync (db))
   (values))
 
-(register-image-dump-hook 'save-database)
+(defun release-database ()
+  (when *db*
+    (save-database)
+    (unload-db)))
 
-(add-exit-hook #'save-database)
+(add-exit-hook #'release-database)
 
 (defun call/saving-database (thunk)
   "Call THUNK, saving the database afterwards, unless a save is
