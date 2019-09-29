@@ -78,6 +78,35 @@
   "Type for database values."
   't)
 
+(defcondition db-error (overlord-error)
+  ())
+
+(defcondition version-mismatch (db-error)
+  ((new-version :initarg :new-version)
+   (old-version :initarg :old-version))
+  (:report (lambda (c s)
+             (with-slots (new-version old-version) c
+               (format s "Database version mismatch: wanted ~a, got ~a."
+                       new-version
+                       old-version)))))
+
+(defcondition locked-db (db-error)
+  ((saved-pid :initarg :saved-pid))
+  (:report (lambda (c s)
+             (with-slots (pid saved-pid) c
+               (format s "The database is already locked by another process (pid ~a)."
+                       saved-pid)))))
+
+(defun db-error (control-str &rest args)
+  (make-condition 'db-error
+                  :format-control control-str
+                  :format-arguments args))
+
+(define-compiler-macro db-error (&whole call control-str &rest args)
+  (if (stringp control-str)
+      `(db-error (formatter ,control-str) ,@args)
+      call))
+
 (defgeneric db.ref (db key)
   (:documentation "Lookup KEY in DB."))
 
@@ -224,7 +253,8 @@ For debugging."
                                          :external-format :ascii))))
            (unless (= saved-pid pid)
              (cerror "Steal the database"
-                     "The database is already locked by another process.")
+                     'locked-db
+                     :saved-pid saved-pid)
              (delete-file-if-exists file)
              (go :retry))))))
 
@@ -347,7 +377,8 @@ If there is no difference, write nothing."
                                         ((typep data 'log-record)
                                          (rec (cons data records)))
                                         (t
-                                         (error "Invalid database log entry: ~a" data))))))))
+                                         (error (db-error "Invalid database log entry: ~a"
+                                                          data)))))))))
                         (maps
                           (mapcar #'log-record.data records))
                         (map
@@ -397,7 +428,7 @@ If there is no difference, write nothing."
 (defun reload-db ()
   "Reload the current version of the database from its log file."
   (when (in-worker?)
-    (error "Cannot load the DB from within a worker."))
+    (error (db-error "Cannot load the DB from within a worker.")))
   (lret* ((log-file (log-file-path))
           (log-data
            (progn
@@ -456,11 +487,14 @@ reloaded on demand."
 
 (defun check-version ()
   "Check that the database version matches the Overlord system version."
-  (unless (= (db.version *db*)
-             (db-version))
-    (cerror "Load the correct database"
-            "Database version mismatch")
-    (setq *db* (reload-db))))
+  (let ((new-version (db-version))
+        (old-version (db-version)))
+    (unless (= new-version old-version)
+      (cerror "Reload the database"
+              'version-mismatch
+              :new-version new-version
+              :old-version old-version)
+      (setq *db* (reload-db)))))
 
 (defplace db-ref* (key)
   (db.ref (db) key)
