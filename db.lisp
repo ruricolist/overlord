@@ -228,7 +228,6 @@ the stack so the error itself can be printed."
     (block escape
       (handler-bind ((serious-condition
                        (lambda (e)
-                         ;; Mutate the local binding only.
                          (return-from escape
                            (lambda ()
                              (error e))))))
