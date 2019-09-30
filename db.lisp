@@ -120,10 +120,12 @@
   (:documentation "Sync the database to disk."))
 
 (defgeneric lock-db (db)
-  (:documentation "Create a lockfile for the DB."))
+  (:documentation "Create a lockfile for the DB.")
+  (:method ((db t)) nil))
 
 (defgeneric unlock-db (db)
-  (:documentation "Remove the lockfile for the DB."))
+  (:documentation "Remove the lockfile for the DB.")
+  (:method ((db t)) nil))
 
 (defunit tombstone "A tombstone value.")
 
