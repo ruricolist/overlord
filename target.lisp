@@ -1805,11 +1805,9 @@ That is, does it begin and end with an asterisk?"
 
 (defclass pattern (externalizable)
   ((input-defaults
-    :initarg :input-defaults
     :type (list-of pathname)
     :reader pattern.input-defaults)
    (output-defaults
-    :initarg :output-defaults
     :type (list-of pathname)
     :reader pattern.output-defaults)
    (script
@@ -1822,13 +1820,13 @@ That is, does it begin and end with an asterisk?"
    :script trivial-prereq)
   (:documentation "A file-to-file build pattern."))
 
-(defmethod initialize-instance :after ((self pattern) &key)
+(defmethod initialize-instance :after ((self pattern) &key input-defaults output-defaults)
   (flet ((canonicalize-defaults (defaults)
-           (or (substitute *nil-pathname* nil defaults)
-               (list *nil-pathname*))))
-    (with-slots (input-defaults output-defaults) self
-      (callf #'canonicalize-defaults input-defaults)
-      (callf #'canonicalize-defaults output-defaults))))
+           (let ((defaults (ensure-list defaults)))
+             (or (substitute *nil-pathname* nil defaults)
+                 (list *nil-pathname*)))))
+    (setf (slot-value self 'input-defaults) (canonicalize-defaults input-defaults))
+    (setf (slot-value self 'output-defaults) (canonicalize-defaults output-defaults))))
 
 (defmethod load-form-slot-names append ((self pattern))
   '(input-defaults output-defaults script))
@@ -1875,27 +1873,49 @@ That is, does it begin and end with an asterisk?"
              (errorp (error* "No such pattern: ~s" pattern))
              (t nil))))))
 
-(defmacro defpattern (class-name
-                      (&key (in nil in-supplied?)
-                            (out nil out-supplied?)
-                            (dest nil dest-supplied?))
-                      (&rest initargs &key &allow-other-keys)
-                      &body script)
-  "Define a file pattern named NAME.
+(define-modify-macro ensure-listf () ensure-list)
 
-Some build systems let you define file patterns based on extensions or
-regular expressions. That won't work for Overlord, because there is no
-special namespace for targets, so such a rule would apply everywhere.
-It has to have a name.
+(defmacro defpattern (pattern-name
+                      (&rest initargs
+                       &key (in nil in-supplied?)
+                            (out nil out-supplied?)
+                            (dest nil dest-supplied?)
+                            ;; Just here so they show in eldoc.
+                            input-defaults
+                            output-defaults
+                       &allow-other-keys)
+                      &body script)
+  "Define a file pattern named PATTERN-NAME.
+
+This defines both a class and a function named PATTERN-NAME.
+
+Some build systems let you define implicit file patterns based on
+extensions or regular expressions. That won't work for Overlord,
+because there is no special namespace for targets, so such a rule
+would apply everywhere. It has to have a name.
 
 The behavior of `defpattern' changes based on the bindings you
-request. IN is bound to the name of the input file or files.
+request. IN is bound to the name of the input file (or files).
 
 For the meaning of OUT and DEST, compare the documentation for
-`file-target'."
-  (check-type in (list-of symbol))
-  (check-type out (list-of symbol))
-  (check-type dest (list-of symbol))
+`file-target'.
+
+INPUT-DEFAULTS and OUTPUT-DEFAULTS are each a pathname, or a list of
+pathnames, that will be merged with the input or output, respectively.
+They could be useful, among other things, to specify a default
+extension (`extension' may be useful for this)."
+  (check-type in (or symbol (list-of symbol)))
+  (check-type out (or symbol (list-of symbol)))
+  (check-type dest (or symbol (list-of symbol)))
+  (remove-from-plistf initargs :in :out :dest)
+  (ensure-listf in)
+  (ensure-listf out)
+  (ensure-listf dest)
+  ;; You could do this in the lambda list, but it would make
+  ;; it ugly and hard to read.
+  (ensure in   (list (string-gensym 'in)))
+  (ensure out  (list (string-gensym 'out)))
+  (ensure dest (list (string-gensym 'dest)))
   (mvlet ((class-options script
            (loop for form in script
                  if (and (consp form)
@@ -1903,31 +1923,26 @@ For the meaning of OUT and DEST, compare the documentation for
                    collect form into class-options
                  else collect form into script
                  finally (return (values class-options script))))
-          ;; You could do this in the lambda list, but it would make
-          ;; it ugly and hard to read.
-          (in   (or in   (list (string-gensym 'in))))
-          (out  (or out  (list (string-gensym 'out))))
-          (dest (or dest (list (string-gensym 'dest))))
           (in-temp   (string-gensym 'in))
           (dest-temp (string-gensym 'dest))
           (out-temp  (string-gensym 'out)))
     `(progn
-       (define-script-for ,class-name
+       (define-script-for ,pattern-name
          ;; Be careful not to splice in the gensyms.
          ,(and in-supplied? in)
          ,(and out-supplied? out)
          ,(and dest-supplied? dest)
          ,@initargs
          ,@script)
-       (defclass ,class-name (pattern)
+       (defclass ,pattern-name (pattern)
          ()
          (:default-initargs
-          :script ',(script-for class-name)
+          :script ',(script-for pattern-name)
           ;; Save the base around initforms.
           ,@(loop for (initarg initform) in (batches initargs 2)
                   append `(,initarg ,(wrap-save-base initform))))
          ,@class-options)
-       (defmethod pattern-build ((self ,class-name) ,in-temp ,dest-temp)
+       (defmethod pattern-build ((self ,pattern-name) ,in-temp ,dest-temp)
          (declare
           (ignorable
            ,@(unsplice (unless in-supplied? in-temp))))
@@ -1950,4 +1965,12 @@ For the meaning of OUT and DEST, compare the documentation for
                       ,form)))
                 `(progn
                    (mapc #'ensure-directories-exist ,dest-temp)
-                   ,form)))))))
+                   ,form))))
+       (defun ,pattern-name (&key ((:from inputs) nil inputs-supplied?)
+                                  ((:to outputs) nil outputs-supplied?))
+         (unless (or inputs-supplied? outputs-supplied?)
+           (error* "You must supply either or both of INPUTS or OUTPUTS."))
+         (make 'pattern-ref
+               :pattern ',pattern-name
+               :inputs (ensure-list inputs)
+               :outputs (ensure-list outputs))))))
