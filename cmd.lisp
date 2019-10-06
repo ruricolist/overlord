@@ -12,8 +12,7 @@
   (:export
    :cmd :$cmd
    :run-program-in-dir
-   :run-program-in-dir*
-   :resolve-executable))
+   :run-program-in-dir*))
 (cl:in-package :overlord/cmd)
 
 (defun $cmd (cmd &rest args)
@@ -229,39 +228,8 @@ process to change its own working directory."
               "File name ~a begins with a dash"
               string))))
 
-(defun exe (p)
-  (let* ((p (pathname p))
-         (type (pathname-type p)))
-    (if (and (os-windows-p)
-             (no type))
-        (make-pathname :type "exe"
-                       :defaults p)
-        p)))
-
 (defun exe-string (p)
   (stringify-pathname (exe p)))
-
-(defconst pathsep
-  (if (os-windows-p) #\; #\:))
-
-(defun $path ()
-  (mapcar #'uiop:pathname-directory-pathname
-          ;; Neither Windows nor POSIX supports escaping the separator
-          ;; in $PATH.
-          (split-sequence pathsep
-                          (getenv "PATH")
-                          :remove-empty-subseqs t)))
-
-(defun resolve-executable (p)
-  (let* ((p (exe p))
-         (name (pathname-name p))
-         (type (pathname-type p)))
-    (loop for dir in ($path)
-          for pathname = (make-pathname :name name
-                                        :type type
-                                        :defaults dir)
-          when (file-exists-p pathname)
-            do (return pathname))))
 
 (defun split-cmd (cmd)
   ;; NB UIOP expects simple-strings for arguments.
