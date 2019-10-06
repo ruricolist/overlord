@@ -222,7 +222,7 @@ files into DESTS."
 DATA may be a string or a byte vector.
 
 Return T if the file was written to, NIL otherwise."
-  (check-type file pathname)
+  (ensure-pathnamef file)
   (etypecase (assure vector data)
     (string
      (write-file-if-changed
@@ -243,6 +243,8 @@ Return T if the file was written to, NIL otherwise."
             t)))))
 
 (defun copy-file-if-changed (from to)
+  (ensure-pathnamef from)
+  (ensure-pathnamef to)
   (if (not (file-exists-p to))
       (copy-file from to)
       (unless (file= from to)
