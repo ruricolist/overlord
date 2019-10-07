@@ -10,6 +10,8 @@ It also solves certain problems specific to Lisp programming (namely,
 it lets you you reproducibly specify the desired state of a Lisp
 system which is to be saved as an image).
 
+Overlord is designed to be used from the Lisp REPL. A command line interface is available in [a separate repository][cli]
+
 For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
 might want to jump straight to the [tutorial for Lispers][tutorial].
 
@@ -106,6 +108,7 @@ You might want them again later. -->
 [Proctor]: https://github.com/ruricolist/proctor
 [Vernacular]: https://github.com/ruricolist/vernacular
 [tutorial]: https://github.com/ruricolist/overlord/wiki/Overlord-for-Lispers:-A-Tutorial
+[cli]: https://github.com/ruricolist/overlord-cli
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
