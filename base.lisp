@@ -67,7 +67,8 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
 
 (defun call/current-dir (thunk dir)
   (ensure-directories-exist dir)
-  (let ((*default-pathname-defaults* *nil-pathname*))
+  (let ((*base* dir)
+        (*default-pathname-defaults* *nil-pathname*))
     (setf (current-dir!) dir)
     (funcall thunk)))
 
