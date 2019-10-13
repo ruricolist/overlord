@@ -230,6 +230,7 @@ For debugging."
     (make-pathname :type "lock" :defaults log-file))
 
   (:method lock-db (db)
+    ;; XXX This locking scheme is currently effectively disabled.
     (let* ((file (db.lock-file db))
            (pid (or (getpid)
                     ;; Just in case we missed one.
@@ -254,9 +255,10 @@ For debugging."
                   (read-file-into-string file
                                          :external-format :ascii))))
            (unless (= saved-pid pid)
-             (cerror "Steal the database"
-                     'locked-db
-                     :saved-pid saved-pid)
+             ;; (cerror "Steal the database"
+             ;;         'locked-db
+             ;;         :saved-pid saved-pid)
+             (message "Database was locked by ~a, stealing." saved-pid)
              (delete-file-if-exists file)
              (go :retry))))))
 
