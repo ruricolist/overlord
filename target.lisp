@@ -728,22 +728,22 @@ You must either provide a list of outputs, or provide a list of inputs from whic
   (:method target-build-time (self)
     (build-time-from-files self inputs)))
 
-(defun pattern-ref (pattern inputs)
+(defun pattern-ref (inputs pattern)
   "Make a pattern reference."
-  (pattern-from pattern inputs))
+  (pattern-from inputs pattern))
 
-(defun pattern-from (pattern inputs)
+(defun pattern-from (inputs pattern)
   (make 'pattern-ref
         :pattern pattern
         :inputs (ensure-list inputs)))
 
-(defun pattern-into (pattern outputs)
+(defun pattern-into (outputs pattern)
   (make 'pattern-ref
         :pattern pattern
         :outputs (ensure-list outputs)))
 
-(defun pattern (name inputs)
-  (pattern-ref name inputs))
+(defun pattern (inputs name)
+  (pattern-ref inputs name))
 
 (defun make-pattern (pattern-name
                      &key (inputs nil inputs-supplied?)
