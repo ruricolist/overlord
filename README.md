@@ -10,7 +10,7 @@ It also solves certain problems specific to Lisp programming (namely,
 it lets you you reproducibly specify the desired state of a Lisp
 system which is to be saved as an image).
 
-Overlord is designed to be used from the Lisp REPL. A command line interface is available in [a separate repository][cli]
+Overlord is designed to be used from the Lisp REPL. A command line interface is available in [a separate repository][cli].
 
 For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
 might want to jump straight to the [tutorial for Lispers][tutorial].
