@@ -4,8 +4,12 @@
   (:import-from :overlord/base :base :current-dir!)
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream* :message)
-  (:import-from :uiop :os-windows-p :file-exists-p :getenv
-    :pathname-directory-pathname)
+  (:import-from :uiop
+                :os-unix-p
+                :native-namestring
+                :native-namestring
+                :os-windows-p :file-exists-p :getenv
+                :pathname-directory-pathname)
   (:import-from :trivia :match)
   (:import-from :overlord/build-env :register-proc*)
   (:import-from :shlex)
@@ -14,6 +18,19 @@
    :run-program-in-dir
    :run-program-in-dir*))
 (cl:in-package :overlord/cmd)
+
+(defparameter *can-use-env-c*
+  (and (os-unix-p)
+       (zerop
+        (nth-value 2
+          (uiop:run-program
+           `("env" "-C"
+                   ,(native-namestring
+                     (user-homedir-pathname))
+                   "pwd")
+           :ignore-error-status t
+           :output nil
+           :error-output nil)))))
 
 (defun $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
@@ -137,9 +154,7 @@ valid."
             (uiop:terminate-process proc)))))))
 
 (defun parse-cmd-args (args)
-  (nlet rec ((args args)
-             (tokens '())
-             (plist '()))
+  (nlet rec
     (match args
       ((list)
        (values (nreverse tokens)
@@ -187,39 +202,41 @@ The OS-level current directory is per-process, not per thread. Using
 `chdir' could lead to race conditions. Instead, we arrange for the new
 process to change its own working directory."
   (destructuring-bind (command . args) tokens
-    (if (not (os-windows-p))
-        `("/bin/sh"
-          "-c"
-          ;; Use Bernstein chaining; change to the directory in $1,
-          ;; shift, and exec the rest of the argument array. (If only
-          ;; there were a standard tool to do this, along the lines of
-          ;; chroot or su, so we wouldn't have to spin up a shell.
-          ;; Hopefully your distro uses something lighter than bash
-          ;; for /bin/sh.)
-          "set -e; CDPATH='' cd -P \"$1\"; shift; exec \"$@\""
-          ;; Terminate processing of shell options; everything
-          ;; after this is passed through.
-          "--"
-          ,dir
-          ,command
-          ,@args)
-        ;; This looks weird, but it actually works, because the
-        ;; Windows API to start a process is called with a
-        ;; string rather than an array. We could just as well
-        ;; pass a string, but then we would have to do our own
-        ;; escaping.
-        `("cmd"
-          "/c"
-          ;; Note that /d is required for cd to work across drives.
-          "cd" "/d" ,dir
-          ;; Ampersand is the command separator.
-          "&" ,command ,@args))))
+    (cond (*can-use-env-c*
+           ;; When there is a recent version of GNU env installed, the
+           ;; -C switch lets us do Bernstein chaining without spinning
+           ;; up a shell.
+           `("env" "-C" ,dir ,command ,@args))
+          ((not (os-windows-p))
+           `("/bin/sh"
+             "-c"
+             ;; Use Bernstein chaining; change to the directory in $1,
+             ;; shift, and exec the rest of the argument array.
+             "set -e; CDPATH='' cd -P \"$1\"; shift; exec \"$@\""
+             ;; Terminate processing of shell options; everything
+             ;; after this is passed through.
+             "--"
+             ,dir
+             ,command
+             ,@args))
+          ;; This looks weird, but it actually works, because the
+          ;; Windows API to start a process is called with a
+          ;; string rather than an array. We could just as well
+          ;; pass a string, but then we would have to do our own
+          ;; escaping.
+          (t
+           `("cmd"
+             "/c"
+             ;; Note that /d is required for cd to work across drives.
+             "cd" "/d" ,dir
+             ;; Ampersand is the command separator.
+             "&" ,command ,@args)))))
 
 (defun stringify-pathname (arg)
   (unless (pathnamep arg)
     (return-from stringify-pathname arg))
   (lret ((string
-          (let ((string (uiop:native-namestring arg)))
+          (let ((string (native-namestring arg)))
             (if (and (os-windows-p)
                      (or #+ccl t)
                      (position #\/ string))
