@@ -144,6 +144,11 @@ valid."
       ((list)
        (values (nreverse tokens)
                (nreverse plist)))
+      ((list* (and arg (type integer)) args)
+       (rec (cons (princ-to-string arg)
+                  args)
+            tokens
+            plist))
       ((list* (and arg (type string)) args)
        (rec args
             (nreconc (split-cmd arg) tokens)
