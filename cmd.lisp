@@ -154,7 +154,9 @@ valid."
             (uiop:terminate-process proc)))))))
 
 (defun parse-cmd-args (args)
-  (nlet rec
+  (nlet rec ((args args)
+             (tokens '())
+             (plist '()))
     (match args
       ((list)
        (values (nreverse tokens)
