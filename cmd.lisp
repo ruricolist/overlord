@@ -1,7 +1,7 @@
 (cl:defpackage :overlord/cmd
   (:use :cl :alexandria :serapeum)
   (:shadowing-import-from :serapeum :collecting :summing :in)
-  (:import-from :overlord/base :base :current-dir!)
+  (:import-from :overlord/base :base :current-dir! :with-current-dir)
   (:import-from :overlord/types :list-of :plist :error*)
   (:import-from :overlord/message :*message-stream* :message)
   (:import-from :uiop
@@ -112,8 +112,11 @@ valid."
 
 (defun run-program-in-dir* (tokens &rest args)
   "Run a program (with uiop:run-program) in the current base directory."
-  (let ((dir (stringify-pathname (current-dir!))))
-    (apply #'run-program-in-dir dir tokens args)))
+  (let ((dir (stringify-pathname
+              (or (getf args :directory)
+                  (current-dir!)))))
+    (apply #'run-program-in-dir dir tokens
+           (remove-from-plist args :directory))))
 
 (defun run-program-in-dir (dir tokens
                            &rest args
