@@ -72,7 +72,7 @@ On Windows, the .exe suffix may be omitted from the name of the
 executable."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
-    (message "$ ~{~a~^ ~}" tokens)
+    (message "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))
     (multiple-value-call #'run-program-in-dir*
       tokens
       (values-list args)
