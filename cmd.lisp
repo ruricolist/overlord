@@ -151,7 +151,7 @@ valid."
                    (cond ((zerop status)
                           status)
                          (ignore-error-status
-                          nil)
+                          status)
                          (t
                           (cerror "IGNORE-ERROR-STATUS"
                                   'uiop:subprocess-error
