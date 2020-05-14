@@ -16,7 +16,8 @@
   (:export
    :cmd :$cmd
    :run-program-in-dir
-   :run-program-in-dir*))
+   :run-program-in-dir*
+   :with-cmd-dir))
 (cl:in-package :overlord/cmd)
 
 (defparameter *can-use-env-c*
@@ -31,6 +32,10 @@
            :ignore-error-status t
            :output nil
            :error-output nil)))))
+
+(defmacro with-cmd-dir (dir &body body)
+  `(with-current-dir (,dir)
+     ,@body))
 
 (defun $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
