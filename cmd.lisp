@@ -33,6 +33,32 @@
            :output nil
            :error-output nil)))))
 
+(defparameter *keyword-abbrevs*
+  ;; >| would be |>\|| in Lisp syntax, not worth it.
+  ;; >? for Fish-style noclobber?
+  '((:in :directory _)
+    (:< :input _)
+    ((:> :1>) :output _)
+    (:>> :if-output-exists :append :output _)
+    (:2> :error-output _)
+    (:2>> :if-error-output-exists :append :error-output _)
+    ((:&> :>&)
+     :output _ :error-output _)
+    ((:&>> :>>&)
+     :if-error-output-exists :append
+     :if-output-exists :append
+     :error-output _
+     :output _)))
+
+(defun expand-keyword-abbrevs (args)
+  (collecting
+    (doplist (k v args)
+      (if-let (match (assoc k *keyword-abbrevs*
+                            :test #'member
+                            :key #'ensure-list))
+        (apply #'collect (substitute v '_ (rest match)))
+        (collect k v)))))
+
 (defmacro with-cmd-dir (dir &body body)
   `(with-current-dir (,dir)
      ,@body))
@@ -68,7 +94,10 @@ A pathname in ARGS is translated to a native namestring and passed as
 an argument to the command. The native namestring is not permitted to
 start with a dash.
 
-A property list is treated as a list of arguments to `uiop:run-program'.
+A property list is treated as a list of keyword arguments to
+`uiop:run-program'. Certain keywords are treated as abbreviations:
+e.g. `:>' is an abbreviation for `:output'. Abbreviations can be
+compound: e.g. `:>>' affects both `:output' and `:if-exists'.
 
 By default, standard output is sent to `*standard-output*', and error
 output is sent to `*message-stream*'.
@@ -77,8 +106,7 @@ On Windows, the .exe suffix may be omitted from the name of the
 executable."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
-    (when-let (dir (getf args :in))
-      (setf args (list* :directory dir (remove-from-plist args :in))))
+    (setf args (expand-keyword-abbrevs args))
     (message "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))
     (multiple-value-call #'run-program-in-dir*
       tokens
