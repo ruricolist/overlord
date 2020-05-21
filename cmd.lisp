@@ -250,7 +250,7 @@ process to change its own working directory."
   (lret ((string
           (let ((string (native-namestring arg)))
             (if (and (os-windows-p)
-                     (or #+ccl t)
+                     (featurep :ccl)
                      (position #\/ string))
                 ;; Work around a CCL bug; issue #103 on GitHub.
                 (substitute #\\ #\/ string)
