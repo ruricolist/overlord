@@ -248,7 +248,7 @@
                     ($cmd "echo" #p"hello")
                     ($cmd '("echo" #p "hello"))))
         (let ((file (asdf-system-relative-pathname :overlord "tests/literal.txt")))
-          (is (equal (read-file-into-string file)
+          (is (equal (chomp (read-file-into-string file))
                      ($cmd "cat" file)))))
       (skip "Not on Unix")))
 
