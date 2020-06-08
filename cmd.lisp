@@ -14,7 +14,7 @@
   (:import-from :overlord/build-env :register-proc*)
   (:import-from :shlex)
   (:export
-   :cmd :$cmd
+   :cmd :$cmd :cmd?
    :run-program-in-dir
    :run-program-in-dir*
    :with-cmd-dir))
@@ -63,7 +63,17 @@
   `(with-current-dir (,dir)
      ,@body))
 
-(defun $cmd (cmd &rest args)
+(defmacro define-cmd-variant (name lambda-list &body body)
+  (let ((docstring (and (stringp (car body)) (pop body))))
+    `(progn
+       (defun ,name ,lambda-list
+         ,@(unsplice docstring)
+         ,@body)
+       (define-compiler-macro ,name (cmd &rest args)
+         `(locally (declare (notinline ,',name))
+            (,',name ,@(simplify-cmd-args (cons cmd args))))))))
+
+(define-cmd-variant $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell."
   (chomp
@@ -73,11 +83,16 @@ newlines, like $(cmd) would in a shell."
             :output s
             args))))
 
-(define-compiler-macro $cmd (cmd &rest args)
-  `(locally (declare (notinline $cmd))
-     ($cmd ,@(simplify-cmd-args (cons cmd args)))))
+(define-cmd-variant cmd? (cmd &rest args)
+  (let ((exit-code
+          (apply #'cmd
+                 cmd
+                 :ignore-error-status t
+                 args)))
+    (if (zerop exit-code) t
+        (values nil exit-code))))
 
-(defun cmd (cmd &rest args)
+(define-cmd-variant cmd (cmd &rest args)
   "Run a program.
 
 CMD should be a string naming a program. This command will be run with
@@ -113,12 +128,6 @@ executable."
       (values-list args)
       :output *standard-output*
       :error-output *message-stream*)))
-
-(define-compiler-macro cmd (cmd &rest args)
-  "At compile time, make sure the keyword arguments are syntactically
-valid."
-  `(locally (declare (notinline cmd))
-     (cmd ,@(simplify-cmd-args (cons cmd args)))))
 
 (defun simplify-cmd-args (args)
   (nlet rec ((args-in args)
