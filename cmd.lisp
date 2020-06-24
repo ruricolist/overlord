@@ -60,7 +60,7 @@
         (collect k v)))))
 
 (defmacro with-cmd-dir (dir &body body)
-  `(with-current-dir (,dir)
+  `(with-current-dir ((pathname ,dir))
      ,@body))
 
 (defmacro define-cmd-variant (name lambda-list &body body)
