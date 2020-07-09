@@ -20,7 +20,7 @@
    :with-cmd-dir))
 (cl:in-package :overlord/cmd)
 
-(defparameter *can-use-env-c*
+(defun can-use-env-c? ()
   (and (os-unix-p)
        (zerop
         (nth-value 2
@@ -32,6 +32,14 @@
            :ignore-error-status t
            :output nil
            :error-output nil)))))
+
+(defparameter *can-use-env-c*
+  (can-use-env-c?))
+
+(defun update-can-use-env-c ()
+  (setf *can-use-env-c* (can-use-env-c?)))
+
+(uiop:register-image-restore-hook 'update-can-use-env-c)
 
 (defparameter *keyword-abbrevs*
   ;; >| would be |>\|| in Lisp syntax, not worth it.
