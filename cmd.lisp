@@ -14,9 +14,7 @@
   (:import-from :overlord/build-env :register-proc*)
   (:import-from :shlex)
   (:export
-   :cmd :$cmd :cmd?
-   :run-program-in-dir
-   :run-program-in-dir*
+   :cmd :$cmd :cmd? :cmd&
    :with-cmd-dir))
 (cl:in-package :overlord/cmd)
 
@@ -127,15 +125,29 @@ output is sent to `*message-stream*'.
 
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
+  (multiple-value-bind (proc tokens args)
+      (apply #'cmd& cmd args)
+    (await proc
+           :ignore-error-status (getf args :ignore-error-status)
+           :tokens tokens)))
+
+(define-cmd-variant cmd& (cmd &rest args)
+  "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
     (setf args (expand-keyword-abbrevs args))
     (message "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))
-    (multiple-value-call #'run-program-in-dir*
-      tokens
-      (values-list args)
-      :output *standard-output*
-      :error-output *message-stream*)))
+    (destructuring-bind (&key (output *standard-output*)
+                              (error-output *message-stream*)
+                         &allow-other-keys)
+        args
+      (values
+       (multiple-value-call #'launch-program-in-dir*
+         tokens
+         (values-list args)
+         :output output
+         :error-output error-output)
+       tokens args))))
 
 (defun simplify-cmd-args (args)
   (nlet rec ((args-in args)
@@ -162,51 +174,56 @@ executable."
       ((list* x xs)
        (rec xs (cons x args-out))))))
 
-(defun run-program-in-dir* (tokens &rest args)
+(defun launch-program-in-dir* (tokens &rest args)
   "Run a program (with uiop:run-program) in the current base directory."
   (let ((dir (stringify-pathname
               (or (getf args :directory)
                   (current-dir!)))))
-    (apply #'run-program-in-dir dir tokens
+    (apply #'launch-program-in-dir dir tokens
            (remove-from-plist args :directory))))
 
-(defun run-program-in-dir (dir tokens
-                           &rest args
-                           &key ignore-error-status
-                                (output *standard-output*)
-                                (error-output *message-stream*)
-                           &allow-other-keys)
-  "Run a program (with `uiop:run-program`) with DIR as its working directory."
-  (handler-bind ((serious-condition
-                   (lambda (e) (declare (ignore e))
-                     (finish-output output)
-                     (finish-output error-output))))
-    (let* ((cmd
-             ;; NB The :directory argument to launch-program may end up
-             ;; calling `chdir', which is unacceptable.
-             (wrap-with-dir dir tokens))
-           (proc
-             (multiple-value-call #'uiop:launch-program cmd
-               (values-list args))))
-      (register-proc* proc)
-      (let ((abnormal? t))
-        (unwind-protect
-             (multiple-value-prog1
-                 (let ((status (uiop:wait-process proc)))
-                   (cond ((zerop status)
-                          status)
-                         (ignore-error-status
-                          status)
-                         (t
-                          (cerror "IGNORE-ERROR-STATUS"
-                                  'uiop:subprocess-error
-                                  :command tokens
-                                  :code status
-                                  :process proc)
-                          status)))
-               (setf abnormal? nil))
-          (when abnormal?
-            (uiop:terminate-process proc)))))))
+(defun launch-program-in-dir (dir tokens
+                              &rest args
+                              &key
+                              &allow-other-keys)
+  (let* ((cmd
+           ;; NB The :directory argument to launch-program may end up
+           ;; calling `chdir', which is unacceptable.
+           (wrap-with-dir dir tokens))
+         (proc
+           (multiple-value-call #'uiop:launch-program cmd
+             (values-list args))))
+    (register-proc* proc)
+    proc))
+
+(defun await (proc &key ignore-error-status tokens)
+  "Wait for PROC to finish."
+  (nest
+   (let ((out (uiop:process-info-output proc))
+         (err (uiop:process-info-error-output proc))))
+   (handler-bind ((serious-condition
+                    ;; Flush output on error.
+                    (lambda (e) (declare (ignore e))
+                      (finish-output out)
+                      (finish-output err)))))
+   (let ((abnormal? t)))
+   (unwind-protect
+        (multiple-value-prog1
+            (let ((status (uiop:wait-process proc)))
+              (cond ((zerop status)
+                     status)
+                    (ignore-error-status
+                     status)
+                    (t
+                     (cerror "IGNORE-ERROR-STATUS"
+                             'uiop:subprocess-error
+                             :command tokens
+                             :code status
+                             :process proc)
+                     status)))
+          (setf abnormal? nil))
+     (when abnormal?
+       (uiop:terminate-process proc)))))
 
 (defun parse-cmd-args (args)
   (nlet rec ((args args)
