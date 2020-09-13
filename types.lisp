@@ -29,16 +29,7 @@
    #:delay-symbol
    #:maybe-delay-symbol
    #:force-symbol
-   ;; Pathname types.
-   #:wild-pathname
    #:tame-pathname
-   #:absolute-pathname
-   #:relative-pathname
-   #:directory-pathname
-   #:absolute-directory-pathname
-   #:file-pathname
-   #:physical-pathname
-   #:temporary-file
    #:hash-code
    ;; Symbols
    #:cl-symbol
@@ -251,40 +242,8 @@ If DELAY is not a delayed symbol, return it (second value T)."
 
 ;;; Pathname types.
 
-(deftype wild-pathname ()
-  "A pathname with wild components."
-  '(and pathname (satisfies wild-pathname-p)))
-
 (deftype tame-pathname ()
-  "A pathname without wild components."
-  '(or directory-pathname
-    (and pathname (not (satisfies wild-pathname-p)))))
-
-(deftype absolute-pathname ()
-  '(and pathname (satisfies absolute-pathname-p)))
-
-(deftype relative-pathname ()
-  '(and pathname (satisfies relative-pathname-p)))
-
-(deftype directory-pathname ()
-  '(and pathname (satisfies directory-pathname-p)))
-
-(deftype absolute-directory-pathname ()
-  '(and absolute-pathname directory-pathname))
-
-(deftype file-pathname ()
-  '(and pathname (satisfies file-pathname-p)))
-
-;;; logical-pathname is defined in CL.
-
-(deftype physical-pathname ()
-  '(and pathname (not (satisfies logical-pathname-p))))
-
-(defun temporary-file? (file)
-  (subpathp file (default-temporary-directory)))
-
-(deftype temporary-file ()
-  '(and pathname (satisfies temporary-file?)))
+  'non-wild-pathname)
 
 
 ;;; Symbol types.

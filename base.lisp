@@ -39,7 +39,7 @@
   (and (absolute-pathname-p x)
        (directory-pathname-p x)))
 
-(defun absolute-directory-pathname (x)
+(defun ensure-absolute-directory-pathname (x)
   "Resolve X as an absolute directory pathname."
   (assure absolute-directory-pathname
     (if (absolute-directory-pathname? x) x
@@ -57,10 +57,10 @@ Otherwise, resolve `*default-pathname-defaults*' to an absolute directory, set `
   (let ((dpd *default-pathname-defaults*))
     (if (absolute-directory-pathname? dpd) dpd
         (setf *default-pathname-defaults*
-              (absolute-directory-pathname dpd)))))
+              (ensure-absolute-directory-pathname dpd)))))
 
 (defun (setf current-dir!) (dir)
-  (lret ((dir (absolute-directory-pathname dir)))
+  (lret ((dir (ensure-absolute-directory-pathname dir)))
     (ensure-directories-exist dir)
     (unless (pathname-equal dir *default-pathname-defaults*)
       (setf *default-pathname-defaults* dir))))
@@ -164,7 +164,7 @@ time as well as load time."
   "Return the current base, which is either the current value of
 `*base*' (if that is bound) or the base of the current package."
   #+(or) (or *compile-file-truename* *load-truename*)
-  (absolute-directory-pathname
+  (ensure-absolute-directory-pathname
    (if (boundp '*base*) *base*
        (package-base (base-package)))))
 
