@@ -62,9 +62,6 @@ If you want to call an ASDF function in another package, don't! Add a wrapper fo
 (defun asdf-system? (system)
   (typep system 'asdf:system))
 
-(-> asdf-system-name-keyword
-    ((or asdf:system string keyword))
-    (values keyword &optional))
 (defun asdf-system-name-keyword (system)
   (etypecase system
     (asdf:system
