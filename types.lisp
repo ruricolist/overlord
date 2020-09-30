@@ -29,6 +29,7 @@
    #:delay-symbol
    #:maybe-delay-symbol
    #:force-symbol
+   #:temporary-file
    #:tame-pathname
    #:hash-code
    ;; Symbols
@@ -241,6 +242,12 @@ If DELAY is not a delayed symbol, return it (second value T)."
 
 
 ;;; Pathname types.
+
+(defun temporary-file? (file)
+  (subpathp file (default-temporary-directory)))
+
+(deftype temporary-file ()
+  '(and pathname (satisfies temporary-file?)))
 
 (deftype tame-pathname ()
   'non-wild-pathname)
