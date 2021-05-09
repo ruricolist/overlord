@@ -41,7 +41,7 @@
    :overlord/message
    :overlord/target-protocol
    :overlord/oracle
-   :overlord/cmd
+   :cmd
    :overlord/project-system))
 
 (defpackage :overlord-user

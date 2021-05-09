@@ -24,8 +24,7 @@
     :asdf-system-version)
   (:import-from :overlord/util
     :version-major-version)
-  (:import-from :overlord/cmd
-    :$cmd)
+  (:import-from :cmd :$cmd)
   (:import-from :fset)
   (:import-from #:cl-strftime
     #:format-time)

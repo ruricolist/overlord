@@ -35,7 +35,7 @@
     ;; Logging.
     :overlord/message
     ;; Running shell commands.
-    :overlord/cmd
+    :cmd
     ;; The database.
     :overlord/db
     ;; Freezing the state of the Lisp image.
