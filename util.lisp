@@ -266,10 +266,14 @@ nicknames."
     (find-package package-designator)))
 
 (defun file-mtime (pathname)
-  "Same as `file-write-date'.
+  "As `file-write-date', but check if the file exists first.
 This is provided in case we ever want to offer more precise timestamps
-on Lisp/OS/filesystem combinations that support it."
-  (cl:file-write-date pathname))
+on Lisp/OS/filesystem combinations that support it, and for
+implementations which signal an error rather than returning nil when
+PATHNAME does not exist."
+  (and
+   (cl:probe-file pathname)
+   (cl:file-write-date pathname)))
 
 (defmacro propagate-side-effect (&body body &environment env)
   "Force BODY to be evaluated both at compile time AND load time (but
