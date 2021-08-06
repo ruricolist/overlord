@@ -1,16 +1,15 @@
 # Overlord
 
-Overlord is a build system written in Common Lisp.
+Overlord is a build system in Common Lisp. It is a real build system,
+with all the modern features: rules with multiple outputs, parallel
+builds, immunity to clock issues, and dynamic dependencies.
 
-It has the features you would expect of any reasonably modern build
-system: rules with multiple outputs, parallel builds, immunity to
-clock issues, and dynamic dependencies.
+But Overlord is more than another build system. Overlord is a uniform
+approach to dependencies inside or outside of a Lisp image. Overlord
+is to Make what Lisp macros are to C macros.
 
-It also solves certain problems specific to Lisp programming (namely,
-it lets you you reproducibly specify the desired state of a Lisp
-system which is to be saved as an image).
-
-Overlord is designed to be used from the Lisp REPL. A command line interface is available in [a separate repository][cli].
+Overlord is designed to be used from the Lisp REPL. A command line
+interface is available in [a separate repository][cli].
 
 For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
 might want to jump straight to the [tutorial for Lispers][tutorial].
