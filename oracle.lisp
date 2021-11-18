@@ -350,7 +350,7 @@ an argument of `--version'."
 ;;; Glob oracles.
 
 (defun wildcard-hash (wildcard)
-  (declare ((and absolute-pathname wild-pathname) wildcard))
+  (declare (type (and absolute-pathname wild-pathname) wildcard))
   (let* ((files (directory wildcard))
          (files (map 'vector #'namestring files))
          (files (sort files #'string<))
