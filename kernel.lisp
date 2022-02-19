@@ -19,27 +19,9 @@
 
 (defconst thread-count-cap 20)
 
-(defun nproc-string ()
-  (handler-case
-      (cond
-        ((uiop:os-macosx-p)             ;NB macosx is also unix.
-         (uiop:run-program
-          '("sysctl" "-n" "hw.physicalcpu")
-          :output :string))
-        ((uiop:os-unix-p)
-         (uiop:run-program
-          '("nproc" "--all")
-          :output :string))
-        ;; TODO do something reasonable for Windows
-        ((uiop:os-windows-p)
-         (uiop:getenv "NUMBER_OF_PROCESSORS"))
-        (t "2"))
-    (serious-condition ()
-      "2")))
-
 (defun nproc ()
   (assure (integer 1 *)
-    (parse-integer (nproc-string) :junk-allowed t)))
+    (count-cpus :online nil)))
 
 (def nproc
   (nproc))
