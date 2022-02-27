@@ -1,15 +1,20 @@
 # Overlord
 
+## Introduction
+
 Overlord is a build system in Common Lisp. It is a real build system,
 with all the modern features: rules with multiple outputs, parallel
 builds, immunity to clock issues, and dynamic dependencies.
 
 But Overlord is more than another build system. Overlord is a uniform
-approach to dependencies inside or outside of a Lisp image. Overlord
-is to Make what Lisp macros are to C macros.
+approach to dependencies inside or outside of a Lisp image.
+Conceptually, Overlord is to Make what Lisp macros are to C macros.
 
-Overlord is designed to be used from the Lisp REPL. A command line
-interface is available in [a separate repository][cli].
+Overlord uses a persistent store to track dependencies. This small
+overhead translates into drastically simplified semantics for the
+programmer. Much like garbage collection allows programmers largely
+not to have to think about lifetimes, persistent dependencies allow
+programmers largely not to have to think about phasing.
 
 For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
 might want to jump straight to the [tutorial for Lispers][tutorial].
@@ -108,6 +113,7 @@ You might want them again later. -->
 [Vernacular]: https://github.com/ruricolist/vernacular
 [tutorial]: https://github.com/ruricolist/overlord/wiki/Overlord-for-Lispers:-A-Tutorial
 [cli]: https://github.com/ruricolist/overlord-cli
+[harmful]: https://accu.org/journals/overload/14/71/miller_2004/
 
 <!-- NB Don’t remove links, even if they’re not currently being used.
 You might want them again later. -->
