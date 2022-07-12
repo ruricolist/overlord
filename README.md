@@ -17,7 +17,7 @@ not to have to think about lifetimes, persistent dependencies allow
 programmers largely not to have to think about phasing.
 
 For more discussion, [consult the wiki][wiki]. If you are a Lisper, you
-might want to jump straight to the [tutorial for Lispers][tutorial].
+might want to jump straight to the [intro for Lispers][intro].
 
 ## Advice for users
 
@@ -111,7 +111,8 @@ You might want them again later. -->
 [parallelism]: https://github.com/ruricolist/overlord/wiki/Parallelism-in-Overlord
 [Proctor]: https://github.com/ruricolist/proctor
 [Vernacular]: https://github.com/ruricolist/vernacular
-[tutorial]: https://github.com/ruricolist/overlord/wiki/Overlord-for-Lispers:-A-Tutorial
+[intro]:
+https://github.com/ruricolist/overlord/wiki/Overlord-for-Lispers
 [cli]: https://github.com/ruricolist/overlord-cli
 [harmful]: https://accu.org/journals/overload/14/71/miller_2004/
 
