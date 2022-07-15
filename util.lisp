@@ -143,7 +143,9 @@
                                      :end1 end1))))))))
 
 (defun rename-by-copying (tmp dest)
-  (copy-file tmp dest :if-to-exists :rename-and-delete))
+  (copy-file tmp dest
+             :if-to-exists :rename-and-delete
+             :finish-output t))
 
 (defun call/temp-file-pathname (dest fn)
   "Like `call/temp-file-pathnames`, but for a single file."
