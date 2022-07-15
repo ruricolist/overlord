@@ -5,6 +5,7 @@
     :with-import-default :require-default
     :depends-on
     :cmd :$cmd)
+  (:import-from :overlord/stamp :timestamp-newer? :never :far-future)
   (:import-from :overlord/target :target-timestamp)
   (:import-from :overlord/types :overlord-error)
   (:import-from :overlord/asdf
@@ -142,6 +143,10 @@
     (test-namestring ".x")
     (test-namestring "x/y/.z")
     (test-namestring "x/y/z")))
+
+(test timestamp-newer-regression
+  (is (not (timestamp-newer? never never)))
+  (is (not (timestamp-newer? far-future far-future))))
 
 
 ;;; Definition form tests.

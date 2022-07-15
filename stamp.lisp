@@ -133,9 +133,10 @@ shadowed."
   "Is TS1 greater than TS2?"
   (dispatch-case ((ts1 target-timestamp)
                   (ts2 target-timestamp))
+    ((never never) nil)
     ((target-timestamp never) t)
-    ((target-timestamp far-future) nil)
     ((never target-timestamp) nil)
+    ((target-timestamp far-future) nil)
     ((far-future target-timestamp) t)
 
     ((timestamp timestamp)
