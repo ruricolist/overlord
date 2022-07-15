@@ -125,6 +125,24 @@
 (defmacro disable (&body body)
   `(comment ,@body))
 
+(test file-target-pathnames-are-readable
+  (flet ((test-namestring (namestring)
+           (let* ((path (overlord:ensure-file-target-pathname namestring))
+                  (path-as-read
+                    (read-from-string (write-to-string path :readably t))))
+             (is (pathnamep path-as-read))
+             (is (equal path-as-read path))
+             (is (uiop:pathname-equal path-as-read path))
+             (is (fset:equal? path-as-read path))
+             (is (same #'pathname-version (list path path-as-read)))
+             (is (same #'pathname-type (list path path-as-read))))))
+    (test-namestring ".cache/lang/cache")
+    (test-namestring "")
+    (test-namestring "x/")
+    (test-namestring ".x")
+    (test-namestring "x/y/.z")
+    (test-namestring "x/y/z")))
+
 
 ;;; Definition form tests.
 

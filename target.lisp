@@ -136,7 +136,9 @@
    :list-package-prereqs
    :directory-exists
    :path
-   :file))
+   :file
+   :ensure-file-target-pathname
+   :canonicalize-pathname-for-readability))
 
 (in-package :overlord/target)
 (in-readtable :standard)
@@ -1478,7 +1480,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
   "Update the stamp for NAME with VAL."
   (let ((old-stamp
           (if (boundp name)
-              (target-timestamp name)
+              (target-stamp name)
               never))
         (new-stamp
           (assure stamp
@@ -1683,11 +1685,35 @@ Unlike tasks defined using `deftask', tasks defined using
 ;;; the same file should not be a target under two names, with two
 ;;; scripts.
 
+(defun canonicalize-pathname-for-readability (pathname)
+  "Return a copy of PATHNAME with the version and type set in ways
+that will be readable for this LISP."
+  (with-accessors ((version pathname-version)
+                   (type pathname-type)
+                   (directory pathname-directory))
+      pathname
+    (make-pathname
+     :defaults pathname
+     :directory
+     (if (equal directory '(:relative))
+         #.(pathname-directory #p"")
+         directory)
+     :version
+     (if (member version '(:newest nil))
+         (if (directory-pathname-p pathname)
+             #.(pathname-version #p"x/")
+             #.(pathname-version #p"dummy.x"))
+         version)
+     :type (if (member type '(:unspecific nil))
+               #.(pathname-type #p"no-extension")
+               type))))
+
 (defun ensure-file-target-pathname (pathname)
-  (ensure-pathname pathname
-                   :want-pathname t
-                   :want-relative t
-                   :want-non-wild t))
+  (canonicalize-pathname-for-readability
+   (ensure-pathname pathname
+                    :want-pathname t
+                    :want-relative t
+                    :want-non-wild t)))
 
 (defun file-target-name-file-name (name)
   (setf name (string name))
