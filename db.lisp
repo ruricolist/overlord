@@ -216,15 +216,18 @@ For debugging."
     (values))
 
   (:method db.sync (db)
-    (flet ((sync ()
-             (synchronized (db)
-               (append-to-log log-file
-                              last-saved-map
-                              current-map)
-               (setf last-saved-map current-map))))
-      (if (use-threads-p)
-          (make-thread #'sync :name "Overlord: saving database")
-          (sync))))
+    (let ((output *message-stream*))
+      (flet ((sync ()
+               (synchronized (db)
+                 (when (append-to-log log-file
+                                      last-saved-map
+                                      current-map)
+                   (setf last-saved-map current-map)
+                   (let ((*message-stream* output))
+                     (message "Wrote database"))))))
+        (if (use-threads-p)
+            (make-thread #'sync :name "Overlord: saving database")
+            (sync)))))
 
   (:method db.lock-file (db)
     (make-pathname :type "lock" :defaults log-file))
@@ -336,13 +339,18 @@ the stack so the error itself can be printed."
                  :pretty nil
                  :circle nil))))
 
+(-> append-to-log (t fset:map fset:map) boolean)
 (defun append-to-log (log last-saved-map current-map)
   "Compute the difference between CURRENT-MAP and LAST-SAVED-MAP and
 write it into LOG.
 
-If there is no difference, write nothing."
+If there is no difference, write nothing.
+
+Return T if something was written, nil otherwise."
   (unless (eql last-saved-map current-map)
-    (let ((diff (fset:map-difference-2 current-map last-saved-map)))
+    (let ((diff
+            ;; This returns just the pairs that are new in current-map
+            (fset:map-difference-2 current-map last-saved-map)))
       (unless (fset:empty? diff)
         (let ((record (make-log-record :data diff)))
           (with-output-to-file (out (ensure-directories-exist log)
@@ -350,7 +358,8 @@ If there is no difference, write nothing."
                                     :if-does-not-exist :create
                                     :if-exists :append)
             (db-write record out)
-            (finish-output out)))))))
+            (finish-output out)
+            t))))))
 
 (defun strip-tombstones (map)
   "Strip key-value pairs with tombstone values from MAP."
