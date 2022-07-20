@@ -9,9 +9,6 @@
     #:pmap
     #:task-handler-bind
     #:invoke-transfer-error)
-  (:import-from #:bordeaux-threads
-    #:make-lock
-    #:with-lock-held)
   (:import-from #:uiop
     #:register-image-dump-hook)
   (:export
@@ -33,10 +30,8 @@
   (min thread-count-cap
        (* 2 nproc)))
 
-(def +meta-kernel+ nil
+(defvar *meta-kernel* nil
   "Lparallel kernel for fetching target metadata.")
-
-(def +meta-kernel-lock+ (make-lock))
 
 (defun call/meta-kernel (thunk)
   (if (use-threads-p)
@@ -51,23 +46,23 @@
 
 (defun ensure-meta-kernel ()
   (start-meta-kernel)
-  +meta-kernel+)
+  *meta-kernel*)
 
 (defun start-meta-kernel ()
-  (unless +meta-kernel+
-    (with-lock-held (+meta-kernel-lock+)
-      (unless +meta-kernel+
+  (unless *meta-kernel*
+    (synchronized ('*meta-kernel*)
+      (unless *meta-kernel*
         (message "Initializing metadata thread pool for session")
-        (setf +meta-kernel+
+        (setf *meta-kernel*
               (make-kernel meta-kernel-size
                            :name "Overlord metadata fetcher"))))))
 
 (defun end-meta-kernel ()
   "Terminate the Overlord kernel."
-  (when +meta-kernel+
-    (with-lock-held (+meta-kernel-lock+)
-      (when-let (kernel +meta-kernel+)
-        (setf +meta-kernel+ nil)
+  (when *meta-kernel*
+    (synchronized ('*meta-kernel*)
+      (when-let (kernel *meta-kernel*)
+        (setf *meta-kernel* nil)
         (message "Terminating Overlord metadata thread pool")
         (let ((*kernel* kernel))
           (end-kernel :wait t))))))
