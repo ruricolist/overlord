@@ -3,7 +3,8 @@
   (:use :cl :alexandria :serapeum
     :overlord/redo
     :overlord/db
-    :overlord/types)
+    :overlord/types
+    :overlord/message)
   (:import-from :overlord/specials
     :*suppress-phonies*)
   (:import-from :overlord/kernel
@@ -62,14 +63,14 @@ distributed."
   ;; NB. You should be able to load an image and save it again.
   (unless (frozen?)
     (labels ((freeze ()
-               (format t "~&Overlord: freezing image...~%")
+               (message "Freezing image...")
                (redo)
                ;; The DB can still be reloaded, but is not in memory.
                (unload-db)
                (setf *frozen* t))
              (hard-freeze ()
                (freeze)
-               (format t "~&Overlord: hard freeze...~%")
+               (message "Hard freeze...")
                (fmakunbound 'unfreeze)
                (run-hooks '*before-hard-freeze-hook*)
                ;; The DB will not be reloaded.
