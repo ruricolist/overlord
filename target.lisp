@@ -441,7 +441,7 @@ inherit a method on `make-load-form', and need only specialize
   (:method print-object (self stream)
     (if (not *print-escape*)
         (print-unreadable-object (self stream :type t)
-          (format t "~a" name))
+          (format stream "~a" name))
         (call-next-method)))
 
   (:method fset:compare (self (other ref))
@@ -817,7 +817,7 @@ treated as out-of-date, regardless of file metadata."))
   (:method print-object (self stream)
     (if (not *print-escape*)
         (print-unreadable-object (self stream :type t)
-          (format t "~a ~a" system path))
+          (format stream "~a ~a" system path))
         (progn
           (write-string (read-eval-prefix self stream) stream)
           (format stream "~s"
