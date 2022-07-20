@@ -9,7 +9,7 @@
     #:pmap
     #:task-handler-bind
     #:invoke-transfer-error)
-  (:import-from #:bt
+  (:import-from #:bordeaux-threads
     #:make-lock
     #:with-lock-held)
   (:import-from #:uiop
