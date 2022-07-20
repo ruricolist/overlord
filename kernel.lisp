@@ -62,6 +62,7 @@
   (when (boundp '*meta-kernel*)
     (synchronized ('*meta-kernel*)
       (when-let (*kernel* (bound-value '*meta-kernel*))
+        (makunbound '*meta-kernel*)
         (message "Terminating Overlord metadata thread pool")
         (end-kernel :wait t)))))
 
