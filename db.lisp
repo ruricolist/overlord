@@ -168,11 +168,12 @@ For debugging."
       (fset:do-map (k v map)
         (collect (cons k v))))))
 
-(-> log-file-size (pathname)  (integer 0 *))
+(-> log-file-size (pathname) (integer 0 *))
 (defun log-file-size (log-file)
   "Return the size on disk of LOG-FILE."
   (if (file-exists-p log-file)
-      (values (file-size-in-octets log-file))
+      (or (values (file-size-in-octets log-file))
+          0)
       0))
 
 (defmethods db (db (version #'db.version)
