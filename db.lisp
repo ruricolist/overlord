@@ -262,7 +262,7 @@ For debugging."
              ;; (cerror "Steal the database"
              ;;         'locked-db
              ;;         :saved-pid saved-pid)
-             (message "Database was locked by ~a, stealing." saved-pid)
+             ;; (message "Database was locked by ~a, stealing." saved-pid)
              (delete-file-if-exists file)
              (go :retry))))))
 
