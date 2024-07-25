@@ -39,6 +39,8 @@
   (:import-from :overlord/specials
                 :register-worker-special
                 :use-threads-p)
+  (:import-from :overlord/stamp
+                :never)
   (:import-from :overlord/types
                 :error*)
   (:import-from :uiop
@@ -342,7 +344,9 @@ actually being used, so we know how many to allocate for the next run."
 already built it."
   (or (and (build-env-bound?)
            (use-build-cache?)
-           (true (cached-stamp target)))
+           (let ((stamp (cached-stamp target)))
+             (unless (eql stamp never)
+               (true stamp))))
       (target-exists? target)))
 
 (defun target-stamp/cache (target)
