@@ -83,7 +83,7 @@ Not every target type supports this.")
     (declare (ignore timestamp))
     (error* "Cannot set timestamp for ~a" target)))
 
-(-> target-exists? (t) boolean)
+;; (-> target-exists? (t) boolean)
 (defgeneric target-exists? (target)
   (:documentation "Does TARGET exists?")
   (:method :around (target)
@@ -92,7 +92,7 @@ Not every target type supports this.")
   (:method (target)
     (not (eql never (target-stamp target)))))
 
-(-> target= (t t) boolean)
+;; (-> target= (t t) boolean)
 (defgeneric target= (target1 target2)
   (:documentation "Are TARGET1 and TARGET2 the same?")
   ;; This is OK because we expect objects representing targets to be
@@ -103,7 +103,7 @@ Not every target type supports this.")
     (or (eql t1 t2)
         (call-next-method))))
 
-(-> hash-target (t) hash-code)
+;; (-> hash-target (t) hash-code)
 (defgeneric hash-target (target)
   (:documentation "Hash TARGET.
 
