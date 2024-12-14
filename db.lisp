@@ -245,13 +245,19 @@ For debugging."
       (tagbody
        :retry
          (handler-case
-             (with-output-to-file (out file
-                                       :if-exists :error
-                                       :if-does-not-exist :create
-                                       :external-format :ascii)
-               ;; "HDB UUCP lock file format" (according to the FHS).
-               (format out "~10d~%" pid))
-           (file-error ()
+             (let* ((dir (pathname-directory-pathname file))
+                    (tmpfile
+                      (uiop:with-temporary-file (:pathname p
+                                                 :directory dir
+                                                 :keep t)
+                        (with-output-to-file (out p
+                                                  :external-format :ascii
+                                                  :if-exists :overwrite)
+                          ;; "HDB UUCP lock file format" (according to the FHS).
+                          (format out "~10d~%" pid))
+                        p)))
+               (uiop:rename-file-overwriting-target tmpfile file))
+           (file-error (e)
              (go :try)))
        :try
          (let ((saved-pid
