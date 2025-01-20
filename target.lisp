@@ -433,7 +433,7 @@ inherit a method on `make-load-form', and need only specialize
 (defmethods ref (self name)
   (:method initialize-instance :after (self &key &allow-other-keys)
     (unless (slot-boundp self 'name)
-      (error* "No name")))
+      (error* "No name for by-name reference")))
 
   (:method load-form-slot-names append (self)
     '(name))
