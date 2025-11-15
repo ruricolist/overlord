@@ -191,7 +191,7 @@ For debugging."
                    "unsaved"))))
 
   (:method db.ref (db key)
-    (receive (value bool)
+    (multiple-value-bind (value bool)
         (fset:lookup current-map
                      (assure db-key key))
       (if (eq value tombstone)
@@ -548,7 +548,7 @@ required.")
 
 (defun prop (obj prop &optional default)
   "Look up a property for an object in the database."
-  (receive (val val?) (prop-1 obj prop)
+  (multiple-value-bind (val val?) (prop-1 obj prop)
     (if val?
         (values val t)
         (values default nil))))
