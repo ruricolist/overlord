@@ -1486,7 +1486,7 @@ exists, and as a non-existent prereq if TARGET does not exist."
           (assure stamp
             (funcall hash-fun val))))
     (unless (stamp= old-stamp new-stamp)
-      (unless (stamp= old-stamp never)
+      (unless (typep old-stamp 'never)
         (simple-style-warning "Redefining configuration ~s" name))
       (touch-target name new-stamp))
     val))
