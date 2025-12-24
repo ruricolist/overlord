@@ -158,7 +158,7 @@ shadowed."
        (set :nsec 0)))))
 
 (defun target-timestamp= (ts1 ts2)
-  "Is TS1 greater than TS2?"
+  "Is TS1 equal to TS2?"
   (dispatch-case ((ts1 target-timestamp)
                   (ts2 target-timestamp))
     ((timestamp timestamp)
