@@ -308,6 +308,8 @@ For debugging."
     (declare (ignore key))
     (values))
   (:method db.sync (self)
+    (values))
+  (:method unlock-db (self)
     (values)))
 
 (def db-readtable
