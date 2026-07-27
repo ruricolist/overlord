@@ -1228,13 +1228,13 @@ current package."
 
 (defun file-stamp (file)
   (assert (file-exists-p file))
-  (let ((size (file-size-in-octets file))
+  (let ((size (or (file-size-in-octets file) 0))
         (timestamp (target-timestamp file)))
     (file-meta size timestamp)))
 
 (defun file-stamp/hash (file)
   (let* ((file (ensure-pathname file))
-         (size (file-size-in-octets file))
+         (size (or (file-size-in-octets file) 0))
          (hash (file-digest-string file)))
     (file-hash size hash)))
 
